@@ -1,35 +1,82 @@
-import { z } from "zod";
+export type NivelRiesgo = "Bajo" | "Medio" | "Alto" | "Critico";
 
-export const NivelRiesgoSchema = z.enum(["Bajo", "Medio", "Alto", "Critico"]);
-export type NivelRiesgo = z.infer<typeof NivelRiesgoSchema>;
+export type TipoDetector =
+  | "CashFraud"
+  | "InvoiceAnomaly"
+  | "PaymentFraud"
+  | "ComplianceViolation";
 
-export const TipoDetectorSchema = z.enum([
+export type EstadoAlerta =
+  | "Nueva"
+  | "EnRevision"
+  | "Confirmada"
+  | "FalsoPositivo"
+  | "Cerrada";
+
+export interface AlertaResponse {
+  id: number;
+  tipoDetector: TipoDetector;
+  nivelRiesgo: NivelRiesgo;
+  estado: EstadoAlerta;
+  descripcion: string;
+  score: number;
+  fechaDeteccion: string;
+  empleadoCodigo: string | null;
+  transaccionReferencia: string | null;
+  estacionId: number;
+  estacionNombre: string;
+  metadataJson: string | null;
+}
+
+export interface CambiarEstadoRequest {
+  estado: string;
+}
+
+export interface AsignarAlertaRequest {
+  auditorId: number;
+  comentario: string | null;
+}
+
+export const NIVEL_RIESGO_OPTIONS: NivelRiesgo[] = [
+  "Bajo",
+  "Medio",
+  "Alto",
+  "Critico",
+];
+
+export const TIPO_DETECTOR_OPTIONS: TipoDetector[] = [
   "CashFraud",
   "InvoiceAnomaly",
   "PaymentFraud",
   "ComplianceViolation",
-]);
-export type TipoDetector = z.infer<typeof TipoDetectorSchema>;
+];
 
-export const EstadoAlertaSchema = z.enum([
+export const ESTADO_ALERTA_OPTIONS: EstadoAlerta[] = [
   "Nueva",
   "EnRevision",
   "Confirmada",
   "FalsoPositivo",
   "Cerrada",
-]);
-export type EstadoAlerta = z.infer<typeof EstadoAlertaSchema>;
+];
 
-export const AlertaSchema = z.object({
-  id: z.number(),
-  tipoDetector: TipoDetectorSchema,
-  nivelRiesgo: NivelRiesgoSchema,
-  estado: EstadoAlertaSchema,
-  descripcion: z.string(),
-  score: z.number(),
-  estacionId: z.number(),
-  estacionNombre: z.string(),
-  fechaDeteccion: z.string(),
-});
+export const TIPO_DETECTOR_LABELS: Record<TipoDetector, string> = {
+  CashFraud: "Fraude de Efectivo",
+  InvoiceAnomaly: "Anomalía de Factura",
+  PaymentFraud: "Fraude de Pago",
+  ComplianceViolation: "Violación Normativa",
+};
 
-export type Alerta = z.infer<typeof AlertaSchema>;
+export const NIVEL_RIESGO_LABELS: Record<NivelRiesgo, string> = {
+  Bajo: "Bajo",
+  Medio: "Medio",
+  Alto: "Alto",
+  Critico: "Crítico",
+};
+
+export const ESTADO_ALERTA_LABELS: Record<EstadoAlerta, string> = {
+  Nueva: "Nueva",
+  EnRevision: "En Revisión",
+  Confirmada: "Confirmada",
+  FalsoPositivo: "Falso Positivo",
+  Cerrada: "Cerrada",
+};

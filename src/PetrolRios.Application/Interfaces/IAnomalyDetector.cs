@@ -1,3 +1,5 @@
+using PetrolRios.Application.DTOs.Firebird;
+using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
 namespace PetrolRios.Application.Interfaces;
@@ -20,6 +22,26 @@ public sealed class DetectionContext
     public required string EstacionNombre { get; init; }
     public required DateTime FromWatermark { get; init; }
     public required DateTime ToWatermark { get; init; }
+
+    // Datos extraídos de Firebird (staging)
+    public IReadOnlyList<FacturaDto> Facturas { get; init; } = [];
+    public IReadOnlyList<DetalleFacturaDto> Detalles { get; init; } = [];
+    public IReadOnlyList<CierreTurnoDto> CierresTurno { get; init; } = [];
+    public IReadOnlyList<DepositoTurnoDto> DepositosTurno { get; init; } = [];
+    public IReadOnlyList<AnulacionDto> Anulaciones { get; init; } = [];
+    public IReadOnlyList<CreditoDto> Creditos { get; init; } = [];
+    public IReadOnlyList<TarjetaTurnoDto> TarjetasTurno { get; init; } = [];
+
+    // Reglas de detección configuradas
+    public IReadOnlyList<ReglaDeteccion> Reglas { get; init; } = [];
+
+    // Historial de alertas previas por empleado (para detección de reincidencia)
+    public IReadOnlyDictionary<string, int> AlertasPreviasPorEmpleado { get; init; } =
+        new Dictionary<string, int>();
+
+    // Horario de operación de la estación
+    public TimeOnly HoraApertura { get; init; } = new(6, 0);
+    public TimeOnly HoraCierre { get; init; } = new(22, 0);
 }
 
 /// <summary>

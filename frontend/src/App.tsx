@@ -1,7 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { NotificationProvider } from "@/components/notifications/NotificationProvider";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { AlertasPage } from "@/pages/AlertasPage";
+import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
+import { ReglasPage } from "@/pages/ReglasPage";
+import { UsuariosPage } from "@/pages/UsuariosPage";
+import { LogsPage } from "@/pages/LogsPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,13 +25,49 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <NotificationProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/alertas" element={<AlertasPage />} />
+                  <Route path="/alertas/:id" element={<DetalleAlertaPage />} />
+                </Route>
+              </Route>
+
+              <Route
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["Supervisor", "Administrador"]}
+                  />
+                }
+              >
+                <Route element={<AppLayout />}>
+                  <Route path="/reglas" element={<ReglasPage />} />
+                </Route>
+              </Route>
+
+              <Route
+                element={
+                  <ProtectedRoute allowedRoles={["Administrador"]} />
+                }
+              >
+                <Route element={<AppLayout />}>
+                  <Route path="/usuarios" element={<UsuariosPage />} />
+                  <Route path="/logs" element={<LogsPage />} />
+                </Route>
+              </Route>
+
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </BrowserRouter>
+        </NotificationProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
