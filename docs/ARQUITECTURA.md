@@ -15,12 +15,14 @@ C4Context
 
     System(petrolrios, "PetrolRios Anomaly Detection", "Detecta anomalias transaccionales en estaciones de servicio")
 
+    System_Ext(agents, "Station Agents (x10)", ".NET Worker Service instalado en cada estacion, extrae de Firebird y envia al servidor central")
     System_Ext(firebird, "Bases Firebird", "10 bases de datos Contaplus (solo lectura) en estaciones de servicio")
 
     Rel(auditor, petrolrios, "Revisa alertas", "HTTPS + WebSocket")
     Rel(supervisor, petrolrios, "Configura y supervisa", "HTTPS + WebSocket")
     Rel(admin, petrolrios, "Administra", "HTTPS")
-    Rel(petrolrios, firebird, "Extrae transacciones", "Firebird SQL (solo lectura)")
+    Rel(agents, petrolrios, "Envia lotes de transacciones", "HTTPS/JSON + JWT")
+    Rel(agents, firebird, "Extrae transacciones", "Firebird SQL (solo lectura)")
 ```
 
 ## Nivel 2 — Diagrama de Contenedores
@@ -31,22 +33,26 @@ C4Container
 
     Person(usuario, "Usuario", "Auditor, Supervisor o Administrador")
 
-    Container_Boundary(sistema, "PetrolRios") {
+    Container_Boundary(sistema, "PetrolRios — Servidor Central") {
         Container(frontend, "Frontend SPA", "React 19, TypeScript, Vite, TailwindCSS", "Dashboard, alertas, configuracion")
-        Container(api, "API REST", "ASP.NET Core 9, C# 13", "Endpoints HTTP + autenticacion JWT")
+        Container(api, "API REST", "ASP.NET Core 9, C# 13", "Endpoints HTTP + autenticacion JWT + ingesta")
         Container(signalr, "SignalR Hub", "ASP.NET Core SignalR", "Notificaciones en tiempo real via WebSocket")
         Container(hangfire, "Hangfire Worker", "Hangfire + PostgreSQL", "Ejecuta job de deteccion cada 5 min")
         ContainerDb(postgres, "PostgreSQL 16", "Base de datos central", "Alertas, usuarios, reglas, staging, logs")
     }
 
-    System_Ext(firebird, "10 x Firebird", "Bases Contaplus (solo lectura)")
+    Container_Boundary(estaciones, "Estaciones de Servicio (x10)") {
+        Container(agent, "Station Agent", ".NET Worker Service", "Extrae de Firebird local y envia lotes al servidor")
+        ContainerDb(firebird, "Firebird CONTAC.FDB", "Base Contaplus", "Transacciones locales (solo lectura)")
+    }
 
     Rel(usuario, frontend, "Usa", "HTTPS")
     Rel(frontend, api, "Consume", "HTTPS/JSON")
     Rel(frontend, signalr, "Escucha", "WebSocket")
     Rel(api, postgres, "Lee/Escribe", "Npgsql")
     Rel(hangfire, postgres, "Lee/Escribe", "Npgsql")
-    Rel(hangfire, firebird, "Extrae datos", "FirebirdSql.Data (solo lectura)")
+    Rel(agent, firebird, "Extrae datos", "FirebirdSql.Data (solo lectura)")
+    Rel(agent, api, "POST /api/v1/ingesta", "HTTPS/JSON + JWT")
     Rel(hangfire, signalr, "Notifica alertas", "IHubContext")
     Rel(signalr, postgres, "Lee", "Npgsql")
 ```
@@ -88,9 +94,8 @@ C4Component
         Component(dbcontext, "PetrolRiosDbContext", "EF Core", "Acceso a PostgreSQL")
         Component(repos, "Repositories", "Repository Pattern", "IAlertaRepository, IEstacionRepository, etc.")
         Component(uow, "UnitOfWork", "UoW Pattern", "Transaccionalidad")
-        Component(etl, "EtlOrchestrator", "Servicio", "Extraccion incremental de Firebird")
-        Component(firebird_client, "FirebirdSourceClient", "Dapper", "Queries SQL solo lectura")
-        Component(job, "AnomalyDetectionJob", "Hangfire Job", "Ciclo ETL -> Deteccion -> Notificacion")
+        Component(ingesta_svc, "IngestaService", "Servicio", "Recibe lotes de transacciones de los agentes")
+        Component(job, "AnomalyDetectionJob", "Hangfire Job", "Ciclo Deteccion -> Notificacion (datos ya en staging)")
         Component(hub, "AlertsHub", "SignalR Hub", "Notificaciones en tiempo real")
         Component(jwt_svc, "JwtService", "Servicio", "Generacion y validacion de tokens")
     }
@@ -101,14 +106,13 @@ C4Component
     Rel(auth_svc, jwt_svc, "Genera tokens")
     Rel(auth_svc, repos, "Consulta usuarios")
     Rel(alerta_svc, repos, "CRUD alertas")
-    Rel(job, etl, "Paso 1: Extrae datos")
-    Rel(job, cash_det, "Paso 2: Detecta")
-    Rel(job, invoice_det, "Paso 2: Detecta")
-    Rel(job, payment_det, "Paso 2: Detecta")
-    Rel(job, compliance_det, "Paso 2: Detecta")
+    Rel(ingesta_svc, repos, "Inserta en TransaccionStaging")
+    Rel(job, cash_det, "Paso 1: Detecta")
+    Rel(job, invoice_det, "Paso 1: Detecta")
+    Rel(job, payment_det, "Paso 1: Detecta")
+    Rel(job, compliance_det, "Paso 1: Detecta")
     Rel(cash_det, scoring, "Calcula score")
-    Rel(job, hub, "Paso 3: Notifica")
-    Rel(etl, firebird_client, "Extrae de Firebird")
+    Rel(job, hub, "Paso 2: Notifica")
     Rel(repos, dbcontext, "Accede a datos")
 ```
 
@@ -234,31 +238,52 @@ erDiagram
     USUARIO ||--o{ ASIGNACION_ALERTA : "asignado a"
 ```
 
+## Flujo de ingesta (modelo push — Alternativa B de tesis)
+
+```mermaid
+sequenceDiagram
+    participant AG as Station Agent (x10)
+    participant FB as Firebird local
+    participant API as POST /api/v1/ingesta
+    participant PG as PostgreSQL
+    participant FS as Almacen local (JSON)
+
+    loop Cada N segundos (configurable)
+        AG->>FS: Reintentar lotes pendientes (store-and-forward)
+        FS-->>AG: Lotes JSON pendientes
+        alt Hay pendientes
+            AG->>API: POST lote pendiente
+            API->>PG: INSERT TransaccionStaging + actualizar watermark
+            API-->>AG: 200 OK
+            AG->>FS: Eliminar lote enviado
+        end
+
+        AG->>FB: SELECT desde watermark (solo lectura)
+        FB-->>AG: Facturas, cierres, anulaciones, etc.
+        AG->>API: POST lote nuevo
+        alt Servidor disponible
+            API->>PG: INSERT TransaccionStaging + actualizar watermark
+            API-->>AG: 200 OK
+        else Servidor no disponible
+            AG->>FS: Guardar lote como JSON (store-and-forward)
+        end
+        AG->>AG: Actualizar watermark local
+    end
+```
+
 ## Flujo de deteccion de anomalias
 
 ```mermaid
 sequenceDiagram
     participant HF as Hangfire (cada 5 min)
-    participant ETL as EtlOrchestrator
-    participant FB as Firebird (10 estaciones)
     participant PG as PostgreSQL
     participant DET as Detectores (x4)
     participant SE as ScoringEngine
     participant SR as SignalR Hub
     participant FE as Frontend React
 
-    HF->>ETL: ExecuteAsync()
-    loop Por cada estacion activa
-        ETL->>PG: Leer watermark
-        ETL->>FB: SELECT desde watermark (solo lectura)
-        FB-->>ETL: Facturas, cierres, anulaciones, etc.
-        ETL->>PG: INSERT en TransaccionStaging
-        ETL->>PG: Actualizar watermark
-    end
-    ETL-->>HF: EtlResult
-
     HF->>PG: Obtener estaciones y reglas activas
-    loop Por cada estacion
+    loop Por cada estacion con staging pendiente
         HF->>PG: Leer staging no procesada
         par Ejecucion en paralelo
             HF->>DET: CashFraudDetector.DetectAsync()

@@ -21,6 +21,7 @@ public static class SeedData
         await SeedUsuarioAdminAsync(context);
         await SeedEstacionesAsync(context);
         await SeedReglasDeteccionAsync(context);
+        await SeedAgentUsersAsync(context);
 
         await context.SaveChangesAsync();
     }
@@ -162,5 +163,23 @@ public static class SeedData
                 1.0)
         };
         await context.ReglasDeteccion.AddRangeAsync(reglas);
+    }
+
+    private static async Task SeedAgentUsersAsync(PetrolRiosDbContext context)
+    {
+        // Usuarios tipo Auditor para los Station Agents (1 por estacion)
+        var auditorRol = await context.Roles.FirstAsync(r => r.Nombre == "Auditor");
+        var estaciones = await context.Estaciones.ToListAsync();
+
+        foreach (var est in estaciones)
+        {
+            var email = $"agent-{est.Codigo.ToLower()}@petrolrios.com";
+            var agent = Usuario.Create(
+                email,
+                $"Agente Estacion {est.Codigo}",
+                BCrypt.Net.BCrypt.HashPassword("Agent123!"),
+                auditorRol.Id);
+            await context.Usuarios.AddAsync(agent);
+        }
     }
 }

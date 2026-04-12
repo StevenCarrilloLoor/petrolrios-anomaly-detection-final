@@ -12,17 +12,17 @@ using PetrolRios.Infrastructure.Persistence;
 namespace PetrolRios.Infrastructure.Jobs;
 
 /// <summary>
-/// Job de Hangfire que ejecuta el ciclo completo:
-/// 1. ETL (extracción de Firebird)
-/// 2. Ejecución de los 4 detectores en paralelo
-/// 3. Scoring de riesgo
-/// 4. Persistencia de alertas
-/// 5. Notificación por SignalR
-/// 6. Registro de EjecucionJob con métricas
+/// Job de Hangfire que ejecuta el ciclo de detección de anomalías:
+/// 1. Obtener estaciones activas y reglas
+/// 2. Procesar datos de staging (enviados por agentes de estación)
+/// 3. Ejecución de los 4 detectores en paralelo
+/// 4. Scoring de riesgo
+/// 5. Persistencia de alertas
+/// 6. Notificación por SignalR
+/// 7. Registro de EjecucionJob con métricas
 /// </summary>
 public sealed class AnomalyDetectionJob
 {
-    private readonly IEtlOrchestrator _etlOrchestrator;
     private readonly IEnumerable<IAnomalyDetector> _detectors;
     private readonly IUnitOfWork _unitOfWork;
     private readonly PetrolRiosDbContext _dbContext;
@@ -30,14 +30,12 @@ public sealed class AnomalyDetectionJob
     private readonly ILogger<AnomalyDetectionJob> _logger;
 
     public AnomalyDetectionJob(
-        IEtlOrchestrator etlOrchestrator,
         IEnumerable<IAnomalyDetector> detectors,
         IUnitOfWork unitOfWork,
         PetrolRiosDbContext dbContext,
         IHubContext<AlertsHub> hubContext,
         ILogger<AnomalyDetectionJob> logger)
     {
-        _etlOrchestrator = etlOrchestrator;
         _detectors = detectors;
         _unitOfWork = unitOfWork;
         _dbContext = dbContext;
@@ -57,16 +55,11 @@ public sealed class AnomalyDetectionJob
         {
             _logger.LogInformation("Iniciando ciclo de detección de anomalías");
 
-            // Paso 1: ETL — extraer datos de Firebird
-            var etlResult = await _etlOrchestrator.ExecuteAsync(ct);
-            _logger.LogInformation(
-                "ETL completado: {Procesadas} estaciones, {Extraidas} transacciones, {Errores} errores",
-                etlResult.EstacionesProcesadas, etlResult.TransaccionesExtraidas, etlResult.EstacionesConError);
-
-            // Paso 2: Obtener estaciones activas y reglas
+            // Obtener estaciones activas y reglas
             var estaciones = await _unitOfWork.Estaciones.GetActivasAsync(ct);
             var reglas = await _unitOfWork.ReglasDeteccion.GetActivasAsync(ct);
             var totalAlertas = 0;
+            var estacionesProcesadas = 0;
 
             foreach (var estacion in estaciones)
             {
@@ -74,13 +67,13 @@ public sealed class AnomalyDetectionJob
                 var watermark = await _unitOfWork.Estaciones.GetWatermarkAsync(estacion.Id, ct);
                 var context = await BuildDetectionContextAsync(estacion, watermark, reglas, ct);
 
-                // Paso 3: Ejecutar los 4 detectores en paralelo
+                // Ejecutar los 4 detectores en paralelo
                 var detectionTasks = _detectors
                     .Select(d => d.DetectAsync(context, ct))
                     .ToArray();
                 var results = await Task.WhenAll(detectionTasks);
 
-                // Paso 4: Persistir alertas y notificar
+                // Persistir alertas y notificar
                 foreach (var anomalies in results)
                 {
                     foreach (var anomaly in anomalies)
@@ -99,10 +92,12 @@ public sealed class AnomalyDetectionJob
                         await _dbContext.Alertas.AddAsync(alerta, ct);
                         totalAlertas++;
 
-                        // Paso 5: Notificar por SignalR
+                        // Notificar por SignalR
                         await NotifyAlertAsync(alerta, estacion.Id);
                     }
                 }
+
+                estacionesProcesadas++;
             }
 
             await _dbContext.SaveChangesAsync(ct);
@@ -110,16 +105,16 @@ public sealed class AnomalyDetectionJob
             sw.Stop();
             ejecucion.Completar(
                 totalAlertas,
-                etlResult.EstacionesProcesadas,
-                etlResult.EstacionesConError,
+                estacionesProcesadas,
+                0,
                 sw.Elapsed.TotalSeconds);
             await _dbContext.SaveChangesAsync(ct);
 
             _logger.LogInformation(
                 "Ciclo completado en {Duracion:F2}s: {Alertas} alertas generadas, " +
-                "{Procesadas} estaciones, {Errores} con error",
+                "{Procesadas} estaciones procesadas",
                 sw.Elapsed.TotalSeconds, totalAlertas,
-                etlResult.EstacionesProcesadas, etlResult.EstacionesConError);
+                estacionesProcesadas);
         }
         catch (Exception ex)
         {

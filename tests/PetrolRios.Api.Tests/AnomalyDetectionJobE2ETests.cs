@@ -18,13 +18,12 @@ namespace PetrolRios.Api.Tests;
 
 /// <summary>
 /// Test end-to-end del ciclo completo de detección de anomalías:
-/// ETL -> detectores -> scoring -> persistencia -> notificación por SignalR.
+/// staging (push) -> detectores -> scoring -> persistencia -> notificación por SignalR.
 /// Usa datos sintéticos diseñados para disparar reglas específicas.
 /// </summary>
 public sealed class AnomalyDetectionJobE2ETests : IDisposable
 {
     private readonly PetrolRiosDbContext _dbContext;
-    private readonly Mock<IEtlOrchestrator> _etlMock;
     private readonly Mock<IHubContext<AlertsHub>> _hubMock;
     private readonly Mock<IHubClients> _hubClientsMock;
     private readonly Mock<IClientProxy> _clientProxyMock;
@@ -39,17 +38,6 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
 
         // Seed data mínima
         SeedTestData();
-
-        // Mock ETL — devuelve resultado vacío porque pre-poblamos staging manualmente
-        _etlMock = new Mock<IEtlOrchestrator>();
-        _etlMock.Setup(e => e.ExecuteAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new EtlResult
-            {
-                EstacionesProcesadas = 1,
-                EstacionesConError = 0,
-                TransaccionesExtraidas = 3,
-                WatermarkMaxima = DateTime.UtcNow
-            });
 
         // Mock SignalR hub
         _hubMock = new Mock<IHubContext<AlertsHub>>();
@@ -93,7 +81,6 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         var detectors = sp.GetServices<IAnomalyDetector>();
 
         _job = new AnomalyDetectionJob(
-            _etlMock.Object,
             detectors,
             unitOfWorkMock.Object,
             _dbContext,

@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IReglaService, ReglaService>();
         services.AddScoped<IUsuarioService, UsuarioService>();
         services.AddScoped<ILogService, LogService>();
+        services.AddScoped<IIngestaService, IngestaService>();
 
         return services;
     }

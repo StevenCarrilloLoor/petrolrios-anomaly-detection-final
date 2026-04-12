@@ -6,18 +6,21 @@ Sistema web que detecta anomalias transaccionales en ~13,000-15,000 transaccione
 provenientes de 10 estaciones de servicio de PetrolRios S.A. Ejecuta 4 detectores especializados
 cada 5 minutos y notifica alertas en tiempo real.
 
-## Arquitectura
+## Arquitectura (modelo push — Alternativa B de tesis)
 
 ```mermaid
 graph TB
-    subgraph "Fuentes de datos"
+    subgraph "Estaciones de servicio (x10)"
+        AG1[Station Agent EST-001]
+        AG2[Station Agent EST-002]
+        AGN[Station Agent EST-010]
         FB1[Firebird EST-001]
         FB2[Firebird EST-002]
         FBN[Firebird EST-010]
     end
 
-    subgraph "Backend — ASP.NET Core 9"
-        ETL[ETL Orchestrator]
+    subgraph "Servidor Central — ASP.NET Core 9"
+        ING[Ingesta API]
         HF[Hangfire Job]
         D1[CashFraud Detector]
         D2[InvoiceAnomaly Detector]
@@ -31,9 +34,11 @@ graph TB
     PG[(PostgreSQL 16)]
     FE[Frontend React 19]
 
-    FB1 & FB2 & FBN -->|Solo lectura| ETL
-    ETL --> PG
-    HF --> ETL
+    FB1 -->|Solo lectura| AG1
+    FB2 -->|Solo lectura| AG2
+    FBN -->|Solo lectura| AGN
+    AG1 & AG2 & AGN -->|POST /api/v1/ingesta| ING
+    ING --> PG
     HF --> D1 & D2 & D3 & D4
     D1 & D2 & D3 & D4 --> SE
     SE --> PG
@@ -42,6 +47,11 @@ graph TB
     FE -->|HTTP + WS| API
     FE -->|WebSocket| SR
 ```
+
+> **Modelo push con store-and-forward:** Cada estacion tiene un `.NET Worker Service` (Station Agent)
+> que extrae transacciones de su Firebird local y las envia al servidor central via REST. Si el
+> servidor no esta disponible, el agente almacena los lotes como JSON local y los reintenta en el
+> siguiente ciclo.
 
 ## Stack tecnologico
 
@@ -55,7 +65,8 @@ graph TB
 | Data fetching | TanStack Query, Axios, Zod |
 | Graficos | Recharts |
 | BD central | PostgreSQL 16 |
-| Fuentes | 10 x Firebird (solo lectura) |
+| Agentes | PetrolRios.StationAgent (.NET Worker Service, 1 por estacion) |
+| Fuentes | 10 x Firebird (solo lectura, accedidas por agentes locales) |
 | Testing | xUnit, FluentAssertions, Moq, Testcontainers |
 
 ## Prerrequisitos
@@ -97,6 +108,7 @@ El API arranca en `http://localhost:5000`.
 
 Al iniciar por primera vez, se ejecutan las migraciones y se insertan datos semilla:
 - Usuario admin: `admin@petrolrios.com` / `Admin123!`
+- 10 usuarios agente: `agent-est-001@petrolrios.com` ... `agent-est-010@petrolrios.com` / `Agent123!`
 - 10 estaciones de servicio
 - 12 reglas de deteccion con umbrales por defecto
 
@@ -109,6 +121,29 @@ npm run dev
 ```
 
 Accede a `http://localhost:5173`. Inicia sesion con las credenciales del admin.
+
+### 5. Station Agent (por estacion)
+
+Cada estacion ejecuta un Worker Service que envia transacciones al servidor central.
+
+```bash
+cd src/PetrolRios.StationAgent
+dotnet run
+```
+
+Configurar en `appsettings.json` del agente:
+
+| Parametro | Descripcion | Ejemplo |
+|-----------|------------|---------|
+| `Agent:CodigoEstacion` | Codigo de la estacion | `EST-001` |
+| `Agent:ServerUrl` | URL del servidor central | `http://localhost:5000` |
+| `Agent:IntervaloSegundos` | Frecuencia de extraccion | `300` |
+| `Agent:FirebirdConnectionString` | Conexion a Firebird local (solo lectura) | `User=SYSDBA;Password=masterkey;...` |
+| `Agent:Email` | Credencial JWT del agente | `agent-est-001@petrolrios.com` |
+| `Agent:Password` | Password del agente | `Agent123!` |
+
+El agente implementa **store-and-forward**: si el servidor no responde, los lotes se guardan como JSON
+en `Agent:LocalStorePath` y se reintentan en el siguiente ciclo.
 
 ## Variables de entorno
 
@@ -132,8 +167,9 @@ PetrolRios.sln
 │   ├── PetrolRios.Domain/            Entidades, enums, interfaces de dominio
 │   ├── PetrolRios.Application/       Casos de uso, DTOs, interfaces de repositorios
 │   ├── PetrolRios.Infrastructure/    EF Core, repositorios, Firebird, Hangfire, SignalR
-│   ├── PetrolRios.Api/               Controllers, JWT, middlewares, Program.cs
-│   └── PetrolRios.Detectors/         4 detectores + motor de scoring
+│   ├── PetrolRios.Api/               Controllers, JWT, middlewares, ingesta, Program.cs
+│   ├── PetrolRios.Detectors/         4 detectores + motor de scoring
+│   └── PetrolRios.StationAgent/      Worker Service para estaciones (push model)
 ├── tests/
 │   ├── PetrolRios.Domain.Tests/      Tests de entidades de dominio
 │   ├── PetrolRios.Detectors.Tests/   Tests unitarios de detectores (>80% cobertura)
@@ -222,6 +258,7 @@ npm run lint     # ESLint
 | POST | `/api/v1/auth/login` | Publico | Iniciar sesion |
 | POST | `/api/v1/auth/refresh` | Publico | Renovar JWT |
 | POST | `/api/v1/auth/logout` | Autenticado | Cerrar sesion |
+| POST | `/api/v1/ingesta` | Autenticado | Recibir lote de transacciones (Station Agent) |
 | GET | `/api/v1/dashboard/kpis` | Autenticado | KPIs del sistema |
 | GET | `/api/v1/dashboard/alertas-por-tipo` | Autenticado | Alertas por tipo detector |
 | GET | `/api/v1/dashboard/alertas-por-estacion` | Autenticado | Alertas por estacion |
