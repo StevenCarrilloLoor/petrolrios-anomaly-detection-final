@@ -32,7 +32,7 @@ graph TB
     end
 
     PG[(PostgreSQL 16)]
-    FE[Frontend React 19]
+    FE[Frontend React 18]
 
     FB1 -->|Solo lectura| AG1
     FB2 -->|Solo lectura| AG2
@@ -61,7 +61,7 @@ graph TB
 | Jobs | Hangfire con PostgreSQL storage |
 | Tiempo real | SignalR (WebSockets) |
 | Autenticacion | JWT + Refresh Tokens, RBAC (3 roles) |
-| Frontend | React 19, TypeScript 6, Vite 8, TailwindCSS v4 |
+| Frontend | React 18, TypeScript 5, Vite, TailwindCSS |
 | Data fetching | TanStack Query, Axios, Zod |
 | Graficos | Recharts |
 | BD central | PostgreSQL 16 |
@@ -174,7 +174,7 @@ PetrolRios.sln
 │   ├── PetrolRios.Domain.Tests/      Tests de entidades de dominio
 │   ├── PetrolRios.Detectors.Tests/   Tests unitarios de detectores (>80% cobertura)
 │   └── PetrolRios.Api.Tests/         Tests de integracion y E2E
-├── frontend/                          React 19 + TypeScript + Vite + Tailwind
+├── frontend/                          React 18 + TypeScript + Vite + Tailwind
 │   ├── src/
 │   │   ├── components/               Componentes reutilizables (UI, layout, auth)
 │   │   ├── pages/                    Paginas (Login, Dashboard, Alertas, etc.)

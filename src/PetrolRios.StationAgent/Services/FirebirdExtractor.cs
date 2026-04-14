@@ -33,20 +33,20 @@ public sealed class FirebirdExtractor
     {
         var items = new List<TransaccionBatchItem>();
 
-        items.AddRange(await ExtractTypeAsync<FacturaDto>("Factura", GetFacturasSql, watermark, ct));
-        items.AddRange(await ExtractTypeAsync<DetalleFacturaDto>("DetalleFactura", GetDetallesSql, watermark, ct));
-        items.AddRange(await ExtractTypeAsync<CierreTurnoDto>("CierreTurno", GetCierresSql, watermark, ct));
-        items.AddRange(await ExtractTypeAsync<DepositoTurnoDto>("DepositoTurno", GetDepositosSql, watermark, ct));
-        items.AddRange(await ExtractTypeAsync<AnulacionDto>("Anulacion", GetAnulacionesSql, watermark, ct));
-        items.AddRange(await ExtractTypeAsync<CreditoDto>("Credito", GetCreditosSql, watermark, ct));
-        items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>("TarjetaTurno", GetTarjetasSql, watermark, ct));
+        items.AddRange(await ExtractTypeAsync<FacturaDto>("Factura", GetFacturasSql, watermark, r => r.FechaDocumento, ct));
+        items.AddRange(await ExtractTypeAsync<DetalleFacturaDto>("DetalleFactura", GetDetallesSql, watermark, r => r.FechaDespacho, ct));
+        items.AddRange(await ExtractTypeAsync<CierreTurnoDto>("CierreTurno", GetCierresSql, watermark, r => r.FechaFin, ct));
+        items.AddRange(await ExtractTypeAsync<DepositoTurnoDto>("DepositoTurno", GetDepositosSql, watermark, r => r.FechaDeposito, ct));
+        items.AddRange(await ExtractTypeAsync<AnulacionDto>("Anulacion", GetAnulacionesSql, watermark, r => r.FechaAnulacion, ct));
+        items.AddRange(await ExtractTypeAsync<CreditoDto>("Credito", GetCreditosSql, watermark, r => r.FechaCabecera, ct));
+        items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>("TarjetaTurno", GetTarjetasSql, watermark, _ => DateTime.UtcNow, ct));
 
         _logger.LogInformation("Extraídas {Count} transacciones desde watermark {Watermark:O}", items.Count, watermark);
         return items;
     }
 
     private async Task<IEnumerable<TransaccionBatchItem>> ExtractTypeAsync<T>(
-        string tipoTransaccion, string sql, DateTime watermark, CancellationToken ct)
+        string tipoTransaccion, string sql, DateTime watermark, Func<T, DateTime> fechaSelector, CancellationToken ct)
     {
         try
         {
@@ -58,7 +58,7 @@ public sealed class FirebirdExtractor
             {
                 TipoTransaccion = tipoTransaccion,
                 DataJson = System.Text.Json.JsonSerializer.Serialize(row),
-                FechaOriginal = DateTime.UtcNow
+                FechaOriginal = fechaSelector(row)
             });
         }
         catch (Exception ex)

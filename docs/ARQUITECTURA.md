@@ -34,7 +34,7 @@ C4Container
     Person(usuario, "Usuario", "Auditor, Supervisor o Administrador")
 
     Container_Boundary(sistema, "PetrolRios — Servidor Central") {
-        Container(frontend, "Frontend SPA", "React 19, TypeScript, Vite, TailwindCSS", "Dashboard, alertas, configuracion")
+        Container(frontend, "Frontend SPA", "React 18, TypeScript, Vite, TailwindCSS", "Dashboard, alertas, configuracion")
         Container(api, "API REST", "ASP.NET Core 9, C# 13", "Endpoints HTTP + autenticacion JWT + ingesta")
         Container(signalr, "SignalR Hub", "ASP.NET Core SignalR", "Notificaciones en tiempo real via WebSocket")
         Container(hangfire, "Hangfire Worker", "Hangfire + PostgreSQL", "Ejecuta job de deteccion cada 5 min")
