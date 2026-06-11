@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet new:*)",
+      "Bash(mkdir -p src tests)",
+      "Bash(\"/c/Program Files/dotnet/dotnet.exe\" --list-sdks)",
+      "Bash(\"/c/Program Files/dotnet/dotnet.exe\" --version)",
+      "Read(//c/Program Files/dotnet//**)",
+      "Read(//c/Program Files/dotnet/**)",
+      "Bash(export PATH=\"/c/Program Files/dotnet:$PATH\")",
+      "Bash(dotnet --version)",
+      "Bash(mkdir -p src/PetrolRios.Domain src/PetrolRios.Application src/PetrolRios.Infrastructure src/PetrolRios.Api src/PetrolRios.Detectors)",
+      "Bash(mkdir -p tests/PetrolRios.Domain.Tests tests/PetrolRios.Detectors.Tests tests/PetrolRios.Api.Tests)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet build:*)",
+      "Bash(where node:*)",
+      "Bash(npm --version)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npm ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(dotnet test:*)"
+    ]
+  }
+}

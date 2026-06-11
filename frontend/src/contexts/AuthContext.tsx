@@ -59,10 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return;
-    const conn = createSignalRConnection(token);
-    conn.start().catch(() => {
-      /* SignalR no disponible */
-    });
+    createSignalRConnection(token);
     return () => {
       stopSignalRConnection();
     };

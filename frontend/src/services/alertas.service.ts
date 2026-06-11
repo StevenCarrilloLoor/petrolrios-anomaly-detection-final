@@ -19,7 +19,7 @@ export const alertasService = {
     api.get<AlertaResponse>(`/alertas/${id}`).then((r) => r.data),
 
   cambiarEstado: (id: number, data: CambiarEstadoRequest) =>
-    api.put<AlertaResponse>(`/alertas/${id}/estado`, data).then((r) => r.data),
+    api.patch<AlertaResponse>(`/alertas/${id}/estado`, data).then((r) => r.data),
 
   asignar: (id: number, data: AsignarAlertaRequest) =>
     api.post<AlertaResponse>(`/alertas/${id}/asignar`, data).then((r) => r.data),
