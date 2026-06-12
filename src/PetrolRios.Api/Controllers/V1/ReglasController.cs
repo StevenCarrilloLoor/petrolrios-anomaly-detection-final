@@ -1,20 +1,29 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.Reglas;
 using PetrolRios.Application.Interfaces;
 
 namespace PetrolRios.Api.Controllers.V1;
 
+/// <summary>
+/// Configuración de las reglas del motor de detección (CU-14 / CU-16).
+/// Las reglas están definidas por los 4 detectores del motor; desde aquí se
+/// parametrizan (umbral) y se activan o desactivan. No se crean reglas
+/// arbitrarias: cada parámetro corresponde a lógica implementada en el motor.
+/// </summary>
 [ApiController]
 [Route("api/v1/reglas")]
 [Authorize(Roles = "Supervisor,Administrador")]
 public sealed class ReglasController : ControllerBase
 {
     private readonly IReglaService _reglaService;
+    private readonly ILogService _logService;
 
-    public ReglasController(IReglaService reglaService)
+    public ReglasController(IReglaService reglaService, ILogService logService)
     {
         _reglaService = reglaService;
+        _logService = logService;
     }
 
     /// <summary>
@@ -41,18 +50,7 @@ public sealed class ReglasController : ControllerBase
     }
 
     /// <summary>
-    /// Crear una nueva regla de detección.
-    /// </summary>
-    [HttpPost]
-    [ProducesResponseType(typeof(ReglaDeteccionResponse), StatusCodes.Status201Created)]
-    public async Task<IActionResult> Create([FromBody] CrearReglaRequest request, CancellationToken ct)
-    {
-        var result = await _reglaService.CreateAsync(request, ct);
-        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-    }
-
-    /// <summary>
-    /// Actualizar umbral o estado activo de una regla.
+    /// Actualizar el umbral o el estado activo de una regla del motor.
     /// </summary>
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(ReglaDeteccionResponse), StatusCodes.Status200OK)]
@@ -60,18 +58,11 @@ public sealed class ReglasController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] ActualizarReglaRequest request, CancellationToken ct)
     {
         var result = await _reglaService.UpdateAsync(id, request, ct);
-        return Ok(result);
-    }
 
-    /// <summary>
-    /// Eliminar una regla de detección.
-    /// </summary>
-    [HttpDelete("{id:int}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(int id, CancellationToken ct)
-    {
-        await _reglaService.DeleteAsync(id, ct);
-        return NoContent();
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Actualización de regla de detección", "ReglaDeteccion", id,
+            new { result.Nombre, result.ValorUmbral, result.Activa }, ct: ct);
+
+        return Ok(result);
     }
 }

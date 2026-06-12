@@ -189,3 +189,83 @@ automáticamente en bases existentes.
 
 **Scripts:** `scripts/verificar-mejoras.bat` (restore + migración EF + build + tests +
 build de frontend, con log en `verificacion.log`).
+
+---
+
+# Segunda ronda de mejoras (observaciones del usuario, junio 2026)
+
+## 7. Logs de auditoría funcionales (CU-17)
+
+La tabla `logs_auditoria` existía pero **nada escribía en ella**. Ahora se registra con
+usuario e IP de origen: inicio/cierre de sesión, cambios de estado de alertas,
+asignaciones, comentarios, actualización de reglas y creación/edición/desactivación de
+usuarios (`AuditoriaExtensions` + llamadas en todos los controllers de escritura).
+
+## 8. Monitoreo de Conexiones (pestaña nueva)
+
+- **Endpoint `GET /api/v1/monitoreo/conexiones`:** estado por estación — Conectada /
+  Sin conexión / Nunca conectada (ventana de 10 min), última ingesta, transacciones de
+  las últimas 24 h, históricas y pendientes de análisis.
+- **Endpoint `GET /api/v1/monitoreo/sistema`:** API (versión, uptime, entorno), BD
+  (conectada + latencia en ms), SignalR (clientes conectados en vivo, con contador real
+  en el hub), motor de detección (último ciclo: estado, alertas, duración).
+- **Página "Conexiones"** en el menú Monitoreo con auto-refresco cada 10 s, tarjetas de
+  estado con indicador pulsante y tabla de agentes.
+- **KPI corregido en el dashboard:** "Estaciones Activas: 10" (mentira estática) →
+  **"Estaciones Conectadas X/10"** calculado de verdad con la ingesta de los últimos
+  10 minutos; en rojo si no hay ningún agente conectado.
+
+## 9. Reglas honestas y alertas autoexplicativas
+
+- **Pantalla de Reglas rediseñada:** se eliminó el formulario "Nueva Regla" (era
+  engañoso — un parámetro inventado no ejecuta ninguna lógica). Ahora es la
+  "Configuración del Motor de Detección": reglas agrupadas por detector con icono y
+  descripción, umbral editable inline (Enter para guardar) y switch activar/desactivar.
+  Un aviso explica que la lógica vive en el motor (Strategy Pattern, OE2) y aquí solo se
+  parametriza. Los endpoints POST/DELETE de reglas se retiraron de la API.
+- **Lista de alertas:** cada fila ahora muestra la descripción de la anomalía debajo del
+  tipo (con tooltip del texto completo) — ya no hay que entrar a la alerta para saber de
+  qué se trata.
+
+## 10. Station Agent v2 — panel de control propio
+
+El agente dejó de ser una consola ciega; ahora levanta un **panel web local en
+`http://localhost:5180`** (solo accesible desde la máquina de la estación):
+
+- Estado en vivo: último ciclo y resultado, transacciones enviadas, lotes pendientes
+  de store-and-forward, latencia y última conexión/desconexión con el servidor.
+- Configuración activa visible (estación, servidor, Firebird con password oculto,
+  intervalo, watermark).
+- **Modo automático / manual** (switch): en manual el agente no sincroniza solo y el
+  operador usa el botón **"Sincronizar ahora"**.
+- Botones **"Probar conexión Firebird"** (cuenta documentos en DCTO) y **"Probar
+  conexión al servidor"** (login JWT + latencia).
+- Bitácora de actividad de los últimos 60 eventos.
+- Internamente: `AgentState` (estado observable), `CycleRunner` (ciclo reutilizable por
+  el worker y el panel), `Worker` que respeta el modo manual.
+
+## 11. Plug and play y distribución
+
+- **`ejecutables/`** — todos los .bat organizados por propósito y orden de ejecución
+  (ver `ejecutables/LEEME.md`): `1-INICIO` (INICIAR_TODO / DETENER_TODO), `2-DEMO`,
+  `3-DIAGNOSTICO`, `4-PUBLICACION`, `5-DESARROLLO`.
+- **`INICIAR_TODO.bat`:** un doble clic arranca Docker (lo abre si está cerrado),
+  PostgreSQL, Firebird, la API, el frontend y el agente, espera a que cada servicio
+  responda y abre el navegador con la app y el panel del agente.
+- **La API sirve el frontend compilado** (`wwwroot` + SPA fallback): en producción un
+  solo ejecutable entrega todo.
+- **`publicar.bat`:** genera `dist\PetrolRios-Servidor\PetrolRios.Api.exe` y
+  `dist\PetrolRios-Agente\PetrolRios.StationAgent.exe` (single-file, self-contained,
+  no requieren .NET instalado) y, si Inno Setup 6 está presente, compila los
+  instaladores `PetrolRios-Servidor-Setup.exe` y `PetrolRios-Agente-Setup.exe`
+  (scripts `.iss` incluidos).
+
+## 12. Secciones de la tesis a actualizar (segunda ronda)
+
+1. **4.1.6 módulos:** agregar el módulo de Monitoreo de Conexiones y el panel local del
+   Station Agent (modo manual/automático como control operativo).
+2. **CU-17:** describir las acciones efectivamente auditadas (login, alertas, reglas,
+   usuarios) con IP y usuario.
+3. **7.2 despliegue:** describir la distribución como ejecutables self-contained e
+   instaladores Inno Setup, y la API sirviendo la SPA (un contenedor de despliegue).
+4. **Capturas:** regenerar Reglas, Conexiones y el panel del agente.

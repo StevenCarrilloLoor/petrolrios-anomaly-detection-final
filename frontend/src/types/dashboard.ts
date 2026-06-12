@@ -6,7 +6,8 @@ export interface KpiResponse {
   alertasConfirmadas: number;
   alertasFalsoPositivo: number;
   scorePromedio: number;
-  estacionesActivas: number;
+  estacionesConectadas: number;
+  estacionesTotales: number;
 }
 
 export interface AlertasPorTipoResponse {

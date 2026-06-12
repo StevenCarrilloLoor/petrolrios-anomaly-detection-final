@@ -10,6 +10,11 @@ namespace PetrolRios.Infrastructure.Hubs;
 /// </summary>
 public sealed class AlertsHub : Hub
 {
+    private static int _conexionesActivas;
+
+    /// <summary>Clientes SignalR conectados en este momento (para el panel de monitoreo).</summary>
+    public static int ConexionesActivas => Volatile.Read(ref _conexionesActivas);
+
     private readonly ILogger<AlertsHub> _logger;
 
     public AlertsHub(ILogger<AlertsHub> logger)
@@ -19,6 +24,7 @@ public sealed class AlertsHub : Hub
 
     public override async Task OnConnectedAsync()
     {
+        Interlocked.Increment(ref _conexionesActivas);
         var httpContext = Context.GetHttpContext();
         var rol = httpContext?.Request.Query["rol"].ToString();
         var estacionId = httpContext?.Request.Query["estacionId"].ToString();
@@ -54,6 +60,7 @@ public sealed class AlertsHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        Interlocked.Decrement(ref _conexionesActivas);
         _logger.LogDebug("Cliente {Id} desconectado", Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }

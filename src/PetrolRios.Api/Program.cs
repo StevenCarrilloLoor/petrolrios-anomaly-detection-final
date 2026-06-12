@@ -154,6 +154,16 @@ try
 
     app.UseSerilogRequestLogging();
     app.UseCors("Frontend");
+
+    // Frontend compilado (wwwroot): en producción la API sirve la SPA — un solo ejecutable
+    var sirveFrontend = Directory.Exists(Path.Combine(app.Environment.ContentRootPath, "wwwroot"))
+        && File.Exists(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "index.html"));
+    if (sirveFrontend)
+    {
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+    }
+
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();
@@ -172,15 +182,25 @@ try
         job => job.ExecuteAsync(CancellationToken.None),
         cronExpression);
 
-    app.MapGet("/", () => Results.Ok(new { Status = "PetrolRíos API v1 operativa" }));
+    if (sirveFrontend)
+    {
+        // SPA fallback: cualquier ruta no-API devuelve el index del frontend
+        app.MapFallbackToFile("index.html");
+    }
+    else
+    {
+        app.MapGet("/", () => Results.Ok(new { Status = "PetrolRíos API v1 operativa" }));
+    }
 
     // Migraciones y seed data
     await SeedData.InitializeAsync(app.Services);
 
     app.Run();
 }
-catch (Exception ex)
+catch (Exception ex) when (ex is not Microsoft.Extensions.Hosting.HostAbortedException)
 {
+    // HostAbortedException debe propagarse: la lanzan el tooling de EF Core
+    // (migraciones) y WebApplicationFactory (tests de integración).
     Log.Fatal(ex, "La aplicación falló al iniciar");
 }
 finally

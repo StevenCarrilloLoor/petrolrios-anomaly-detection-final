@@ -61,6 +61,28 @@ public sealed class ServerClient
         return false;
     }
 
+    /// <summary>
+    /// Prueba la conexión y autenticación con el servidor central (panel del agente).
+    /// Mide la latencia del login JWT.
+    /// </summary>
+    public async Task<(bool Ok, string Mensaje, double? LatenciaMs)> ProbarConexionAsync(CancellationToken ct)
+    {
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            _token = null; // Forzar autenticación real
+            await EnsureAuthenticatedAsync(ct);
+            sw.Stop();
+            return (true,
+                $"Autenticado contra {_httpClient.BaseAddress} en {sw.Elapsed.TotalMilliseconds:F0} ms",
+                Math.Round(sw.Elapsed.TotalMilliseconds, 1));
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message, null);
+        }
+    }
+
     private async Task EnsureAuthenticatedAsync(CancellationToken ct)
     {
         if (_token is not null && DateTime.UtcNow < _tokenExpiration.AddMinutes(-5))

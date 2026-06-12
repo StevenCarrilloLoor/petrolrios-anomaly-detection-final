@@ -82,6 +82,14 @@ public sealed class PetrolRiosWebApplicationFactory : WebApplicationFactory<Prog
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+
+        // Con minimal hosting, appsettings.{Environment}.json tiene prioridad sobre
+        // ConfigureAppConfiguration del factory. Las variables de entorno se cargan
+        // DESPUÉS de los json, así que son la vía fiable para inyectar el
+        // connection string del Testcontainer (la paralelización está deshabilitada
+        // en AssemblyInfo.cs para evitar carreras entre fixtures).
+        Environment.SetEnvironmentVariable("ConnectionStrings__PostgreSQL", _postgres.GetConnectionString());
+        Environment.SetEnvironmentVariable("ConnectionStrings__Hangfire", _postgres.GetConnectionString());
     }
 
     async Task IAsyncLifetime.DisposeAsync()

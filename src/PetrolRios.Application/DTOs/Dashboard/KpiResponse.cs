@@ -9,7 +9,12 @@ public sealed record KpiResponse
     public int AlertasConfirmadas { get; init; }
     public int AlertasFalsoPositivo { get; init; }
     public double ScorePromedio { get; init; }
-    public int EstacionesActivas { get; init; }
+
+    /// <summary>Estaciones con agente conectado (ingesta en los últimos 10 minutos).</summary>
+    public int EstacionesConectadas { get; init; }
+
+    /// <summary>Total de estaciones registradas y activas en el sistema.</summary>
+    public int EstacionesTotales { get; init; }
 }
 
 public sealed record AlertasPorTipoResponse(string TipoDetector, int Cantidad);

@@ -26,6 +26,25 @@ public sealed class FirebirdExtractor
     private FbConnection CreateConnection() => new(_connectionString);
 
     /// <summary>
+    /// Prueba la conexión a la base Firebird local (panel de control del agente).
+    /// Devuelve el total de documentos en DCTO si la conexión es exitosa.
+    /// </summary>
+    public async Task<(bool Ok, string Mensaje, long? TotalDocumentos)> ProbarConexionAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var connection = CreateConnection();
+            var total = await connection.ExecuteScalarAsync<long>(
+                new CommandDefinition("SELECT COUNT(*) FROM DCTO", cancellationToken: ct));
+            return (true, $"Conexión exitosa — {total:N0} documentos en DCTO", total);
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message, null);
+        }
+    }
+
+    /// <summary>
     /// Extrae todas las transacciones nuevas desde la marca de agua indicada.
     /// Retorna un diccionario: TipoTransaccion → lista de objetos serializados a JSON.
     /// </summary>

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.Usuarios;
 using PetrolRios.Application.Interfaces;
 
@@ -11,10 +12,12 @@ namespace PetrolRios.Api.Controllers.V1;
 public sealed class UsuariosController : ControllerBase
 {
     private readonly IUsuarioService _usuarioService;
+    private readonly ILogService _logService;
 
-    public UsuariosController(IUsuarioService usuarioService)
+    public UsuariosController(IUsuarioService usuarioService, ILogService logService)
     {
         _usuarioService = usuarioService;
+        _logService = logService;
     }
 
     /// <summary>
@@ -65,6 +68,11 @@ public sealed class UsuariosController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CrearUsuarioRequest request, CancellationToken ct)
     {
         var result = await _usuarioService.CreateAsync(request, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Creación de usuario", "Usuario", result.Id,
+            new { result.Email, result.Rol }, ct: ct);
+
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -77,6 +85,11 @@ public sealed class UsuariosController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] ActualizarUsuarioRequest request, CancellationToken ct)
     {
         var result = await _usuarioService.UpdateAsync(id, request, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Actualización de usuario", "Usuario", id,
+            new { result.Email, result.Rol, result.Activo }, ct: ct);
+
         return Ok(result);
     }
 
@@ -89,6 +102,10 @@ public sealed class UsuariosController : ControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         await _usuarioService.DeleteAsync(id, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Desactivación de usuario", "Usuario", id, ct: ct);
+
         return NoContent();
     }
 }

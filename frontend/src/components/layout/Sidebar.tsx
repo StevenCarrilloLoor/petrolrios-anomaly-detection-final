@@ -9,6 +9,7 @@ import {
   FileText,
   Shield,
   BarChart3,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,7 @@ const navSections: NavSection[] = [
     items: [
       { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
       { to: "/alertas", label: "Alertas", icon: <AlertTriangle size={20} /> },
+      { to: "/conexiones", label: "Conexiones", icon: <Radio size={20} /> },
     ],
   },
   {

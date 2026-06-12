@@ -9,7 +9,8 @@ namespace PetrolRios.Api.Tests;
 /// Tests de integración para autenticación y autorización JWT.
 /// Usa PostgreSQL real vía Testcontainers.
 /// </summary>
-public sealed class AuthIntegrationTests : IClassFixture<PetrolRiosWebApplicationFactory>
+[Collection("Integracion")]
+public sealed class AuthIntegrationTests
 {
     private readonly HttpClient _client;
 

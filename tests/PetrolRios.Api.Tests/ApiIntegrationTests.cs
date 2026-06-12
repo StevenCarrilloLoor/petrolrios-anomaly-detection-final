@@ -9,7 +9,8 @@ namespace PetrolRios.Api.Tests;
 /// <summary>
 /// Tests de integración para los endpoints de Dashboard y Alertas.
 /// </summary>
-public sealed class ApiIntegrationTests : IClassFixture<PetrolRiosWebApplicationFactory>
+[Collection("Integracion")]
+public sealed class ApiIntegrationTests
 {
     private readonly HttpClient _client;
 

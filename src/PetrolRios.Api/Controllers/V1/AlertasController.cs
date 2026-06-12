@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.Alertas;
 using PetrolRios.Application.DTOs.Common;
 using PetrolRios.Application.Interfaces;
@@ -13,10 +14,12 @@ namespace PetrolRios.Api.Controllers.V1;
 public sealed class AlertasController : ControllerBase
 {
     private readonly IAlertaService _alertaService;
+    private readonly ILogService _logService;
 
-    public AlertasController(IAlertaService alertaService)
+    public AlertasController(IAlertaService alertaService, ILogService logService)
     {
         _alertaService = alertaService;
+        _logService = logService;
     }
 
     /// <summary>
@@ -61,6 +64,11 @@ public sealed class AlertasController : ControllerBase
     public async Task<IActionResult> CambiarEstado(int id, [FromBody] CambiarEstadoRequest request, CancellationToken ct)
     {
         var result = await _alertaService.CambiarEstadoAsync(id, request, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            $"Cambio de estado de alerta a '{result.Estado}'", "Alerta", id,
+            new { result.Estado, result.TipoDetector }, ct: ct);
+
         return Ok(result);
     }
 
@@ -74,6 +82,11 @@ public sealed class AlertasController : ControllerBase
     public async Task<IActionResult> Asignar(int id, [FromBody] AsignarAlertaRequest request, CancellationToken ct)
     {
         await _alertaService.AsignarAsync(id, request, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Asignación de alerta a auditor", "Alerta", id,
+            new { request.AuditorId }, ct: ct);
+
         return NoContent();
     }
 
@@ -102,6 +115,10 @@ public sealed class AlertasController : ControllerBase
             return Unauthorized();
 
         var result = await _alertaService.AgregarComentarioAsync(id, usuarioId, request, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Comentario de auditoría agregado", "Alerta", id, ct: ct);
+
         return CreatedAtAction(nameof(GetComentarios), new { id }, result);
     }
 }

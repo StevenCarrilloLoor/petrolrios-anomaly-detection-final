@@ -1,15 +1,64 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reglasService } from "@/services/reglas.service";
-import { Spinner } from "@/components/ui/Spinner";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import type { ReglaDeteccionResponse } from "@/types/regla";
-import { Settings, Plus, Save, X } from "lucide-react";
+import { TIPO_DETECTOR_LABELS } from "@/types/alert";
+import type { TipoDetector } from "@/types/alert";
+import {
+  Banknote,
+  ReceiptText,
+  CreditCard,
+  ShieldAlert,
+  Save,
+  X,
+  Pencil,
+  Info,
+} from "lucide-react";
+import type { ReactNode } from "react";
+
+const ORDEN_DETECTORES: TipoDetector[] = [
+  "CashFraud",
+  "InvoiceAnomaly",
+  "PaymentFraud",
+  "ComplianceViolation",
+];
+
+const DETECTOR_META: Record<
+  TipoDetector,
+  { icono: ReactNode; color: string; descripcion: string }
+> = {
+  CashFraud: {
+    icono: <Banknote size={18} />,
+    color: "text-risk-high bg-risk-high/10",
+    descripcion:
+      "Irregularidades en el manejo de efectivo: faltantes, gineteo y ventas registradas como crédito.",
+  },
+  InvoiceAnomaly: {
+    icono: <ReceiptText size={18} />,
+    color: "text-primary bg-primary/10",
+    descripcion:
+      "Discrepancias documentales: anulaciones, precios, descuentos y aritmética de la factura.",
+  },
+  PaymentFraud: {
+    icono: <CreditCard size={18} />,
+    color: "text-risk-medium bg-risk-medium/10",
+    descripcion:
+      "Manipulación de medios de pago: reversiones, duplicados, créditos y despachos sospechosos.",
+  },
+  ComplianceViolation: {
+    icono: <ShieldAlert size={18} />,
+    color: "text-risk-critical bg-risk-critical/10",
+    descripcion:
+      "Incumplimiento normativo ARCERNNR/SRI: placa genérica, trazabilidad y combustibles.",
+  },
+};
 
 export function ReglasPage() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
 
   const { data: reglas, isLoading } = useQuery({
     queryKey: ["reglas"],
@@ -30,14 +79,6 @@ export function ReglasPage() {
     },
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: ({ id, activa }: { id: number; activa: boolean }) =>
-      reglasService.update(id, { activa }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["reglas"] });
-    },
-  });
-
   function startEdit(regla: ReglaDeteccionResponse) {
     setEditingId(regla.id);
     setEditValue(regla.valorUmbral.toString());
@@ -52,243 +93,164 @@ export function ReglasPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Spinner size="lg" />
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-48" />
+        ))}
       </div>
     );
   }
 
+  const grupos = ORDEN_DETECTORES.map((detector) => ({
+    detector,
+    reglas: (reglas ?? []).filter((r) => r.tipoDetector === detector),
+  })).filter((g) => g.reglas.length > 0);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="text-2xl font-bold text-foreground">
-          Reglas de Detección
+          Configuración del Motor de Detección
         </h1>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus size={16} /> Nueva Regla
-        </button>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Parametrice los umbrales y active o desactive las reglas de los 4
+          detectores (CU-14)
+        </p>
       </div>
 
-      {showCreate && (
-        <CreateReglaForm onClose={() => setShowCreate(false)} />
-      )}
+      <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <Info size={18} className="mt-0.5 shrink-0 text-primary" />
+        <p className="text-sm text-muted-foreground">
+          La lógica de cada regla está implementada en el motor de detección
+          (Strategy Pattern, tesis OE2). Desde esta pantalla se{" "}
+          <span className="font-medium text-foreground">
+            ajusta el umbral y se habilita o deshabilita
+          </span>{" "}
+          cada regla sin tocar código; el cambio se aplica en el siguiente ciclo
+          de análisis y queda registrado en los logs de auditoría.
+        </p>
+      </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                Nombre
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                Detector
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                Parámetro
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                Umbral
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                Estado
-              </th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {reglas?.map((regla) => (
-              <tr key={regla.id} className="border-t border-border">
-                <td className="px-4 py-3">
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {regla.nombre}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
+      {grupos.map(({ detector, reglas: reglasGrupo }) => {
+        const meta = DETECTOR_META[detector];
+        const activas = reglasGrupo.filter((r) => r.activa).length;
+        return (
+          <Card key={detector}>
+            <CardHeader
+              title={TIPO_DETECTOR_LABELS[detector]}
+              subtitle={meta.descripcion}
+              action={
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">
+                    {activas}/{reglasGrupo.length} activas
+                  </span>
+                  <div className={`rounded-lg p-2 ${meta.color}`}>{meta.icono}</div>
+                </div>
+              }
+            />
+            <CardContent className="p-0">
+              {reglasGrupo.map((regla, idx) => (
+                <div
+                  key={regla.id}
+                  className={`flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between ${
+                    idx > 0 ? "border-t border-border" : ""
+                  } ${!regla.activa ? "opacity-60" : ""}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-foreground">{regla.nombre}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {regla.descripcion}
                     </p>
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground/60">
+                      {regla.parametroNombre}
+                    </p>
                   </div>
-                </td>
-                <td className="px-4 py-3">{regla.tipoDetector}</td>
-                <td className="px-4 py-3 font-mono text-xs">
-                  {regla.parametroNombre}
-                </td>
-                <td className="px-4 py-3">
-                  {editingId === regla.id ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="w-24 rounded border border-border bg-background px-2 py-1 text-sm"
-                        step="0.01"
-                      />
+
+                  <div className="flex shrink-0 items-center gap-4">
+                    {/* Umbral */}
+                    {editingId === regla.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveEdit(regla.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          autoFocus
+                          className="w-24 rounded-md border border-primary bg-background px-2 py-1.5 text-sm focus:outline-none"
+                          step="0.01"
+                        />
+                        <button
+                          onClick={() => saveEdit(regla.id)}
+                          disabled={updateMutation.isPending}
+                          className="rounded-md bg-primary p-1.5 text-primary-foreground hover:bg-primary/90"
+                          title="Guardar"
+                        >
+                          <Save size={14} />
+                        </button>
+                        <button
+                          onClick={() => setEditingId(null)}
+                          className="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted"
+                          title="Cancelar"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
                       <button
-                        onClick={() => saveEdit(regla.id)}
-                        className="text-primary hover:text-primary/80"
+                        onClick={() => startEdit(regla)}
+                        className="group flex items-center gap-2 rounded-md border border-border px-3 py-1.5 hover:border-primary"
+                        title="Editar umbral"
                       >
-                        <Save size={16} />
+                        <span className="text-xs text-muted-foreground">Umbral</span>
+                        <span className="font-mono text-sm font-semibold text-foreground">
+                          {regla.valorUmbral}
+                        </span>
+                        <Pencil
+                          size={12}
+                          className="text-muted-foreground/50 group-hover:text-primary"
+                        />
                       </button>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
+                    )}
+
+                    {/* Switch activa */}
                     <button
-                      onClick={() => startEdit(regla)}
-                      className="font-mono hover:text-primary"
+                      role="switch"
+                      aria-checked={regla.activa}
+                      onClick={() =>
+                        updateMutation.mutate({
+                          id: regla.id,
+                          data: { activa: !regla.activa },
+                        })
+                      }
+                      className={`relative h-6 w-11 rounded-full transition-colors ${
+                        regla.activa ? "bg-risk-low" : "bg-muted-foreground/30"
+                      }`}
+                      title={regla.activa ? "Desactivar regla" : "Activar regla"}
                     >
-                      {regla.valorUmbral}
+                      <span
+                        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                          regla.activa ? "left-[22px]" : "left-0.5"
+                        }`}
+                      />
                     </button>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() =>
-                      toggleMutation.mutate({
-                        id: regla.id,
-                        activa: !regla.activa,
-                      })
-                    }
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      regla.activa
-                        ? "bg-green-500/20 text-green-600"
-                        : "bg-gray-500/20 text-gray-500"
-                    }`}
-                  >
-                    {regla.activa ? "Activa" : "Inactiva"}
-                  </button>
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => startEdit(regla)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <Settings size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function CreateReglaForm({ onClose }: { onClose: () => void }) {
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    tipoDetector: "",
-    nombre: "",
-    descripcion: "",
-    parametroNombre: "",
-    valorUmbral: "",
-  });
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      reglasService.create({
-        ...form,
-        valorUmbral: parseFloat(form.valorUmbral),
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["reglas"] });
-      onClose();
-    },
-  });
-
-  return (
-    <div className="rounded-lg border border-border bg-background p-6">
-      <h3 className="mb-4 text-lg font-semibold">Nueva Regla</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium">
-            Tipo Detector
-          </label>
-          <select
-            value={form.tipoDetector}
-            onChange={(e) =>
-              setForm({ ...form, tipoDetector: e.target.value })
-            }
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Seleccionar...</option>
-            <option value="CashFraud">CashFraud</option>
-            <option value="InvoiceAnomaly">InvoiceAnomaly</option>
-            <option value="PaymentFraud">PaymentFraud</option>
-            <option value="ComplianceViolation">ComplianceViolation</option>
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Nombre</label>
-          <input
-            value={form.nombre}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-sm font-medium">
-            Descripción
-          </label>
-          <input
-            value={form.descripcion}
-            onChange={(e) =>
-              setForm({ ...form, descripcion: e.target.value })
-            }
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Parámetro</label>
-          <input
-            value={form.parametroNombre}
-            onChange={(e) =>
-              setForm({ ...form, parametroNombre: e.target.value })
-            }
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">
-            Valor Umbral
-          </label>
-          <input
-            type="number"
-            value={form.valorUmbral}
-            onChange={(e) =>
-              setForm({ ...form, valorUmbral: e.target.value })
-            }
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            step="0.01"
-          />
-        </div>
-      </div>
-      <div className="mt-4 flex gap-3">
-        <button
-          onClick={() => createMutation.mutate()}
-          disabled={
-            createMutation.isPending || !form.nombre || !form.tipoDetector
-          }
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          Crear
-        </button>
-        <button
-          onClick={onClose}
-          className="rounded-md border border-border px-4 py-2 text-sm"
-        >
-          Cancelar
-        </button>
-      </div>
+                    <span
+                      className={`w-14 text-xs font-semibold ${
+                        regla.activa ? "text-risk-low" : "text-muted-foreground"
+                      }`}
+                    >
+                      {regla.activa ? "Activa" : "Inactiva"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

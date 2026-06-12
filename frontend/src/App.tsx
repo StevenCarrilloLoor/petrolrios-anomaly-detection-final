@@ -8,6 +8,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { AlertasPage } from "@/pages/AlertasPage";
 import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
+import { ConexionesPage } from "@/pages/ConexionesPage";
 import { ReglasPage } from "@/pages/ReglasPage";
 import { ReportesPage } from "@/pages/ReportesPage";
 import { UsuariosPage } from "@/pages/UsuariosPage";
@@ -37,6 +38,7 @@ function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/alertas" element={<AlertasPage />} />
                   <Route path="/alertas/:id" element={<DetalleAlertaPage />} />
+                  <Route path="/conexiones" element={<ConexionesPage />} />
                 </Route>
               </Route>
 

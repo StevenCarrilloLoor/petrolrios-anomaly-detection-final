@@ -7,7 +7,8 @@ namespace PetrolRios.Api.Tests;
 /// Test básico de disponibilidad del API.
 /// Tests de autenticación y endpoints completos están en AuthIntegrationTests y ApiIntegrationTests.
 /// </summary>
-public sealed class HealthCheckTests : IClassFixture<PetrolRiosWebApplicationFactory>
+[Collection("Integracion")]
+public sealed class HealthCheckTests
 {
     private readonly HttpClient _client;
 

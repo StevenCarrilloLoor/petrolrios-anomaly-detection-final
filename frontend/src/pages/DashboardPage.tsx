@@ -206,10 +206,14 @@ export function DashboardPage() {
         />
         <KpiCard
           icon={<Building2 size={20} />}
-          title="Estaciones Activas"
-          value={kpis?.estacionesActivas ?? 0}
-          color="text-risk-low"
-          detail="Monitoreadas cada 5–10 min"
+          title="Estaciones Conectadas"
+          value={`${kpis?.estacionesConectadas ?? 0}/${kpis?.estacionesTotales ?? 0}`}
+          color={
+            (kpis?.estacionesConectadas ?? 0) > 0
+              ? "text-risk-low"
+              : "text-risk-critical"
+          }
+          detail="Agentes con ingesta en los últimos 10 min"
         />
       </div>
 

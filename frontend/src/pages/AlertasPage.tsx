@@ -200,8 +200,16 @@ export function AlertasPage() {
                     <td className="px-4 py-3 font-mono text-muted-foreground">
                       #{alerta.id}
                     </td>
-                    <td className="px-4 py-3 font-medium">
-                      {TIPO_DETECTOR_LABELS[alerta.tipoDetector]}
+                    <td className="max-w-md px-4 py-3">
+                      <p className="font-medium">
+                        {TIPO_DETECTOR_LABELS[alerta.tipoDetector]}
+                      </p>
+                      <p
+                        className="mt-0.5 truncate text-xs text-muted-foreground"
+                        title={alerta.descripcion}
+                      >
+                        {alerta.descripcion}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="risk" riskLevel={alerta.nivelRiesgo}>

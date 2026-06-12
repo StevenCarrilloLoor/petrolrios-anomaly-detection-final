@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.Auth;
 using PetrolRios.Application.Interfaces;
 
@@ -10,10 +11,12 @@ namespace PetrolRios.Api.Controllers.V1;
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly ILogService _logService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, ILogService logService)
     {
         _authService = authService;
+        _logService = logService;
     }
 
     /// <summary>
@@ -26,6 +29,11 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         var response = await _authService.LoginAsync(request, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Inicio de sesión", "Usuario", response.Usuario.Id,
+            new { response.Usuario.Email }, usuarioIdExplicito: response.Usuario.Id, ct: ct);
+
         return Ok(response);
     }
 
@@ -51,6 +59,10 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Logout([FromBody] RefreshRequest request, CancellationToken ct)
     {
         await _authService.LogoutAsync(request.RefreshToken, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Cierre de sesión", "Usuario", ct: ct);
+
         return NoContent();
     }
 }

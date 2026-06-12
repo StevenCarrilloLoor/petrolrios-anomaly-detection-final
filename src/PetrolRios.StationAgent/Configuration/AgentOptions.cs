@@ -25,4 +25,10 @@ public sealed class AgentOptions
 
     /// <summary>Ruta local para store-and-forward cuando no hay conectividad.</summary>
     public string LocalStorePath { get; set; } = "pending";
+
+    /// <summary>Puerto del panel de control local del agente (default: 5180).</summary>
+    public int PanelPuerto { get; set; } = 5180;
+
+    /// <summary>Si es false, el agente arranca en modo manual (no sincroniza solo).</summary>
+    public bool InicioAutomatico { get; set; } = true;
 }

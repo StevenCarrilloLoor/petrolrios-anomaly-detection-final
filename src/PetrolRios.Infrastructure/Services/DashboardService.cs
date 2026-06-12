@@ -22,6 +22,14 @@ public sealed class DashboardService : IDashboardService
     {
         var alertas = _dbContext.Alertas.AsQueryable();
 
+        // Estaciones conectadas de verdad: con ingesta del agente en los últimos 10 minutos
+        var limiteConexion = DateTime.UtcNow - MonitoreoService.VentanaConexion;
+        var conectadas = await _dbContext.TransaccionesStaging
+            .Where(s => s.CreatedAt >= limiteConexion)
+            .Select(s => s.EstacionId)
+            .Distinct()
+            .CountAsync(ct);
+
         return new KpiResponse
         {
             TotalAlertas = await alertas.CountAsync(ct),
@@ -31,7 +39,8 @@ public sealed class DashboardService : IDashboardService
             AlertasConfirmadas = await alertas.CountAsync(a => a.Estado == EstadoAlerta.Confirmada, ct),
             AlertasFalsoPositivo = await alertas.CountAsync(a => a.Estado == EstadoAlerta.FalsoPositivo, ct),
             ScorePromedio = await alertas.AnyAsync(ct) ? await alertas.AverageAsync(a => a.Score, ct) : 0,
-            EstacionesActivas = await _dbContext.Estaciones.CountAsync(e => e.Activa, ct)
+            EstacionesConectadas = conectadas,
+            EstacionesTotales = await _dbContext.Estaciones.CountAsync(e => e.Activa, ct)
         };
     }
 
