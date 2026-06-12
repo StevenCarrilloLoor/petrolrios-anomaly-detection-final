@@ -65,7 +65,7 @@ export function ReportesPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Reportes</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Genere reportes consolidados de alertas en PDF o Excel (CU-12)
+          Genere reportes consolidados de alertas en PDF o Excel
         </p>
       </div>
 

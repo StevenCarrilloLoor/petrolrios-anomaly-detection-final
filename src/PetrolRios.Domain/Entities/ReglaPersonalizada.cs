@@ -1,0 +1,40 @@
+namespace PetrolRios.Domain.Entities;
+
+/// <summary>
+/// Regla de negocio definida por el usuario desde la interfaz (sin tocar código).
+/// La evalúa el detector genérico <c>CustomRuleDetector</c> en cada ciclo:
+/// filtra los registros de la fuente con las condiciones (AND) y, opcionalmente,
+/// agrupa y compara un agregado contra un umbral.
+/// </summary>
+public class ReglaPersonalizada : BaseEntity
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+
+    /// <summary>Fuente de datos: Factura, CierreTurno, DetalleFactura, Credito o TarjetaTurno.</summary>
+    public string FuenteDatos { get; set; } = string.Empty;
+
+    /// <summary>Condiciones de filtrado (JSON): [{"campo","operador","valor"}], combinadas con AND.</summary>
+    public string CondicionesJson { get; set; } = "[]";
+
+    /// <summary>Agregación opcional (JSON): {"agruparPor","funcion","campo","operador","umbral"}.</summary>
+    public string? AgregacionJson { get; set; }
+
+    /// <summary>Riesgo base de la alerta generada (1–100); el motor de scoring aplica multiplicadores.</summary>
+    public double RiesgoBase { get; set; } = 50;
+
+    public bool Activa { get; set; } = true;
+
+    public static ReglaPersonalizada Create(
+        string nombre, string descripcion, string fuenteDatos,
+        string condicionesJson, string? agregacionJson, double riesgoBase) =>
+        new()
+        {
+            Nombre = nombre,
+            Descripcion = descripcion,
+            FuenteDatos = fuenteDatos,
+            CondicionesJson = condicionesJson,
+            AgregacionJson = agregacionJson,
+            RiesgoBase = riesgoBase
+        };
+}

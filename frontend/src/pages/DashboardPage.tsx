@@ -206,14 +206,14 @@ export function DashboardPage() {
         />
         <KpiCard
           icon={<Building2 size={20} />}
-          title="Estaciones Conectadas"
-          value={`${kpis?.estacionesConectadas ?? 0}/${kpis?.estacionesTotales ?? 0}`}
+          title="Estaciones en Línea"
+          value={`${kpis?.estacionesConectadas ?? 0} de ${kpis?.estacionesTotales ?? 0}`}
           color={
             (kpis?.estacionesConectadas ?? 0) > 0
               ? "text-risk-low"
               : "text-risk-critical"
           }
-          detail="Agentes con ingesta en los últimos 10 min"
+          detail="Agentes con señal de vida (las estaciones se registran solas)"
         />
       </div>
 
@@ -235,7 +235,7 @@ export function DashboardPage() {
           icon={<Target size={18} />}
           title="Tasa de alertas válidas"
           value={`${metricas?.tasaAlertasValidas ?? 0}%`}
-          description="Alertas confirmadas sobre el total resuelto (meta OE2: > 90%)"
+          description="Alertas confirmadas sobre el total resuelto (meta institucional: > 90%)"
         />
         <MetricaCard
           icon={<Activity size={18} />}
@@ -409,7 +409,7 @@ export function DashboardPage() {
         <Card>
           <CardHeader
             title="Empleados con más alertas"
-            subtitle="Ranking de riesgo por despachador (CU-13)"
+            subtitle="Ranking de riesgo por despachador"
             action={<Users size={18} className="text-muted-foreground" />}
           />
           <CardContent className="p-0">

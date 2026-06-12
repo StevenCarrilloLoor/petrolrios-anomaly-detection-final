@@ -50,6 +50,8 @@ export function AlertasPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["alertas", filters],
     queryFn: () => alertasService.getAll(filters),
+    // Además del refresco por SignalR, sondeo de respaldo cada 15 s
+    refetchInterval: 15_000,
   });
 
   const hayFiltros =

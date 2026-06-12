@@ -71,7 +71,7 @@ export function LoginPage() {
         </div>
 
         <p className="text-xs text-slate-500">
-          Proyecto de titulación — Ingeniería de Software · UDLA · 2026
+          PetrolRíos S.A. · Plataforma de Auditoría Transaccional · {new Date().getFullYear()}
         </p>
       </div>
 

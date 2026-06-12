@@ -15,8 +15,11 @@ namespace PetrolRios.Infrastructure.Services;
 /// </summary>
 public sealed class MonitoreoService : IMonitoreoService
 {
-    /// <summary>Una estación se considera conectada si envió datos hace menos de 10 minutos.</summary>
-    public static readonly TimeSpan VentanaConexion = TimeSpan.FromMinutes(10);
+    /// <summary>
+    /// Un agente se considera en línea si envió un heartbeat hace menos de 3 minutos
+    /// (el agente late en cada ciclo, aunque no haya transacciones nuevas).
+    /// </summary>
+    public static readonly TimeSpan VentanaConexion = TimeSpan.FromMinutes(3);
 
     private static readonly DateTime InicioProceso = Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
@@ -34,7 +37,7 @@ public sealed class MonitoreoService : IMonitoreoService
 
         var estaciones = await _dbContext.Estaciones
             .OrderBy(e => e.Codigo)
-            .Select(e => new { e.Id, e.Codigo, e.Nombre, e.Zona })
+            .Select(e => new { e.Id, e.Codigo, e.Nombre, e.Zona, e.Activa, e.UltimoHeartbeat, e.VersionAgente })
             .ToListAsync(ct);
 
         // Estadísticas de ingesta por estación (la última ingesta REAL, no el seed)
@@ -55,10 +58,17 @@ public sealed class MonitoreoService : IMonitoreoService
             var stats = estadisticas.GetValueOrDefault(e.Id);
 
             var ultimaIngesta = stats?.UltimaIngesta;
-            var minutos = ultimaIngesta.HasValue
+            var minutosIngesta = ultimaIngesta.HasValue
                 ? Math.Round((ahora - ultimaIngesta.Value).TotalMinutes, 1)
                 : (double?)null;
-            var conectada = ultimaIngesta.HasValue && (ahora - ultimaIngesta.Value) < VentanaConexion;
+
+            // El estado de conexión lo da el HEARTBEAT del agente, no los datos:
+            // un agente activo sin transacciones nuevas sigue estando en línea.
+            var minutosHeartbeat = e.UltimoHeartbeat.HasValue
+                ? Math.Round((ahora - e.UltimoHeartbeat.Value).TotalMinutes, 1)
+                : (double?)null;
+            var conectada = e.UltimoHeartbeat.HasValue
+                && (ahora - e.UltimoHeartbeat.Value) < VentanaConexion;
 
             return new ConexionEstacionResponse
             {
@@ -66,12 +76,16 @@ public sealed class MonitoreoService : IMonitoreoService
                 Codigo = e.Codigo,
                 Nombre = e.Nombre,
                 Zona = e.Zona ?? string.Empty,
+                Activa = e.Activa,
                 Conectada = conectada,
                 Estado = conectada
-                    ? "Conectada"
-                    : ultimaIngesta.HasValue ? "Sin conexión" : "Nunca conectada",
+                    ? "En línea"
+                    : e.UltimoHeartbeat.HasValue ? "Sin conexión" : "Nunca conectada",
+                UltimoHeartbeat = e.UltimoHeartbeat,
+                MinutosDesdeUltimoHeartbeat = minutosHeartbeat,
+                VersionAgente = e.VersionAgente,
                 UltimaIngesta = ultimaIngesta,
-                MinutosDesdeUltimaIngesta = minutos,
+                MinutosDesdeUltimaIngesta = minutosIngesta,
                 TransaccionesUltimas24Horas = stats?.Ultimas24h ?? 0,
                 TransaccionesTotales = stats?.Total ?? 0,
                 PendientesAnalisis = stats?.Pendientes ?? 0
@@ -102,13 +116,10 @@ public sealed class MonitoreoService : IMonitoreoService
             .Select(j => new { j.FechaInicio, j.Estado, j.AlertasGeneradas, j.DuracionSegundos })
             .FirstOrDefaultAsync(ct);
 
-        // Estaciones conectadas (ingesta real en la ventana)
+        // Estaciones en línea (heartbeat del agente dentro de la ventana)
         var limite = ahora - VentanaConexion;
-        var estacionesConectadas = await _dbContext.TransaccionesStaging
-            .Where(s => s.CreatedAt >= limite)
-            .Select(s => s.EstacionId)
-            .Distinct()
-            .CountAsync(ct);
+        var estacionesConectadas = await _dbContext.Estaciones
+            .CountAsync(e => e.Activa && e.UltimoHeartbeat >= limite, ct);
 
         return new EstadoSistemaResponse
         {

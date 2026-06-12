@@ -3,8 +3,12 @@ export interface ConexionEstacionResponse {
   codigo: string;
   nombre: string;
   zona: string;
+  activa: boolean;
   conectada: boolean;
-  estado: "Conectada" | "Sin conexión" | "Nunca conectada";
+  estado: "En línea" | "Sin conexión" | "Nunca conectada";
+  ultimoHeartbeat: string | null;
+  minutosDesdeUltimoHeartbeat: number | null;
+  versionAgente: string | null;
   ultimaIngesta: string | null;
   minutosDesdeUltimaIngesta: number | null;
   transaccionesUltimas24Horas: number;

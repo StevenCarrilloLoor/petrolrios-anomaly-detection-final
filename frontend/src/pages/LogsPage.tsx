@@ -10,6 +10,8 @@ export function LogsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["logs", page],
     queryFn: () => logsService.getAll(page, 50),
+    // Tiempo real: la bitácora se refresca sola sin recargar la página
+    refetchInterval: 10_000,
   });
 
   if (isLoading) {

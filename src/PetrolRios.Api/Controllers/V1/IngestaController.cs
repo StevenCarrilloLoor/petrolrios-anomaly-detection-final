@@ -31,4 +31,18 @@ public sealed class IngestaController : ControllerBase
         var result = await _ingestaService.RecibirLoteAsync(request, ct);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Heartbeat del agente: señal de vida periódica aunque no haya datos nuevos.
+    /// Si la estación no existe, se auto-registra en el sistema.
+    /// </summary>
+    [HttpPost("heartbeat")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Heartbeat(
+        [FromBody] HeartbeatRequest request,
+        CancellationToken ct)
+    {
+        await _ingestaService.HeartbeatAsync(request, ct);
+        return NoContent();
+    }
 }

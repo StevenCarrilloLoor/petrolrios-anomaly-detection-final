@@ -60,6 +60,9 @@ public sealed class AnomalyDetectionJob
             // (si no la ven, aplicarían su umbral por defecto).
             var estaciones = await _unitOfWork.Estaciones.GetActivasAsync(ct);
             var reglas = await _unitOfWork.ReglasDeteccion.GetAllAsync(ct);
+            var reglasPersonalizadas = await _dbContext.ReglasPersonalizadas
+                .AsNoTracking()
+                .ToListAsync(ct);
             var totalAlertas = 0;
             var estacionesProcesadas = 0;
 
@@ -67,7 +70,7 @@ public sealed class AnomalyDetectionJob
             {
                 // Construir contexto de detección para esta estación
                 var watermark = await _unitOfWork.Estaciones.GetWatermarkAsync(estacion.Id, ct);
-                var context = await BuildDetectionContextAsync(estacion, watermark, reglas, ct);
+                var context = await BuildDetectionContextAsync(estacion, watermark, reglas, reglasPersonalizadas, ct);
 
                 // Ejecutar los 4 detectores en paralelo
                 var detectionTasks = _detectors
@@ -132,6 +135,7 @@ public sealed class AnomalyDetectionJob
         Estacion estacion,
         EstacionWatermark? watermark,
         IReadOnlyList<ReglaDeteccion> reglas,
+        IReadOnlyList<ReglaPersonalizada> reglasPersonalizadas,
         CancellationToken ct)
     {
         var desde = watermark?.UltimaExtraccion ?? DateTime.UtcNow.AddHours(-1);
@@ -187,6 +191,7 @@ public sealed class AnomalyDetectionJob
             Creditos = creditos,
             TarjetasTurno = tarjetas,
             Reglas = reglas,
+            ReglasPersonalizadas = reglasPersonalizadas,
             AlertasPreviasPorEmpleado = alertasPrevias,
             HoraApertura = estacion.HoraApertura,
             HoraCierre = estacion.HoraCierre

@@ -1,7 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { monitoreoService } from "@/services/monitoreo.service";
+import { estacionesService } from "@/services/estaciones.service";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import type { ConexionEstacionResponse } from "@/types/monitoreo";
 import {
   Server,
   Database,
@@ -11,12 +15,26 @@ import {
   WifiOff,
   CircleSlash,
   RefreshCw,
+  Pencil,
+  Trash2,
+  Save,
+  X,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
 const REFRESCO_MS = 10_000;
 
 export function ConexionesPage() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const puedeGestionar = user?.rol === "Supervisor" || user?.rol === "Administrador";
+  const puedeEliminar = user?.rol === "Administrador";
+
+  const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [editNombre, setEditNombre] = useState("");
+  const [editZona, setEditZona] = useState("");
+  const [mensaje, setMensaje] = useState<string | null>(null);
+
   const {
     data: sistema,
     isLoading: loadingSistema,
@@ -32,6 +50,38 @@ export function ConexionesPage() {
     queryFn: monitoreoService.getConexiones,
     refetchInterval: REFRESCO_MS,
   });
+
+  const invalidar = () => {
+    void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
+    void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+  };
+
+  const actualizarMutation = useMutation({
+    mutationFn: ({ id }: { id: number }) =>
+      estacionesService.update(id, { nombre: editNombre, zona: editZona || null }),
+    onSuccess: () => {
+      setEditandoId(null);
+      invalidar();
+    },
+  });
+
+  const eliminarMutation = useMutation({
+    mutationFn: (id: number) => estacionesService.delete(id),
+    onSuccess: (resultado) => {
+      setMensaje(resultado.mensaje);
+      invalidar();
+      setTimeout(() => setMensaje(null), 6000);
+    },
+  });
+
+  const enLinea = (conexiones ?? []).filter((c) => c.conectada).length;
+  const registradas = (conexiones ?? []).length;
+
+  function iniciarEdicion(conexion: ConexionEstacionResponse) {
+    setEditandoId(conexion.estacionId);
+    setEditNombre(conexion.nombre);
+    setEditZona(conexion.zona ?? "");
+  }
 
   return (
     <div className="space-y-6">
@@ -124,51 +174,119 @@ export function ConexionesPage() {
         )
       )}
 
+      {mensaje && (
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          {mensaje}
+        </div>
+      )}
+
       {/* Agentes por estación */}
       <Card>
         <CardHeader
-          title={`Agentes de estación ${
-            sistema
-              ? `— ${sistema.estacionesConectadas} de ${sistema.estacionesTotales} conectados`
-              : ""
-          }`}
-          subtitle="Un agente se considera conectado si envió datos en los últimos 10 minutos"
+          title={`Agentes de estación — ${enLinea} en línea · ${registradas} registradas`}
+          subtitle="Las estaciones se registran automáticamente cuando su agente se conecta por primera vez. Un agente está en línea si envió señal de vida en los últimos 3 minutos."
         />
         <CardContent className="p-0">
           {loadingConexiones ? (
             <div className="space-y-2 p-6">
-              {Array.from({ length: 5 }).map((_, i) => (
+              {Array.from({ length: 4 }).map((_, i) => (
                 <Skeleton key={i} className="h-12" />
               ))}
             </div>
+          ) : registradas === 0 ? (
+            <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+              Aún no hay estaciones registradas. Cuando un Station Agent se conecte
+              por primera vez, su estación aparecerá aquí automáticamente.
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-6 py-3 font-semibold">Estación</th>
                   <th className="px-4 py-3 font-semibold">Estado</th>
-                  <th className="px-4 py-3 font-semibold">Última ingesta</th>
+                  <th className="px-4 py-3 font-semibold">Señal de vida</th>
+                  <th className="px-4 py-3 font-semibold">Última ingesta de datos</th>
                   <th className="px-4 py-3 text-right font-semibold">Últimas 24 h</th>
-                  <th className="px-4 py-3 text-right font-semibold">Históricas</th>
-                  <th className="px-6 py-3 text-right font-semibold">
-                    Pendientes de análisis
-                  </th>
+                  <th className="px-4 py-3 text-right font-semibold">Pendientes</th>
+                  {puedeGestionar && (
+                    <th className="px-6 py-3 text-right font-semibold">Acciones</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {(conexiones ?? []).map((c) => (
                   <tr
                     key={c.estacionId}
-                    className="border-b border-border last:border-0"
+                    className={`border-b border-border last:border-0 ${!c.activa ? "opacity-50" : ""}`}
                   >
                     <td className="px-6 py-3">
-                      <p className="font-medium text-foreground">{c.nombre}</p>
-                      <p className="font-mono text-xs text-muted-foreground">
-                        {c.codigo} · zona {c.zona}
-                      </p>
+                      {editandoId === c.estacionId ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            value={editNombre}
+                            onChange={(e) => setEditNombre(e.target.value)}
+                            className="w-52 rounded-md border border-primary bg-background px-2 py-1.5 text-sm focus:outline-none"
+                            placeholder="Nombre de la estación"
+                            autoFocus
+                          />
+                          <input
+                            value={editZona}
+                            onChange={(e) => setEditZona(e.target.value)}
+                            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:outline-none"
+                            placeholder="Zona"
+                          />
+                          <button
+                            onClick={() =>
+                              actualizarMutation.mutate({ id: c.estacionId })
+                            }
+                            disabled={!editNombre.trim() || actualizarMutation.isPending}
+                            className="rounded-md bg-primary p-1.5 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                            title="Guardar"
+                          >
+                            <Save size={14} />
+                          </button>
+                          <button
+                            onClick={() => setEditandoId(null)}
+                            className="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted"
+                            title="Cancelar"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="font-medium text-foreground">
+                            {c.nombre}
+                            {!c.activa && (
+                              <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                                inactiva
+                              </span>
+                            )}
+                          </p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {c.codigo}
+                            {c.zona ? ` · zona ${c.zona}` : ""}
+                            {c.versionAgente ? ` · agente v${c.versionAgente}` : ""}
+                          </p>
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <EstadoConexion estado={c.estado} />
+                    </td>
+                    <td className="px-4 py-3">
+                      {c.ultimoHeartbeat ? (
+                        <>
+                          <p className="text-foreground">
+                            {new Date(c.ultimoHeartbeat).toLocaleTimeString("es-EC")}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            hace {formatearMinutos(c.minutosDesdeUltimoHeartbeat)}
+                          </p>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {c.ultimaIngesta ? (
@@ -176,24 +294,21 @@ export function ConexionesPage() {
                           <p className="text-foreground">
                             {new Date(c.ultimaIngesta).toLocaleString("es-EC", {
                               dateStyle: "short",
-                              timeStyle: "medium",
+                              timeStyle: "short",
                             })}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            hace {formatearMinutos(c.minutosDesdeUltimaIngesta)}
+                            {c.transaccionesTotales} históricas
                           </p>
                         </>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">sin datos aún</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">
                       {c.transaccionesUltimas24Horas}
                     </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
-                      {c.transaccionesTotales}
-                    </td>
-                    <td className="px-6 py-3 text-right">
+                    <td className="px-4 py-3 text-right">
                       {c.pendientesAnalisis > 0 ? (
                         <span className="rounded-full bg-risk-medium/15 px-2.5 py-0.5 text-xs font-semibold text-risk-medium">
                           {c.pendientesAnalisis}
@@ -202,6 +317,35 @@ export function ConexionesPage() {
                         <span className="text-muted-foreground">0</span>
                       )}
                     </td>
+                    {puedeGestionar && (
+                      <td className="px-6 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => iniciarEdicion(c)}
+                            className="rounded-md border border-border p-2 text-muted-foreground hover:border-primary hover:text-primary"
+                            title="Editar nombre y zona"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          {puedeEliminar && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `¿Eliminar la estación ${c.codigo} (${c.nombre})?\n\nSi tiene historial de alertas se desactivará en lugar de eliminarse.`,
+                                  )
+                                )
+                                  eliminarMutation.mutate(c.estacionId);
+                              }}
+                              className="rounded-md border border-border p-2 text-muted-foreground hover:border-risk-critical hover:text-risk-critical"
+                              title="Eliminar estación"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -209,13 +353,6 @@ export function ConexionesPage() {
           )}
         </CardContent>
       </Card>
-
-      <p className="text-xs text-muted-foreground">
-        Nota: en producción cada estación ejecuta su propio Station Agent contra el
-        Firebird local de Contaplus. En el entorno de demostración solo la estación
-        EST-001 tiene un agente real conectado; el resto aparecerá como "Nunca
-        conectada" — ese es el comportamiento esperado.
-      </p>
     </div>
   );
 }
@@ -271,10 +408,10 @@ function EstadoCard({
 }
 
 function EstadoConexion({ estado }: { estado: string }) {
-  if (estado === "Conectada")
+  if (estado === "En línea")
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-risk-low/15 px-2.5 py-1 text-xs font-semibold text-risk-low">
-        <Wifi size={12} /> Conectada
+        <Wifi size={12} /> En línea
       </span>
     );
   if (estado === "Sin conexión")
@@ -300,7 +437,7 @@ function formatearUptime(segundos: number): string {
 
 function formatearMinutos(minutos: number | null): string {
   if (minutos === null) return "—";
-  if (minutos < 1) return "menos de 1 min";
+  if (minutos < 1) return "segundos";
   if (minutos < 60) return `${Math.round(minutos)} min`;
   if (minutos < 1440) return `${Math.floor(minutos / 60)} h ${Math.round(minutos % 60)} min`;
   return `${Math.floor(minutos / 1440)} días`;

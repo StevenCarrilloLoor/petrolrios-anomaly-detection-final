@@ -62,6 +62,34 @@ public sealed class ServerClient
     }
 
     /// <summary>
+    /// Envía un heartbeat al servidor: señal de vida del agente aunque no haya
+    /// transacciones nuevas. Devuelve true si el servidor lo aceptó.
+    /// </summary>
+    public async Task<bool> SendHeartbeatAsync(CancellationToken ct)
+    {
+        try
+        {
+            await EnsureAuthenticatedAsync(ct);
+
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _token);
+
+            var payload = new
+            {
+                CodigoEstacion = _options.CodigoEstacion,
+                VersionAgente = "2.0"
+            };
+            var response = await _httpClient.PostAsJsonAsync("/api/v1/ingesta/heartbeat", payload, ct);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Heartbeat no entregado (servidor no disponible)");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Prueba la conexión y autenticación con el servidor central (panel del agente).
     /// Mide la latencia del login JWT.
     /// </summary>

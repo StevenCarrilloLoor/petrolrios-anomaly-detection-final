@@ -6,6 +6,7 @@ import {
   useCallback,
 } from "react";
 import type { ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { getConnectionReady, getSignalRConnection } from "@/services/signalr";
 import type { AlertaResponse } from "@/types/alert";
 import { ToastContainer, type Toast } from "./ToastContainer";
@@ -31,6 +32,7 @@ export function useResetNotifications(): () => void {
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const [alertCount, setAlertCount] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -62,6 +64,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         message: alerta.descripcion,
         level: alerta.nivelRiesgo,
       });
+
+      // Tiempo real: refrescar automáticamente las vistas afectadas
+      // sin que el usuario tenga que recargar la página
+      void queryClient.invalidateQueries({ queryKey: ["alertas"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
     };
 
     const promise = getConnectionReady();
@@ -81,7 +89,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         conn.off("NuevaAlerta", handler);
       }
     };
-  }, [token, addToast]);
+  }, [token, addToast, queryClient]);
 
   return (
     <NotificationContext.Provider value={{ alertCount, resetCount }}>

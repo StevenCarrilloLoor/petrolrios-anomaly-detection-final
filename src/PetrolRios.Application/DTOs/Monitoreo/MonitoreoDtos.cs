@@ -8,13 +8,25 @@ public sealed record ConexionEstacionResponse
     public string Nombre { get; init; } = string.Empty;
     public string Zona { get; init; } = string.Empty;
 
-    /// <summary>Conectada = recibió datos en los últimos 10 minutos.</summary>
+    /// <summary>En línea = el agente envió un heartbeat recientemente (aunque no haya datos nuevos).</summary>
     public bool Conectada { get; init; }
 
-    /// <summary>"Conectada", "Sin conexión" o "Nunca conectada".</summary>
+    /// <summary>"En línea", "Sin conexión" o "Nunca conectada".</summary>
     public string Estado { get; init; } = string.Empty;
 
-    /// <summary>Fecha/hora de la última ingesta recibida desde el agente.</summary>
+    /// <summary>La estación está activa en el sistema (no fue dada de baja).</summary>
+    public bool Activa { get; init; }
+
+    /// <summary>Último heartbeat del agente (señal de vida).</summary>
+    public DateTime? UltimoHeartbeat { get; init; }
+
+    /// <summary>Minutos desde el último heartbeat.</summary>
+    public double? MinutosDesdeUltimoHeartbeat { get; init; }
+
+    /// <summary>Versión del agente reportada.</summary>
+    public string? VersionAgente { get; init; }
+
+    /// <summary>Fecha/hora de la última ingesta de DATOS recibida desde el agente.</summary>
     public DateTime? UltimaIngesta { get; init; }
 
     /// <summary>Minutos transcurridos desde la última ingesta.</summary>

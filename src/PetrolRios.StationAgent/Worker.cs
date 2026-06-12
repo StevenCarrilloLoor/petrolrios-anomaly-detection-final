@@ -12,17 +12,20 @@ namespace PetrolRios.StationAgent;
 public sealed class Worker : BackgroundService
 {
     private readonly CycleRunner _cycleRunner;
+    private readonly ServerClient _serverClient;
     private readonly AgentState _state;
     private readonly AgentOptions _options;
     private readonly ILogger<Worker> _logger;
 
     public Worker(
         CycleRunner cycleRunner,
+        ServerClient serverClient,
         AgentState state,
         IOptions<AgentOptions> options,
         ILogger<Worker> logger)
     {
         _cycleRunner = cycleRunner;
+        _serverClient = serverClient;
         _state = state;
         _options = options.Value;
         _logger = logger;
@@ -40,6 +43,14 @@ public sealed class Worker : BackgroundService
         {
             try
             {
+                // Heartbeat SIEMPRE (también en modo manual): el panel central debe
+                // saber que el agente está vivo aunque no haya datos nuevos.
+                var latido = await _serverClient.SendHeartbeatAsync(stoppingToken);
+                if (latido)
+                    _state.UltimaConexionServidor = DateTime.UtcNow;
+                else
+                    _state.UltimaDesconexionServidor = DateTime.UtcNow;
+
                 if (_state.ModoAutomatico)
                 {
                     await _cycleRunner.RunCycleAsync(stoppingToken);

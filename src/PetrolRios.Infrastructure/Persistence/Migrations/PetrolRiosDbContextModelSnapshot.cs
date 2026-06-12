@@ -248,8 +248,14 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<DateTime?>("UltimoHeartbeat")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VersionAgente")
+                        .HasColumnType("text");
 
                     b.Property<string>("Zona")
                         .HasMaxLength(50)
@@ -422,6 +428,58 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("reglas_deteccion", (string)null);
+                });
+
+            modelBuilder.Entity("PetrolRios.Domain.Entities.ReglaPersonalizada", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AgregacionJson")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("CondicionesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FuenteDatos")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<double>("RiesgoBase")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Activa");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("reglas_personalizadas", (string)null);
                 });
 
             modelBuilder.Entity("PetrolRios.Domain.Entities.Rol", b =>

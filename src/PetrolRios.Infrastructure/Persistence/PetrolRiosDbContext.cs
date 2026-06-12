@@ -16,6 +16,7 @@ public class PetrolRiosDbContext : DbContext
     public DbSet<LogAuditoria> LogsAuditoria => Set<LogAuditoria>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<ReglaDeteccion> ReglasDeteccion => Set<ReglaDeteccion>();
+    public DbSet<ReglaPersonalizada> ReglasPersonalizadas => Set<ReglaPersonalizada>();
     public DbSet<Rol> Roles => Set<Rol>();
     public DbSet<TransaccionStaging> TransaccionesStaging => Set<TransaccionStaging>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();

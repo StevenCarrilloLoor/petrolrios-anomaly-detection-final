@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reglasService } from "@/services/reglas.service";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import { ReglasPersonalizadasSection } from "@/components/reglas/ReglasPersonalizadasSection";
 import type { ReglaDeteccionResponse } from "@/types/regla";
 import { TIPO_DETECTOR_LABELS } from "@/types/alert";
 import type { TipoDetector } from "@/types/alert";
@@ -114,23 +115,26 @@ export function ReglasPage() {
           Configuración del Motor de Detección
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Parametrice los umbrales y active o desactive las reglas de los 4
-          detectores (CU-14)
+          Parametrice las reglas del motor y cree sus propias reglas de negocio
         </p>
       </div>
 
       <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
         <Info size={18} className="mt-0.5 shrink-0 text-primary" />
         <p className="text-sm text-muted-foreground">
-          La lógica de cada regla está implementada en el motor de detección
-          (Strategy Pattern, tesis OE2). Desde esta pantalla se{" "}
+          Las reglas del motor se{" "}
           <span className="font-medium text-foreground">
-            ajusta el umbral y se habilita o deshabilita
+            parametrizan (umbral) y se habilitan o deshabilitan
           </span>{" "}
-          cada regla sin tocar código; el cambio se aplica en el siguiente ciclo
-          de análisis y queda registrado en los logs de auditoría.
+          desde esta pantalla. Además, en{" "}
+          <span className="font-medium text-foreground">Reglas personalizadas</span>{" "}
+          puede crear nuevas reglas de negocio adaptadas a sus necesidades sin
+          modificar el sistema. Todo cambio se aplica en el siguiente ciclo de
+          análisis y queda registrado en los logs de auditoría.
         </p>
       </div>
+
+      <ReglasPersonalizadasSection />
 
       {grupos.map(({ detector, reglas: reglasGrupo }) => {
         const meta = DETECTOR_META[detector];

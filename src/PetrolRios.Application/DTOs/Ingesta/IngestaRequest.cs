@@ -21,3 +21,10 @@ public sealed record IngestaResponse
     public int TransaccionesRecibidas { get; init; }
     public DateTime FechaRecepcion { get; init; }
 }
+
+/// <summary>Latido del agente: señal de vida aunque no haya transacciones nuevas.</summary>
+public sealed record HeartbeatRequest
+{
+    public required string CodigoEstacion { get; init; }
+    public string? VersionAgente { get; init; }
+}

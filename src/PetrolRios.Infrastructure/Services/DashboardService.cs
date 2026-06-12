@@ -22,13 +22,10 @@ public sealed class DashboardService : IDashboardService
     {
         var alertas = _dbContext.Alertas.AsQueryable();
 
-        // Estaciones conectadas de verdad: con ingesta del agente en los últimos 10 minutos
+        // Estaciones en línea de verdad: heartbeat del agente dentro de la ventana
         var limiteConexion = DateTime.UtcNow - MonitoreoService.VentanaConexion;
-        var conectadas = await _dbContext.TransaccionesStaging
-            .Where(s => s.CreatedAt >= limiteConexion)
-            .Select(s => s.EstacionId)
-            .Distinct()
-            .CountAsync(ct);
+        var conectadas = await _dbContext.Estaciones
+            .CountAsync(e => e.Activa && e.UltimoHeartbeat >= limiteConexion, ct);
 
         return new KpiResponse
         {

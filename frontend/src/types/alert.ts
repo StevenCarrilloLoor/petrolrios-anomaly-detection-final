@@ -4,7 +4,8 @@ export type TipoDetector =
   | "CashFraud"
   | "InvoiceAnomaly"
   | "PaymentFraud"
-  | "ComplianceViolation";
+  | "ComplianceViolation"
+  | "Personalizada";
 
 export type EstadoAlerta =
   | "Nueva"
@@ -62,6 +63,7 @@ export const TIPO_DETECTOR_OPTIONS: TipoDetector[] = [
   "InvoiceAnomaly",
   "PaymentFraud",
   "ComplianceViolation",
+  "Personalizada",
 ];
 
 export const ESTADO_ALERTA_OPTIONS: EstadoAlerta[] = [
@@ -77,6 +79,7 @@ export const TIPO_DETECTOR_LABELS: Record<TipoDetector, string> = {
   InvoiceAnomaly: "Anomalía de Factura",
   PaymentFraud: "Fraude de Pago",
   ComplianceViolation: "Violación Normativa",
+  Personalizada: "Regla Personalizada",
 };
 
 export const NIVEL_RIESGO_LABELS: Record<NivelRiesgo, string> = {

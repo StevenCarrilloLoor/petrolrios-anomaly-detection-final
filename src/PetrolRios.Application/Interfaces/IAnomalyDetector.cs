@@ -35,6 +35,9 @@ public sealed class DetectionContext
     // Reglas de detección configuradas
     public IReadOnlyList<ReglaDeteccion> Reglas { get; init; } = [];
 
+    // Reglas de negocio definidas por el usuario (evaluadas por CustomRuleDetector)
+    public IReadOnlyList<ReglaPersonalizada> ReglasPersonalizadas { get; init; } = [];
+
     // Historial de alertas previas por empleado (para detección de reincidencia)
     public IReadOnlyDictionary<string, int> AlertasPreviasPorEmpleado { get; init; } =
         new Dictionary<string, int>();

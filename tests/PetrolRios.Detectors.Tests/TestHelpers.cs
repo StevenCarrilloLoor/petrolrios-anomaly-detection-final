@@ -21,6 +21,7 @@ internal static class TestHelpers
         IReadOnlyList<CreditoDto>? creditos = null,
         IReadOnlyList<TarjetaTurnoDto>? tarjetasTurno = null,
         IReadOnlyList<ReglaDeteccion>? reglas = null,
+        IReadOnlyList<ReglaPersonalizada>? reglasPersonalizadas = null,
         IReadOnlyDictionary<string, int>? alertasPrevias = null,
         TimeOnly? horaApertura = null,
         TimeOnly? horaCierre = null) => new()
@@ -37,6 +38,7 @@ internal static class TestHelpers
             Creditos = creditos ?? [],
             TarjetasTurno = tarjetasTurno ?? [],
             Reglas = reglas ?? DefaultReglas(),
+            ReglasPersonalizadas = reglasPersonalizadas ?? [],
             AlertasPreviasPorEmpleado = alertasPrevias ?? new Dictionary<string, int>(),
             HoraApertura = horaApertura ?? new TimeOnly(6, 0),
             HoraCierre = horaCierre ?? new TimeOnly(22, 0)

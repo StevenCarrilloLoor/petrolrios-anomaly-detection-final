@@ -130,7 +130,7 @@ export function Sidebar() {
           Detección de Anomalías v2.0
         </p>
         <p className="mt-0.5 text-[10px] text-muted-foreground/60">
-          10 estaciones · ciclo 5–10 min
+          PetrolRíos S.A. · monitoreo continuo
         </p>
       </div>
     </aside>

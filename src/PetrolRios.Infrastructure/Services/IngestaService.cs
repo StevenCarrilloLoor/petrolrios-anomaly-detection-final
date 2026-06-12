@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PetrolRios.Application.DTOs.Ingesta;
 using PetrolRios.Application.Interfaces;
@@ -26,15 +27,42 @@ public sealed class IngestaService : IIngestaService
         _logger = logger;
     }
 
+    public async Task HeartbeatAsync(HeartbeatRequest request, CancellationToken ct = default)
+    {
+        var estacion = await ObtenerORegistrarEstacionAsync(request.CodigoEstacion, ct);
+        estacion.UltimoHeartbeat = DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(request.VersionAgente))
+            estacion.VersionAgente = request.VersionAgente;
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Busca la estación por código; si no existe la registra automáticamente
+    /// (las estaciones se dan de alta cuando su agente se conecta por primera vez).
+    /// </summary>
+    private async Task<Domain.Entities.Estacion> ObtenerORegistrarEstacionAsync(
+        string codigoEstacion, CancellationToken ct)
+    {
+        var codigo = codigoEstacion.Trim().ToUpperInvariant();
+        var estacion = await _dbContext.Estaciones
+            .FirstOrDefaultAsync(e => e.Codigo == codigo, ct);
+
+        if (estacion is not null) return estacion;
+
+        estacion = Domain.Entities.Estacion.CreateDesdeAgente(codigo);
+        await _dbContext.Estaciones.AddAsync(estacion, ct);
+        await _dbContext.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Estación {Codigo} auto-registrada por primer contacto de su agente", codigo);
+        return estacion;
+    }
+
     public async Task<IngestaResponse> RecibirLoteAsync(IngestaRequest request, CancellationToken ct = default)
     {
-        // Validar que la estación existe y está activa
-        var estaciones = await _unitOfWork.Estaciones.GetActivasAsync(ct);
-        var estacion = estaciones.FirstOrDefault(e => e.Codigo == request.CodigoEstacion);
-
-        if (estacion is null)
-            throw new InvalidOperationException(
-                $"Estación '{request.CodigoEstacion}' no encontrada o no está activa.");
+        // Obtener (o auto-registrar) la estación y marcar el contacto
+        var estacion = await ObtenerORegistrarEstacionAsync(request.CodigoEstacion, ct);
+        estacion.UltimoHeartbeat = DateTime.UtcNow;
 
         // Insertar cada transacción en staging
         foreach (var item in request.Transacciones)
