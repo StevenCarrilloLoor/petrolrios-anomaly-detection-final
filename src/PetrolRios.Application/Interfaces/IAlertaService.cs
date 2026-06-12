@@ -14,4 +14,9 @@ public interface IAlertaService
     Task<AlertaResponse?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<AlertaResponse> CambiarEstadoAsync(int id, CambiarEstadoRequest request, CancellationToken ct = default);
     Task AsignarAsync(int alertaId, AsignarAlertaRequest request, CancellationToken ct = default);
+
+    // CU-07: comentarios de auditoría
+    Task<IReadOnlyList<ComentarioResponse>> GetComentariosAsync(int alertaId, CancellationToken ct = default);
+    Task<ComentarioResponse> AgregarComentarioAsync(
+        int alertaId, int usuarioId, AgregarComentarioRequest request, CancellationToken ct = default);
 }

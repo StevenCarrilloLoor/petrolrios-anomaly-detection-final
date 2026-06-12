@@ -10,6 +10,9 @@ namespace PetrolRios.Infrastructure.Services;
 
 public sealed class AlertaService : IAlertaService
 {
+    private static readonly EstadoAlerta[] EstadosResueltos =
+        [EstadoAlerta.Confirmada, EstadoAlerta.FalsoPositivo, EstadoAlerta.Cerrada];
+
     private readonly IUnitOfWork _unitOfWork;
     private readonly PetrolRiosDbContext _dbContext;
 
@@ -67,6 +70,12 @@ public sealed class AlertaService : IAlertaService
             throw new ArgumentException($"Estado '{request.Estado}' no es válido.");
 
         alerta.Estado = nuevoEstado;
+
+        // Registrar la fecha de resolución para métricas de tiempos (CU-13)
+        alerta.FechaResolucion = EstadosResueltos.Contains(nuevoEstado)
+            ? DateTime.UtcNow
+            : null;
+
         await _dbContext.SaveChangesAsync(ct);
 
         var estaciones = new Dictionary<int, string> { [alerta.EstacionId] = alerta.Estacion.Nombre };
@@ -86,6 +95,51 @@ public sealed class AlertaService : IAlertaService
 
         alerta.Estado = EstadoAlerta.EnRevision;
         await _dbContext.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ComentarioResponse>> GetComentariosAsync(int alertaId, CancellationToken ct = default)
+    {
+        return await _dbContext.ComentariosAlerta
+            .Where(c => c.AlertaId == alertaId)
+            .Include(c => c.Usuario)
+            .OrderBy(c => c.CreatedAt)
+            .Select(c => new ComentarioResponse
+            {
+                Id = c.Id,
+                AlertaId = c.AlertaId,
+                UsuarioId = c.UsuarioId,
+                UsuarioNombre = c.Usuario.NombreCompleto,
+                Texto = c.Texto,
+                Fecha = c.CreatedAt
+            })
+            .ToListAsync(ct);
+    }
+
+    public async Task<ComentarioResponse> AgregarComentarioAsync(
+        int alertaId, int usuarioId, AgregarComentarioRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Texto))
+            throw new ArgumentException("El comentario no puede estar vacío.");
+
+        _ = await _dbContext.Alertas.FindAsync(new object[] { alertaId }, ct)
+            ?? throw new KeyNotFoundException($"Alerta {alertaId} no encontrada.");
+
+        var usuario = await _dbContext.Usuarios.FindAsync(new object[] { usuarioId }, ct)
+            ?? throw new KeyNotFoundException($"Usuario {usuarioId} no encontrado.");
+
+        var comentario = ComentarioAlerta.Create(alertaId, usuarioId, request.Texto.Trim());
+        await _dbContext.ComentariosAlerta.AddAsync(comentario, ct);
+        await _dbContext.SaveChangesAsync(ct);
+
+        return new ComentarioResponse
+        {
+            Id = comentario.Id,
+            AlertaId = alertaId,
+            UsuarioId = usuarioId,
+            UsuarioNombre = usuario.NombreCompleto,
+            Texto = comentario.Texto,
+            Fecha = comentario.CreatedAt
+        };
     }
 
     private static AlertaResponse MapToResponse(Alerta a, Dictionary<int, string> estaciones) => new()

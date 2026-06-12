@@ -17,10 +17,14 @@ public class Alerta : BaseEntity
     public int EstacionId { get; private set; }
     public Estacion Estacion { get; private set; } = null!;
 
+    /// <summary>Fecha en que la alerta fue resuelta (confirmada, falso positivo o cerrada).</summary>
+    public DateTime? FechaResolucion { get; set; }
+
     public int? EjecucionJobId { get; private set; }
     public EjecucionJob? EjecucionJob { get; private set; }
 
     public ICollection<AsignacionAlerta> Asignaciones { get; private set; } = [];
+    public ICollection<ComentarioAlerta> Comentarios { get; private set; } = [];
 
     public static Alerta Create(
         TipoDetector tipoDetector,

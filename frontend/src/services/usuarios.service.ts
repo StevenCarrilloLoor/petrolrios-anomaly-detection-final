@@ -9,6 +9,9 @@ export const usuariosService = {
   getAll: () =>
     api.get<UsuarioResponse[]>("/usuarios").then((r) => r.data),
 
+  getAuditores: () =>
+    api.get<UsuarioResponse[]>("/usuarios/auditores").then((r) => r.data),
+
   getById: (id: number) =>
     api.get<UsuarioResponse>(`/usuarios/${id}`).then((r) => r.data),
 

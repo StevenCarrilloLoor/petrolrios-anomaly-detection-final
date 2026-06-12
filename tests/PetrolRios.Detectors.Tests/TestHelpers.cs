@@ -48,40 +48,57 @@ internal static class TestHelpers
         ReglaDeteccion.Create(TipoDetector.CashFraud, "R1", "D1", "DiferenciaEfectivoUmbral", 50.0),
         ReglaDeteccion.Create(TipoDetector.CashFraud, "R2", "D2", "FaltantesRecurrentesMaximo", 3.0),
         ReglaDeteccion.Create(TipoDetector.CashFraud, "R3", "D3", "FaltantesRecurrentesDias", 30.0),
+        ReglaDeteccion.Create(TipoDetector.CashFraud, "R3a", "D3a", "CreditoSinClienteHabilitado", 1.0),
+        ReglaDeteccion.Create(TipoDetector.CashFraud, "R3b", "D3b", "EfectivoCorporativoPorcentajeUmbral", 30.0),
         // Invoice Anomaly
         ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R4", "D4", "AnulacionesPorcentajeUmbral", 5.0),
         ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R5", "D5", "PrecioFueraListaHabilitado", 1.0),
         ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R6", "D6", "CamposObligatoriosHabilitado", 1.0),
+        ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R6a", "D6a", "DescuentoPorcentajeMaximo", 10.0),
+        ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R6b", "D6b", "TotalInconsistenteHabilitado", 1.0),
         // Payment Fraud
         ReglaDeteccion.Create(TipoDetector.PaymentFraud, "R7", "D7", "ReversionTarjetaMinutosUmbral", 30.0),
         ReglaDeteccion.Create(TipoDetector.PaymentFraud, "R8", "D8", "CreditoSinAutorizacionHabilitado", 1.0),
         ReglaDeteccion.Create(TipoDetector.PaymentFraud, "R9", "D9", "DuplicadaMinutosUmbral", 5.0),
+        ReglaDeteccion.Create(TipoDetector.PaymentFraud, "R9a", "D9a", "DespachosRapidosMinutosUmbral", 10.0),
         // Compliance Violation
         ReglaDeteccion.Create(TipoDetector.ComplianceViolation, "R10", "D10", "PlacaGenericaGalonesMaximo", 5.0),
         ReglaDeteccion.Create(TipoDetector.ComplianceViolation, "R11", "D11", "MultipleCombustibleHabilitado", 1.0),
+        ReglaDeteccion.Create(TipoDetector.ComplianceViolation, "R11a", "D11a", "VentaSinPlacaMontoMinimo", 200.0),
         ReglaDeteccion.Create(TipoDetector.ComplianceViolation, "R12", "D12", "FueraHorarioHabilitado", 1.0)
     ];
+
+    /// <summary>Crea una regla desactivada para probar el respeto al flag Activa.</summary>
+    public static ReglaDeteccion CreateReglaInactiva(
+        TipoDetector tipo, string parametro, double umbral)
+    {
+        var regla = ReglaDeteccion.Create(tipo, $"Regla {parametro}", "Desactivada", parametro, umbral);
+        regla.Activa = false;
+        return regla;
+    }
 
     public static FacturaDto CreateFactura(
         double secuencia = 1, string vendedor = "V001", string placa = "ABC1234",
         string ruc = "1234567890", int turno = 100, double totalNeto = 100,
-        string codigoPago = "EF", DateTime? fecha = null, string manguera = "01") => new()
+        string codigoPago = "EF", DateTime? fecha = null, string manguera = "01",
+        string codigoCliente = "C001", double descuento = 0,
+        double? subtotal = null, double? iva = null) => new()
         {
             SecuenciaDocumento = secuencia,
             TipoDocumento = "FV",
             NumeroDocumento = $"001-001-{secuencia:0000000}",
             FechaDocumento = fecha ?? DateTime.UtcNow.AddMinutes(-30),
-            CodigoCliente = "C001",
+            CodigoCliente = codigoCliente,
             TotalNeto = totalNeto,
             TotalSinIva = totalNeto / 1.12,
-            Descuento = 0,
-            Iva = totalNeto - totalNeto / 1.12,
+            Descuento = descuento,
+            Iva = iva ?? (totalNeto - (subtotal ?? totalNeto / 1.12) + descuento),
             CodigoVendedor = vendedor,
             CodigoPago = codigoPago,
             Placa = placa,
             RucCliente = ruc,
             NumeroTurno = turno,
-            Subtotal = totalNeto / 1.12,
+            Subtotal = subtotal ?? totalNeto / 1.12,
             NumeroConsecutivo = (int)secuencia,
             CodigoChofer = "",
             CodigoManguera = manguera

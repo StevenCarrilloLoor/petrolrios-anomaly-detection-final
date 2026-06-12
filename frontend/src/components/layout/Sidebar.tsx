@@ -8,6 +8,7 @@ import {
   Users,
   FileText,
   Shield,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,68 +19,116 @@ interface NavItem {
   roles?: string[];
 }
 
-const navItems: NavItem[] = [
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
   {
-    to: "/dashboard",
-    label: "Dashboard",
-    icon: <LayoutDashboard size={20} />,
-  },
-  { to: "/alertas", label: "Alertas", icon: <AlertTriangle size={20} /> },
-  {
-    to: "/reglas",
-    label: "Reglas",
-    icon: <Settings size={20} />,
-    roles: ["Supervisor", "Administrador"],
-  },
-  {
-    to: "/usuarios",
-    label: "Usuarios",
-    icon: <Users size={20} />,
-    roles: ["Administrador"],
+    title: "Monitoreo",
+    items: [
+      { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
+      { to: "/alertas", label: "Alertas", icon: <AlertTriangle size={20} /> },
+    ],
   },
   {
-    to: "/logs",
-    label: "Logs",
-    icon: <FileText size={20} />,
-    roles: ["Administrador"],
+    title: "Gestión",
+    items: [
+      {
+        to: "/reportes",
+        label: "Reportes",
+        icon: <BarChart3 size={20} />,
+        roles: ["Supervisor", "Administrador"],
+      },
+      {
+        to: "/reglas",
+        label: "Reglas",
+        icon: <Settings size={20} />,
+        roles: ["Supervisor", "Administrador"],
+      },
+    ],
+  },
+  {
+    title: "Administración",
+    items: [
+      {
+        to: "/usuarios",
+        label: "Usuarios",
+        icon: <Users size={20} />,
+        roles: ["Administrador"],
+      },
+      {
+        to: "/logs",
+        label: "Logs de Auditoría",
+        icon: <FileText size={20} />,
+        roles: ["Administrador"],
+      },
+    ],
   },
 ];
 
 export function Sidebar() {
   const { user } = useAuth();
 
-  const filteredItems = navItems.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.rol)),
-  );
+  const sections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) => !item.roles || (user && item.roles.includes(user.rol)),
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside className="flex w-64 flex-col border-r border-border bg-background">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-        <Shield className="text-primary" size={24} />
-        <span className="text-lg font-bold text-foreground">PetrolRíos</span>
+      <div className="flex h-16 items-center gap-2.5 border-b border-border px-6">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+          <Shield className="text-primary" size={20} />
+        </div>
+        <div>
+          <span className="block text-base font-bold leading-tight text-foreground">
+            PetrolRíos
+          </span>
+          <span className="block text-[10px] uppercase tracking-wider text-muted-foreground">
+            Anomaly Detection
+          </span>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1 p-4">
-        {filteredItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )
-            }
-          >
-            {item.icon}
-            {item.label}
-          </NavLink>
+      <nav className="flex-1 space-y-5 overflow-y-auto p-4">
+        {sections.map((section) => (
+          <div key={section.title}>
+            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              {section.title}
+            </p>
+            <div className="space-y-1">
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )
+                  }
+                >
+                  {item.icon}
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
       <div className="border-t border-border p-4">
         <p className="text-xs text-muted-foreground">
-          Detección de Anomalías v1.0
+          Detección de Anomalías v2.0
+        </p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground/60">
+          10 estaciones · ciclo 5–10 min
         </p>
       </div>
     </aside>

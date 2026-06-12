@@ -32,6 +32,19 @@ export interface CambiarEstadoRequest {
   estado: string;
 }
 
+export interface ComentarioResponse {
+  id: number;
+  alertaId: number;
+  usuarioId: number;
+  usuarioNombre: string;
+  texto: string;
+  fecha: string;
+}
+
+export interface AgregarComentarioRequest {
+  texto: string;
+}
+
 export interface AsignarAlertaRequest {
   auditorId: number;
   comentario: string | null;

@@ -14,16 +14,106 @@ public static class SeedData
 
         await context.Database.MigrateAsync();
 
-        if (await context.Roles.AnyAsync())
-            return; // Ya tiene datos
+        if (!await context.Roles.AnyAsync())
+        {
+            await SeedRolesAsync(context);
+            await SeedUsuarioAdminAsync(context);
+            await SeedEstacionesAsync(context);
+            await SeedReglasDeteccionAsync(context);
+            await SeedAgentUsersAsync(context);
 
-        await SeedRolesAsync(context);
-        await SeedUsuarioAdminAsync(context);
-        await SeedEstacionesAsync(context);
-        await SeedReglasDeteccionAsync(context);
-        await SeedAgentUsersAsync(context);
+            await context.SaveChangesAsync();
+        }
+
+        // Pasos idempotentes: aplican también sobre bases ya sembradas
+        await EnsureReglasNuevasAsync(context);
+        await EnsureUsuariosDemoAsync(context);
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Agrega las reglas nuevas que no existan (post-revisión del jurado) y desactiva
+    /// la regla de fuera de horario en bases existentes (las estaciones operan 24/7).
+    /// </summary>
+    private static async Task EnsureReglasNuevasAsync(PetrolRiosDbContext context)
+    {
+        var existentes = await context.ReglasDeteccion
+            .Select(r => r.ParametroNombre)
+            .ToListAsync();
+
+        var nuevas = new List<ReglaDeteccion>();
+
+        void AddIfMissing(TipoDetector tipo, string nombre, string descripcion, string parametro, double umbral)
+        {
+            if (!existentes.Contains(parametro))
+                nuevas.Add(ReglaDeteccion.Create(tipo, nombre, descripcion, parametro, umbral));
+        }
+
+        AddIfMissing(TipoDetector.CashFraud,
+            "Venta a credito sin cliente identificado",
+            "Genera alerta si una venta a credito no tiene cliente o identificacion registrada (posible venta en efectivo registrada como credito)",
+            "CreditoSinClienteHabilitado", 1.0);
+        AddIfMissing(TipoDetector.CashFraud,
+            "Proporcion atipica de efectivo corporativo",
+            "Genera alerta si un vendedor supera el porcentaje umbral de ventas en efectivo sobre clientes corporativos (patron del caso documentado de enero 2026)",
+            "EfectivoCorporativoPorcentajeUmbral", 30.0);
+        AddIfMissing(TipoDetector.InvoiceAnomaly,
+            "Descuento excesivo fuera de politica",
+            "Genera alerta si el descuento aplicado excede el porcentaje maximo permitido por la politica comercial",
+            "DescuentoPorcentajeMaximo", 10.0);
+        AddIfMissing(TipoDetector.InvoiceAnomaly,
+            "Total de factura inconsistente",
+            "Genera alerta si el total registrado no corresponde a subtotal - descuento + IVA (indicador de manipulacion documental)",
+            "TotalInconsistenteHabilitado", 1.0);
+        AddIfMissing(TipoDetector.PaymentFraud,
+            "Despachos rapidos sucesivos",
+            "Genera alerta si el mismo cliente registra 3 o mas despachos consecutivos con menos de N minutos entre ellos (patron del caso documentado de enero 2026)",
+            "DespachosRapidosMinutosUmbral", 10.0);
+        AddIfMissing(TipoDetector.ComplianceViolation,
+            "Venta sin placa en monto mayor",
+            "Genera alerta si una venta supera el monto umbral sin placa registrada (trazabilidad exigida por normativa de comercializacion)",
+            "VentaSinPlacaMontoMinimo", 200.0);
+
+        if (nuevas.Count > 0)
+            await context.ReglasDeteccion.AddRangeAsync(nuevas);
+
+        // Desactivar fuera de horario en bases existentes (estaciones 24/7)
+        var fueraHorario = await context.ReglasDeteccion
+            .FirstOrDefaultAsync(r => r.ParametroNombre == "FueraHorarioHabilitado");
+        if (fueraHorario is not null && fueraHorario.Activa)
+        {
+            fueraHorario.Activa = false;
+            fueraHorario.ValorUmbral = 0.0;
+        }
+    }
+
+    /// <summary>
+    /// Crea usuarios demo Auditor y Supervisor si no existen (para CU-11 y demostración de RBAC).
+    /// </summary>
+    private static async Task EnsureUsuariosDemoAsync(PetrolRiosDbContext context)
+    {
+        var roles = await context.Roles.ToDictionaryAsync(r => r.Nombre, r => r.Id);
+
+        if (!await context.Usuarios.AnyAsync(u => u.Email == "auditor@petrolrios.com")
+            && roles.TryGetValue("Auditor", out var auditorRolId))
+        {
+            await context.Usuarios.AddAsync(Usuario.Create(
+                "auditor@petrolrios.com",
+                "Maria Fernanda Auditora",
+                BCrypt.Net.BCrypt.HashPassword("Auditor123!"),
+                auditorRolId));
+        }
+
+        if (!await context.Usuarios.AnyAsync(u => u.Email == "supervisor@petrolrios.com")
+            && roles.TryGetValue("Supervisor", out var supervisorRolId))
+        {
+            await context.Usuarios.AddAsync(Usuario.Create(
+                "supervisor@petrolrios.com",
+                "Carlos Supervisor de Auditoria",
+                BCrypt.Net.BCrypt.HashPassword("Supervisor123!"),
+                supervisorRolId));
+        }
     }
 
     private static async Task SeedRolesAsync(PetrolRiosDbContext context)
@@ -79,6 +169,16 @@ public static class SeedData
 
     private static async Task SeedReglasDeteccionAsync(PetrolRiosDbContext context)
     {
+        // Operacion fuera de horario: DESHABILITADA por defecto porque las estaciones de
+        // PetrolRios operan 24/7. Queda disponible para estaciones con horario restringido.
+        var reglaFueraHorario = ReglaDeteccion.Create(
+            TipoDetector.ComplianceViolation,
+            "Operacion fuera de horario",
+            "Genera alerta si se registran transacciones fuera del horario configurado por estacion. Deshabilitada por defecto: las estaciones operan 24/7",
+            "FueraHorarioHabilitado",
+            0.0);
+        reglaFueraHorario.Activa = false;
+
         // Umbrales por defecto según tesis Tabla 3
         var reglas = new[]
         {
@@ -101,6 +201,18 @@ public static class SeedData
                 "Cantidad de dias hacia atras para evaluar patron de faltantes recurrentes",
                 "FaltantesRecurrentesDias",
                 30.0),
+            ReglaDeteccion.Create(
+                TipoDetector.CashFraud,
+                "Venta a credito sin cliente identificado",
+                "Genera alerta si una venta a credito no tiene cliente o identificacion registrada (posible venta en efectivo registrada como credito)",
+                "CreditoSinClienteHabilitado",
+                1.0),
+            ReglaDeteccion.Create(
+                TipoDetector.CashFraud,
+                "Proporcion atipica de efectivo corporativo",
+                "Genera alerta si un vendedor supera el porcentaje umbral de ventas en efectivo sobre clientes corporativos (patron del caso documentado de enero 2026)",
+                "EfectivoCorporativoPorcentajeUmbral",
+                30.0),
 
             // Invoice Anomaly
             ReglaDeteccion.Create(
@@ -120,6 +232,18 @@ public static class SeedData
                 "Campos obligatorios vacios",
                 "Genera alerta si la factura tiene campos obligatorios vacios (placa, identificacion) segun configuracion",
                 "CamposObligatoriosHabilitado",
+                1.0),
+            ReglaDeteccion.Create(
+                TipoDetector.InvoiceAnomaly,
+                "Descuento excesivo fuera de politica",
+                "Genera alerta si el descuento aplicado excede el porcentaje maximo permitido por la politica comercial",
+                "DescuentoPorcentajeMaximo",
+                10.0),
+            ReglaDeteccion.Create(
+                TipoDetector.InvoiceAnomaly,
+                "Total de factura inconsistente",
+                "Genera alerta si el total registrado no corresponde a subtotal - descuento + IVA (indicador de manipulacion documental)",
+                "TotalInconsistenteHabilitado",
                 1.0),
 
             // Payment Fraud
@@ -141,6 +265,12 @@ public static class SeedData
                 "Genera alerta si se detectan transacciones con misma tarjeta, mismo monto y diferencia menor a N minutos",
                 "DuplicadaMinutosUmbral",
                 5.0),
+            ReglaDeteccion.Create(
+                TipoDetector.PaymentFraud,
+                "Despachos rapidos sucesivos",
+                "Genera alerta si el mismo cliente registra 3 o mas despachos consecutivos con menos de N minutos entre ellos (patron del caso documentado de enero 2026)",
+                "DespachosRapidosMinutosUmbral",
+                10.0),
 
             // Compliance Violation
             ReglaDeteccion.Create(
@@ -157,10 +287,11 @@ public static class SeedData
                 1.0),
             ReglaDeteccion.Create(
                 TipoDetector.ComplianceViolation,
-                "Operacion fuera de horario",
-                "Genera alerta si se registran transacciones fuera del horario configurado por estacion",
-                "FueraHorarioHabilitado",
-                1.0)
+                "Venta sin placa en monto mayor",
+                "Genera alerta si una venta supera el monto umbral sin placa registrada (trazabilidad exigida por normativa de comercializacion)",
+                "VentaSinPlacaMontoMinimo",
+                200.0),
+            reglaFueraHorario
         };
         await context.ReglasDeteccion.AddRangeAsync(reglas);
     }

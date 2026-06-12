@@ -39,11 +39,17 @@ public sealed class IngestaService : IIngestaService
         // Insertar cada transacción en staging
         foreach (var item in request.Transacciones)
         {
+            // Las fechas de Firebird llegan con Kind=Unspecified; Npgsql exige UTC
+            // para columnas 'timestamp with time zone'.
+            var fechaOriginal = item.FechaOriginal.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(item.FechaOriginal, DateTimeKind.Utc)
+                : item.FechaOriginal.ToUniversalTime();
+
             var staging = TransaccionStaging.Create(
                 estacion.Id,
                 item.TipoTransaccion,
                 item.DataJson,
-                item.FechaOriginal);
+                fechaOriginal);
             await _dbContext.TransaccionesStaging.AddAsync(staging, ct);
         }
 

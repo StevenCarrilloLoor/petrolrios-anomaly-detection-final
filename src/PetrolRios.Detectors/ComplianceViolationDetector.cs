@@ -8,7 +8,10 @@ namespace PetrolRios.Detectors;
 /// Detector de violaciones de cumplimiento regulatorio:
 /// 1. Venta excesiva a placa genérica ZZZ999949 (regulación ARCERNNR).
 /// 2. Vehículo con múltiples tipos de combustible en el mismo día.
-/// 3. Operación fuera de horario configurado.
+/// 3. Venta sin placa en monto mayor (Tabla 2 de la tesis: identificación obligatoria).
+/// 4. Operación fuera de horario configurado — DESHABILITADA por defecto: las estaciones
+///    de PetrolRíos operan 24/7. Se conserva como regla configurable para estaciones
+///    que definan un horario restringido.
 /// </summary>
 public sealed class ComplianceViolationDetector : IAnomalyDetector
 {
@@ -33,15 +36,21 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
         var galonesMaxPlacaGenerica = GetUmbral(reglas, "PlacaGenericaGalonesMaximo", 5.0);
         var multipleCombustibleHabilitado = GetUmbral(reglas, "MultipleCombustibleHabilitado", 1.0) >= 1.0;
         var fueraHorarioHabilitado = GetUmbral(reglas, "FueraHorarioHabilitado", 1.0) >= 1.0;
+        var montoMinimoSinPlaca = GetUmbral(reglas, "VentaSinPlacaMontoMinimo", 200.0);
 
         // Regla 1: Placa genérica con exceso de galones
-        DetectPlacaGenericaExceso(context, galonesMaxPlacaGenerica, anomalies);
+        if (galonesMaxPlacaGenerica is not null)
+            DetectPlacaGenericaExceso(context, galonesMaxPlacaGenerica.Value, anomalies);
 
         // Regla 2: Múltiples tipos de combustible por placa/día
         if (multipleCombustibleHabilitado)
             DetectMultipleCombustible(context, anomalies);
 
-        // Regla 3: Operaciones fuera de horario
+        // Regla 3: Venta sin placa en monto mayor
+        if (montoMinimoSinPlaca is not null)
+            DetectVentaSinPlacaMontoMayor(context, montoMinimoSinPlaca.Value, anomalies);
+
+        // Regla 4: Operaciones fuera de horario (solo si la estación define horario restringido)
         if (fueraHorarioHabilitado)
             DetectFueraHorario(context, anomalies);
 
@@ -157,6 +166,49 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
         }
     }
 
+    /// <summary>
+    /// Venta sin placa en monto mayor (Tabla 2 de la tesis: "Ventas sin placa en montos
+    /// mayores"). Las ventas de combustible de montos altos sin identificación del vehículo
+    /// impiden la trazabilidad exigida por la normativa de comercialización de combustibles.
+    /// </summary>
+    private void DetectVentaSinPlacaMontoMayor(
+        DetectionContext context, double montoMinimo, List<DetectedAnomaly> anomalies)
+    {
+        var ventasSinPlaca = context.Facturas
+            .Where(f => string.IsNullOrWhiteSpace(f.Placa) && f.TotalNeto > montoMinimo);
+
+        foreach (var factura in ventasSinPlaca)
+        {
+            var reincidencias = context.AlertasPreviasPorEmpleado
+                .GetValueOrDefault(factura.CodigoVendedor.Trim(), 0);
+
+            var (score, nivel) = _scoring.Calculate(
+                riesgoBase: 50,
+                montoInvolucrado: factura.TotalNeto,
+                reincidenciasEmpleado: reincidencias);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.ComplianceViolation,
+                Descripcion = $"Venta de ${factura.TotalNeto:F2} sin placa registrada " +
+                              $"(monto mínimo que exige placa: ${montoMinimo:F2}). " +
+                              $"Doc: {factura.NumeroDocumento}",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                EmpleadoCodigo = factura.CodigoVendedor.Trim(),
+                TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["NumeroDocumento"] = factura.NumeroDocumento,
+                    ["Monto"] = factura.TotalNeto,
+                    ["MontoMinimo"] = montoMinimo,
+                    ["Cliente"] = factura.CodigoCliente.Trim()
+                }
+            });
+        }
+    }
+
     private void DetectFueraHorario(
         DetectionContext context, List<DetectedAnomaly> anomalies)
     {
@@ -204,6 +256,13 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
         }
     }
 
-    private static double GetUmbral(IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, double defaultValue) =>
-        reglas.FirstOrDefault(r => r.ParametroNombre == parametro)?.ValorUmbral ?? defaultValue;
+    /// <summary>
+    /// Obtiene el umbral de una regla. Devuelve null si la regla existe pero está desactivada.
+    /// Si la regla no existe, usa el valor por defecto.
+    /// </summary>
+    private static double? GetUmbral(
+        IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, double defaultValue) =>
+        reglas.FirstOrDefault(r => r.ParametroNombre == parametro) is { } regla
+            ? (regla.Activa ? regla.ValorUmbral : null)
+            : defaultValue;
 }

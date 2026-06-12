@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
 using PetrolRios.Domain.Enums;
 
@@ -9,9 +10,14 @@ namespace PetrolRios.Detectors;
 /// 1. Reversión de tarjeta tardía (> N minutos después de la venta).
 /// 2. Crédito otorgado sin código de autorización (excede límite).
 /// 3. Transacciones duplicadas (misma tarjeta, mismo monto, < N minutos).
+/// 4. Despachos rápidos sucesivos al mismo cliente (patrón del caso documentado
+///    enero 2026: 40 transacciones con menos de 10 minutos entre despachos).
 /// </summary>
 public sealed class PaymentFraudDetector : IAnomalyDetector
 {
+    /// <summary>Mínimo de despachos consecutivos rápidos para generar alerta.</summary>
+    private const int MinDespachosRapidos = 3;
+
     private readonly RiskScoringEngine _scoring;
     private readonly ILogger<PaymentFraudDetector> _logger;
 
@@ -31,16 +37,23 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
         var umbralReversionMinutos = GetUmbral(reglas, "ReversionTarjetaMinutosUmbral", 30.0);
         var creditoSinAutHabilitado = GetUmbral(reglas, "CreditoSinAutorizacionHabilitado", 1.0) >= 1.0;
         var umbralDuplicadaMinutos = GetUmbral(reglas, "DuplicadaMinutosUmbral", 5.0);
+        var umbralDespachosRapidosMinutos = GetUmbral(reglas, "DespachosRapidosMinutosUmbral", 10.0);
 
         // Regla 1: Reversión tarjeta tardía
-        DetectReversionTardia(context, umbralReversionMinutos, anomalies);
+        if (umbralReversionMinutos is not null)
+            DetectReversionTardia(context, umbralReversionMinutos.Value, anomalies);
 
         // Regla 2: Crédito sin autorización
         if (creditoSinAutHabilitado)
             DetectCreditoSinAutorizacion(context, anomalies);
 
         // Regla 3: Transacciones duplicadas
-        DetectTransaccionesDuplicadas(context, umbralDuplicadaMinutos, anomalies);
+        if (umbralDuplicadaMinutos is not null)
+            DetectTransaccionesDuplicadas(context, umbralDuplicadaMinutos.Value, anomalies);
+
+        // Regla 4: Despachos rápidos sucesivos al mismo cliente
+        if (umbralDespachosRapidosMinutos is not null)
+            DetectDespachosRapidosSucesivos(context, umbralDespachosRapidosMinutos.Value, anomalies);
 
         _logger.LogDebug("PaymentFraudDetector: {Count} anomalías en estación {Est}",
             anomalies.Count, context.EstacionNombre);
@@ -53,8 +66,10 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
     {
         // Las tarjetas de turno (TURN_TARJ) con valores negativos indican reversiones.
         // Comparamos el fin del turno con la fecha de las facturas asociadas.
+        // GroupBy tolera turnos duplicados (posibles por reenvíos store-and-forward del agente).
         var turnosPorNumero = context.CierresTurno
-            .ToDictionary(t => t.NumeroTurno, t => t);
+            .GroupBy(t => t.NumeroTurno)
+            .ToDictionary(g => g.Key, g => g.First());
 
         foreach (var tarjeta in context.TarjetasTurno.Where(t => t.Valor < 0))
         {
@@ -194,6 +209,90 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
         }
     }
 
-    private static double GetUmbral(IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, double defaultValue) =>
-        reglas.FirstOrDefault(r => r.ParametroNombre == parametro)?.ValorUmbral ?? defaultValue;
+    /// <summary>
+    /// Despachos rápidos sucesivos: el mismo cliente con 3 o más transacciones consecutivas
+    /// separadas por menos de N minutos. En el caso documentado (enero 2026), el 33.9% de las
+    /// transacciones del cliente investigado ocurrieron con menos de 10 minutos entre despachos,
+    /// un patrón físicamente improbable para vehículos reales que sugiere facturación ficticia.
+    /// </summary>
+    private void DetectDespachosRapidosSucesivos(
+        DetectionContext context, double umbralMinutos, List<DetectedAnomaly> anomalies)
+    {
+        var facturasPorCliente = context.Facturas
+            .Where(f => !string.IsNullOrWhiteSpace(f.CodigoCliente))
+            .GroupBy(f => f.CodigoCliente.Trim());
+
+        foreach (var grupo in facturasPorCliente)
+        {
+            var ordenadas = grupo.OrderBy(f => f.FechaDocumento).ToList();
+            if (ordenadas.Count < MinDespachosRapidos) continue;
+
+            // Buscar rachas de transacciones consecutivas con gap < umbral
+            var racha = new List<FacturaDto> { ordenadas[0] };
+
+            for (var i = 1; i <= ordenadas.Count; i++)
+            {
+                var continuaRacha = i < ordenadas.Count &&
+                    (ordenadas[i].FechaDocumento - ordenadas[i - 1].FechaDocumento).TotalMinutes < umbralMinutos;
+
+                if (continuaRacha)
+                {
+                    racha.Add(ordenadas[i]);
+                    continue;
+                }
+
+                if (racha.Count >= MinDespachosRapidos)
+                    AgregarAlertaDespachosRapidos(context, grupo.Key, racha, umbralMinutos, anomalies);
+
+                if (i < ordenadas.Count)
+                    racha = [ordenadas[i]];
+            }
+        }
+    }
+
+    private void AgregarAlertaDespachosRapidos(
+        DetectionContext context, string cliente, List<FacturaDto> racha,
+        double umbralMinutos, List<DetectedAnomaly> anomalies)
+    {
+        var montoTotal = racha.Sum(f => f.TotalNeto);
+        var vendedores = racha.Select(f => f.CodigoVendedor.Trim()).Distinct().ToList();
+        var duracionMinutos = (racha[^1].FechaDocumento - racha[0].FechaDocumento).TotalMinutes;
+
+        var (score, nivel) = _scoring.Calculate(
+            riesgoBase: 50,
+            montoInvolucrado: montoTotal);
+
+        anomalies.Add(new DetectedAnomaly
+        {
+            TipoDetector = TipoDetector.PaymentFraud,
+            Descripcion = $"Despachos rápidos sucesivos: cliente {cliente} con {racha.Count} " +
+                          $"transacciones en {duracionMinutos:F0} minutos (gaps < {umbralMinutos} min). " +
+                          $"Monto total: ${montoTotal:F2}",
+            Score = score,
+            NivelRiesgo = nivel,
+            EstacionId = context.EstacionId,
+            EmpleadoCodigo = vendedores.Count == 1 ? vendedores[0] : null,
+            TransaccionReferencia = $"RAPIDOS-{cliente}-{racha[0].SecuenciaDocumento}",
+            Metadata = new Dictionary<string, object>
+            {
+                ["Cliente"] = cliente,
+                ["CantidadTransacciones"] = racha.Count,
+                ["DuracionMinutos"] = duracionMinutos,
+                ["UmbralMinutos"] = umbralMinutos,
+                ["MontoTotal"] = montoTotal,
+                ["Vendedores"] = vendedores,
+                ["Documentos"] = racha.Select(f => f.NumeroDocumento).ToList()
+            }
+        });
+    }
+
+    /// <summary>
+    /// Obtiene el umbral de una regla. Devuelve null si la regla existe pero está desactivada.
+    /// Si la regla no existe, usa el valor por defecto.
+    /// </summary>
+    private static double? GetUmbral(
+        IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, double defaultValue) =>
+        reglas.FirstOrDefault(r => r.ParametroNombre == parametro) is { } regla
+            ? (regla.Activa ? regla.ValorUmbral : null)
+            : defaultValue;
 }

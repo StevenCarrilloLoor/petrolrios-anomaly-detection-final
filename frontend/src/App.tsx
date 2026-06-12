@@ -9,6 +9,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { AlertasPage } from "@/pages/AlertasPage";
 import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
 import { ReglasPage } from "@/pages/ReglasPage";
+import { ReportesPage } from "@/pages/ReportesPage";
 import { UsuariosPage } from "@/pages/UsuariosPage";
 import { LogsPage } from "@/pages/LogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -48,6 +49,7 @@ function App() {
               >
                 <Route element={<AppLayout />}>
                   <Route path="/reglas" element={<ReglasPage />} />
+                  <Route path="/reportes" element={<ReportesPage />} />
                 </Route>
               </Route>
 

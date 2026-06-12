@@ -54,6 +54,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("FechaDeteccion")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("FechaResolucion")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("MetadataJson")
                         .HasColumnType("jsonb");
 
@@ -126,6 +129,40 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.HasIndex("UsuarioId");
 
                     b.ToTable("asignaciones_alerta", (string)null);
+                });
+
+            modelBuilder.Entity("PetrolRios.Domain.Entities.ComentarioAlerta", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AlertaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Texto")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlertaId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("comentarios_alerta", (string)null);
                 });
 
             modelBuilder.Entity("PetrolRios.Domain.Entities.EjecucionJob", b =>
@@ -543,6 +580,25 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("PetrolRios.Domain.Entities.ComentarioAlerta", b =>
+                {
+                    b.HasOne("PetrolRios.Domain.Entities.Alerta", "Alerta")
+                        .WithMany("Comentarios")
+                        .HasForeignKey("AlertaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetrolRios.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Alerta");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("PetrolRios.Domain.Entities.EstacionWatermark", b =>
                 {
                     b.HasOne("PetrolRios.Domain.Entities.Estacion", "Estacion")
@@ -589,6 +645,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("PetrolRios.Domain.Entities.Alerta", b =>
                 {
                     b.Navigation("Asignaciones");
+
+                    b.Navigation("Comentarios");
                 });
 
             modelBuilder.Entity("PetrolRios.Domain.Entities.EjecucionJob", b =>

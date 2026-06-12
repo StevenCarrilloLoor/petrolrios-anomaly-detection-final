@@ -76,4 +76,32 @@ public sealed class AlertasController : ControllerBase
         await _alertaService.AsignarAsync(id, request, ct);
         return NoContent();
     }
+
+    /// <summary>
+    /// Listar los comentarios de auditoría de una alerta (CU-07).
+    /// </summary>
+    [HttpGet("{id:int}/comentarios")]
+    [ProducesResponseType(typeof(IReadOnlyList<ComentarioResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetComentarios(int id, CancellationToken ct)
+    {
+        var result = await _alertaService.GetComentariosAsync(id, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Agregar un comentario de auditoría a una alerta (CU-07).
+    /// </summary>
+    [HttpPost("{id:int}/comentarios")]
+    [ProducesResponseType(typeof(ComentarioResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AgregarComentario(
+        int id, [FromBody] AgregarComentarioRequest request, CancellationToken ct)
+    {
+        var usuarioIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(usuarioIdClaim, out var usuarioId))
+            return Unauthorized();
+
+        var result = await _alertaService.AgregarComentarioAsync(id, usuarioId, request, ct);
+        return CreatedAtAction(nameof(GetComentarios), new { id }, result);
+    }
 }

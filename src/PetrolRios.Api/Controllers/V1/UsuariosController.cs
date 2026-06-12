@@ -29,6 +29,23 @@ public sealed class UsuariosController : ControllerBase
     }
 
     /// <summary>
+    /// Listar los auditores activos, para asignación de alertas (CU-11).
+    /// Disponible también para Supervisor.
+    /// </summary>
+    [HttpGet("auditores")]
+    [Authorize(Roles = "Supervisor,Administrador")]
+    [ProducesResponseType(typeof(IReadOnlyList<UsuarioResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAuditores(CancellationToken ct)
+    {
+        var usuarios = await _usuarioService.GetAllAsync(ct);
+        var auditores = usuarios
+            .Where(u => u.Activo && (u.Rol == "Auditor" || u.Rol == "Supervisor"))
+            .Where(u => !u.Email.StartsWith("agent-", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        return Ok(auditores);
+    }
+
+    /// <summary>
     /// Obtener un usuario por ID.
     /// </summary>
     [HttpGet("{id:int}")]

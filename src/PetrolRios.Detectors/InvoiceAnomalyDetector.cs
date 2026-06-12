@@ -9,9 +9,14 @@ namespace PetrolRios.Detectors;
 /// 1. Tasa de anulaciones excesivas por empleado.
 /// 2. Precio aplicado fuera de lista autorizada.
 /// 3. Campos obligatorios vacíos (placa, identificación).
+/// 4. Descuento que excede el porcentaje máximo de la política comercial (Tabla 3 de la tesis).
+/// 5. Total de factura inconsistente con subtotal, descuento e IVA (interrogación de archivos).
 /// </summary>
 public sealed class InvoiceAnomalyDetector : IAnomalyDetector
 {
+    /// <summary>Tolerancia en dólares para validar la aritmética de la factura.</summary>
+    private const double ToleranciaTotal = 0.05;
+
     private readonly RiskScoringEngine _scoring;
     private readonly ILogger<InvoiceAnomalyDetector> _logger;
 
@@ -31,9 +36,12 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         var umbralAnulaciones = GetUmbral(reglas, "AnulacionesPorcentajeUmbral", 5.0);
         var precioFueraListaHabilitado = GetUmbral(reglas, "PrecioFueraListaHabilitado", 1.0) >= 1.0;
         var camposObligatoriosHabilitado = GetUmbral(reglas, "CamposObligatoriosHabilitado", 1.0) >= 1.0;
+        var umbralDescuentoPorcentaje = GetUmbral(reglas, "DescuentoPorcentajeMaximo", 10.0);
+        var totalInconsistenteHabilitado = GetUmbral(reglas, "TotalInconsistenteHabilitado", 1.0) >= 1.0;
 
         // Regla 1: Tasa de anulaciones excesivas
-        DetectAnulacionesExcesivas(context, umbralAnulaciones, anomalies);
+        if (umbralAnulaciones is not null)
+            DetectAnulacionesExcesivas(context, umbralAnulaciones.Value, anomalies);
 
         // Regla 2: Precio fuera de lista
         if (precioFueraListaHabilitado)
@@ -42,6 +50,14 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         // Regla 3: Campos obligatorios vacíos
         if (camposObligatoriosHabilitado)
             DetectCamposObligatoriosVacios(context, anomalies);
+
+        // Regla 4: Descuento excesivo fuera de política
+        if (umbralDescuentoPorcentaje is not null)
+            DetectDescuentoExcesivo(context, umbralDescuentoPorcentaje.Value, anomalies);
+
+        // Regla 5: Total de factura inconsistente
+        if (totalInconsistenteHabilitado)
+            DetectTotalInconsistente(context, anomalies);
 
         _logger.LogDebug("InvoiceAnomalyDetector: {Count} anomalías en estación {Est}",
             anomalies.Count, context.EstacionNombre);
@@ -62,7 +78,6 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
 
         // Las anulaciones no tienen COD_VEND directo; las asociamos por establecimiento/punto emisión.
         // Aproximación: contar total de anulaciones vs total de facturas por período.
-        // Para una asociación más precisa, cruzamos ANUL con DCTO por número de documento.
         var totalFacturas = context.Facturas.Count;
         var totalAnulaciones = context.Anulaciones.Count;
         var tasaGlobal = totalFacturas > 0
@@ -96,12 +111,6 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         // También revisar por vendedor individual
         foreach (var (vendedor, cantidadFacturas) in facturasPorVendedor)
         {
-            // Estimar anulaciones por vendedor: facturas del vendedor que están anuladas
-            // Cruzamos por número de documento cuando es posible
-            var facturasVendedor = context.Facturas
-                .Where(f => f.CodigoVendedor.Trim() == vendedor)
-                .ToList();
-
             // Calcular la tasa individual si hay suficientes transacciones
             if (cantidadFacturas < 5) continue;
 
@@ -146,7 +155,6 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         DetectionContext context, List<DetectedAnomaly> anomalies)
     {
         // Comparar precio aplicado (VUN_DESP) contra precio autorizado en detalles
-        // Los detalles de despacho tienen ValorUnitario (precio aplicado)
         // Agrupamos por producto y tomamos el precio mínimo como "autorizado" del período
         var preciosPorProducto = context.Detalles
             .Where(d => d.ValorUnitario > 0)
@@ -228,6 +236,108 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         }
     }
 
-    private static double GetUmbral(IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, double defaultValue) =>
-        reglas.FirstOrDefault(r => r.ParametroNombre == parametro)?.ValorUmbral ?? defaultValue;
+    /// <summary>
+    /// Descuento que excede el porcentaje máximo permitido por la política comercial
+    /// (Tabla 3 de la tesis: "descuento_aplicado > descuento_máximo_permitido").
+    /// </summary>
+    private void DetectDescuentoExcesivo(
+        DetectionContext context, double porcentajeMaximo, List<DetectedAnomaly> anomalies)
+    {
+        foreach (var factura in context.Facturas)
+        {
+            if (factura.Subtotal <= 0 || factura.Descuento <= 0) continue;
+
+            var porcentajeDescuento = factura.Descuento / factura.Subtotal * 100;
+            if (porcentajeDescuento <= porcentajeMaximo) continue;
+
+            var reincidencias = context.AlertasPreviasPorEmpleado
+                .GetValueOrDefault(factura.CodigoVendedor.Trim(), 0);
+
+            var (score, nivel) = _scoring.Calculate(
+                riesgoBase: 45,
+                montoInvolucrado: factura.Descuento,
+                reincidenciasEmpleado: reincidencias);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.InvoiceAnomaly,
+                Descripcion = $"Descuento excesivo: {porcentajeDescuento:F1}% sobre subtotal " +
+                              $"(máximo permitido: {porcentajeMaximo:F0}%). " +
+                              $"Doc: {factura.NumeroDocumento}, descuento ${factura.Descuento:F2}",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                EmpleadoCodigo = factura.CodigoVendedor.Trim(),
+                TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["NumeroDocumento"] = factura.NumeroDocumento,
+                    ["PorcentajeDescuento"] = porcentajeDescuento,
+                    ["PorcentajeMaximo"] = porcentajeMaximo,
+                    ["MontoDescuento"] = factura.Descuento,
+                    ["Subtotal"] = factura.Subtotal
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Total de factura inconsistente: el total registrado no corresponde a
+    /// subtotal − descuento + IVA. Una factura cuya aritmética no cierra es un
+    /// indicador clásico de manipulación documental en interrogación de archivos.
+    /// </summary>
+    private void DetectTotalInconsistente(
+        DetectionContext context, List<DetectedAnomaly> anomalies)
+    {
+        foreach (var factura in context.Facturas)
+        {
+            if (factura.Subtotal <= 0) continue;
+
+            var totalEsperado = factura.Subtotal - factura.Descuento + factura.Iva;
+            var diferencia = Math.Abs(factura.TotalNeto - totalEsperado);
+
+            if (diferencia <= ToleranciaTotal) continue;
+
+            var reincidencias = context.AlertasPreviasPorEmpleado
+                .GetValueOrDefault(factura.CodigoVendedor.Trim(), 0);
+
+            var (score, nivel) = _scoring.Calculate(
+                riesgoBase: 55,
+                montoInvolucrado: diferencia,
+                reincidenciasEmpleado: reincidencias);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.InvoiceAnomaly,
+                Descripcion = $"Total inconsistente en documento {factura.NumeroDocumento}: " +
+                              $"registrado ${factura.TotalNeto:F2}, esperado ${totalEsperado:F2} " +
+                              $"(diferencia ${diferencia:F2})",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                EmpleadoCodigo = factura.CodigoVendedor.Trim(),
+                TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["NumeroDocumento"] = factura.NumeroDocumento,
+                    ["TotalRegistrado"] = factura.TotalNeto,
+                    ["TotalEsperado"] = totalEsperado,
+                    ["Diferencia"] = diferencia,
+                    ["Subtotal"] = factura.Subtotal,
+                    ["Descuento"] = factura.Descuento,
+                    ["Iva"] = factura.Iva
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Obtiene el umbral de una regla. Devuelve null si la regla existe pero está desactivada.
+    /// Si la regla no existe, usa el valor por defecto.
+    /// </summary>
+    private static double? GetUmbral(
+        IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, double defaultValue) =>
+        reglas.FirstOrDefault(r => r.ParametroNombre == parametro) is { } regla
+            ? (regla.Activa ? regla.ValorUmbral : null)
+            : defaultValue;
 }

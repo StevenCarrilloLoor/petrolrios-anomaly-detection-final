@@ -55,9 +55,11 @@ public sealed class AnomalyDetectionJob
         {
             _logger.LogInformation("Iniciando ciclo de detección de anomalías");
 
-            // Obtener estaciones activas y reglas
+            // Obtener estaciones activas y TODAS las reglas (incluidas las inactivas):
+            // los detectores necesitan ver una regla desactivada para NO ejecutarla
+            // (si no la ven, aplicarían su umbral por defecto).
             var estaciones = await _unitOfWork.Estaciones.GetActivasAsync(ct);
-            var reglas = await _unitOfWork.ReglasDeteccion.GetActivasAsync(ct);
+            var reglas = await _unitOfWork.ReglasDeteccion.GetAllAsync(ct);
             var totalAlertas = 0;
             var estacionesProcesadas = 0;
 
@@ -135,9 +137,16 @@ public sealed class AnomalyDetectionJob
         var desde = watermark?.UltimaExtraccion ?? DateTime.UtcNow.AddHours(-1);
 
         // Obtener datos de staging para esta estación
-        var staging = await _dbContext.TransaccionesStaging
+        var stagingTodos = await _dbContext.TransaccionesStaging
             .Where(s => s.EstacionId == estacion.Id && !s.Procesada)
             .ToListAsync(ct);
+
+        // Deduplicar lotes reenviados por el agente (store-and-forward puede
+        // reenviar un lote ya recibido si el primer envío falló a mitad de camino)
+        var staging = stagingTodos
+            .GroupBy(s => new { s.TipoTransaccion, s.DataJson })
+            .Select(g => g.First())
+            .ToList();
 
         var facturas = DeserializeStagingByType<Application.DTOs.Firebird.FacturaDto>(staging, "Factura");
         var detalles = DeserializeStagingByType<Application.DTOs.Firebird.DetalleFacturaDto>(staging, "DetalleFactura");
@@ -160,8 +169,8 @@ public sealed class AnomalyDetectionJob
             .GroupBy(codigo => codigo)
             .ToDictionary(g => g.Key, g => g.Count());
 
-        // Marcar staging como procesada
-        foreach (var s in staging)
+        // Marcar TODO el staging (incluidos duplicados) como procesado
+        foreach (var s in stagingTodos)
             s.Procesada = true;
 
         return new DetectionContext

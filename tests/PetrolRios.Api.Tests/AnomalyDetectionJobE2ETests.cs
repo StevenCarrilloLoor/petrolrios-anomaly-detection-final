@@ -71,6 +71,9 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         var reglas = _dbContext.ReglasDeteccion.ToList();
         reglaRepoMock.Setup(r => r.GetActivasAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(reglas);
+        // El job ahora carga TODAS las reglas (incluidas inactivas) para respetar el flag Activa
+        reglaRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reglas);
 
         unitOfWorkMock.Setup(u => u.Estaciones).Returns(estacionRepoMock.Object);
         unitOfWorkMock.Setup(u => u.ReglasDeteccion).Returns(reglaRepoMock.Object);
