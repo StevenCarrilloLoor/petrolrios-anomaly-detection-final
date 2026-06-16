@@ -409,3 +409,28 @@ empaqueta limpio. Verificado en vivo de punta a punta:
    `TotalNeto > 400 && CodigoPago == 'EF' && Descuento / Subtotal > 0.1`; el validador la
    marcó **"Expresión válida"**, se guardó y quedó listada con el indicador ⚡, lista para
    evaluarse en el siguiente ciclo del motor.
+
+## 21. Empaque del agente dentro del repositorio (monorepo)
+
+El agente vive **dentro del proyecto** (`src/PetrolRios.StationAgent/`), así que su código
+ya se versiona con cada commit — no hay un repositorio aparte. Para que implementar en una
+estación sea "copiar una carpeta y ejecutar", se agregó un empaque limpio:
+
+- **Plantilla de configuración versionada y sin secretos:** `agent-config.example.json`
+  (junto al proyecto) documenta el formato y trae los valores por defecto (puertos, charset,
+  dialect, rutas) pero **sin contraseñas**. Viaja con el repo y se copia a la salida en cada
+  publicación. La configuración real de cada estación —con contraseñas— se crea localmente al
+  guardar desde el panel (`config/agent-config.json`) y está **git-ignorada**, cumpliendo la
+  regla 14 de seguridad (nunca subir secretos al repositorio).
+- **Script de publicación `scripts/publicar_agente.bat`:** genera con `dotnet publish` un
+  **ejecutable autocontenido de un solo archivo** (`win-x64`, no requiere instalar .NET) en
+  `dist/agente/`, junto con la plantilla de config y un `LEEME.txt` con los pasos de
+  instalación. La carpeta es el paquete listo para llevar a cada estación; al estar en
+  `dist/` (git-ignorada) no engorda el repo y se regenera cuando cambia el código.
+- **Flujo de implementación en campo:** correr `publicar_agente.bat` → copiar `dist/agente`
+  a la computadora de la estación → ejecutar `PetrolRios.StationAgent.exe` → abrir
+  `localhost:5180` → poner nombre y datos de conexión → guardar. La estación aparece "En
+  línea" en el panel central.
+- **Verificado:** la publicación corrió en Windows con **build correcto**; la carpeta
+  `dist/agente` quedó con un único `PetrolRios.StationAgent.exe` autocontenido más
+  `agent-config.example.json`, `appsettings.json`, `web.config` y `LEEME.txt`.

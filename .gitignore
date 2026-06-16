@@ -68,3 +68,8 @@ coverage-report/
 _arranque/firebird_data/
 *.FBK
 *.fbk
+
+# Configuracion real del agente por estacion (contiene contrasenas) — nunca al repo
+agent-config.json
+**/config/agent-config.json
+!agent-config.example.json

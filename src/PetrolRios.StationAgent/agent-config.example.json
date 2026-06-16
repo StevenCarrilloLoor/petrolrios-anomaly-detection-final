@@ -1,0 +1,30 @@
+{
+  "//": "PLANTILLA DE CONFIGURACION DEL AGENTE PETROLRIOS — sin contrasenas reales.",
+  "//_uso": "Lo normal es NO editar este archivo: ejecute el .exe, abra http://localhost:5180 y configure desde el panel (pestana Configuracion). El agente creara config/agent-config.json automaticamente al guardar. Use esta plantilla solo si quiere dejar una estacion preconfigurada: copiela a config/agent-config.json, rellene los campos y ponga 'Configurado': true.",
+
+  "CodigoEstacion": "EST-001",
+  "NombreEstacion": "Estacion Santo Domingo Centro",
+  "ZonaEstacion": "Centro",
+
+  "ServerUrl": "http://IP-DEL-SERVIDOR-CENTRAL:5170",
+  "Email": "agent-est-001@petrolrios.com",
+  "Password": "",
+
+  "ServerTimeoutSegundos": 30,
+
+  "FirebirdHost": "localhost",
+  "FirebirdPort": 3050,
+  "FirebirdDatabase": "C:\\CONTAC\\CONTAC.FDB",
+  "FirebirdUser": "SYSDBA",
+  "FirebirdPassword": "",
+  "FirebirdCharset": "NONE",
+  "FirebirdDialect": 3,
+  "FirebirdWireCrypt": "Disabled",
+
+  "IntervaloSegundos": 30,
+  "InicioAutomatico": true,
+  "LocalStorePath": "pending",
+  "PanelPuerto": 5180,
+
+  "Configurado": false
+}

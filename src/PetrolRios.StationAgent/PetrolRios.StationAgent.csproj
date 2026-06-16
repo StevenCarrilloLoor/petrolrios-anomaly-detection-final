@@ -21,4 +21,9 @@
     <ProjectReference Include="..\PetrolRios.Application\PetrolRios.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- La plantilla de configuracion viaja junto al .exe en cada publicacion -->
+    <None Include="agent-config.example.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
