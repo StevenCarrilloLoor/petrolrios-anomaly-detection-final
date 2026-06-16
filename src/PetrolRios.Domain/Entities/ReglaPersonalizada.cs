@@ -20,6 +20,13 @@ public class ReglaPersonalizada : BaseEntity
     /// <summary>Agregación opcional (JSON): {"agruparPor","funcion","campo","operador","umbral"}.</summary>
     public string? AgregacionJson { get; set; }
 
+    /// <summary>
+    /// Modo avanzado: expresión lógica (programación) que reemplaza las condiciones
+    /// simples. Si está presente, el detector filtra los registros con esta expresión
+    /// (ej.: "TotalNeto > 400 &amp;&amp; (CodigoPago == 'EF' || Descuento / Subtotal > 0.1)").
+    /// </summary>
+    public string? ExpresionAvanzada { get; set; }
+
     /// <summary>Riesgo base de la alerta generada (1–100); el motor de scoring aplica multiplicadores.</summary>
     public double RiesgoBase { get; set; } = 50;
 

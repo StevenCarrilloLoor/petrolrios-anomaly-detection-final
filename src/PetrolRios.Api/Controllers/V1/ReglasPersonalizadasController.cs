@@ -6,6 +6,7 @@ using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.ReglasPersonalizadas;
 using PetrolRios.Application.Interfaces;
 using PetrolRios.Application.ReglasPersonalizadas;
+using PetrolRios.Application.ReglasPersonalizadas.Expresiones;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Infrastructure.Persistence;
 
@@ -63,6 +64,18 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         return Ok(catalogo);
     }
 
+    /// <summary>
+    /// Valida (sin guardar) una expresión del modo avanzado contra una fuente.
+    /// Sirve para el comprobador en vivo del builder.
+    /// </summary>
+    [HttpPost("validar-expresion")]
+    [ProducesResponseType(typeof(ValidarExpresionResponse), StatusCodes.Status200OK)]
+    public IActionResult ValidarExpresion([FromBody] ValidarExpresionRequest request)
+    {
+        var errores = EvaluadorExpresion.Validar(request.Expresion ?? "", request.FuenteDatos ?? "");
+        return Ok(new ValidarExpresionResponse(errores.Count == 0, errores));
+    }
+
     /// <summary>Listar todas las reglas personalizadas.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<ReglaPersonalizadaResponse>), StatusCodes.Status200OK)]
@@ -96,6 +109,8 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             request.Agregacion is null ? null : JsonSerializer.Serialize(request.Agregacion),
             request.RiesgoBase);
         regla.Activa = request.Activa;
+        regla.ExpresionAvanzada = string.IsNullOrWhiteSpace(request.ExpresionAvanzada)
+            ? null : request.ExpresionAvanzada.Trim();
 
         await _dbContext.ReglasPersonalizadas.AddAsync(regla, ct);
         await _dbContext.SaveChangesAsync(ct);
@@ -128,6 +143,8 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.FuenteDatos = request.FuenteDatos;
         regla.CondicionesJson = JsonSerializer.Serialize(request.Condiciones);
         regla.AgregacionJson = request.Agregacion is null ? null : JsonSerializer.Serialize(request.Agregacion);
+        regla.ExpresionAvanzada = string.IsNullOrWhiteSpace(request.ExpresionAvanzada)
+            ? null : request.ExpresionAvanzada.Trim();
         regla.RiesgoBase = request.RiesgoBase;
         regla.Activa = request.Activa;
         await _dbContext.SaveChangesAsync(ct);
@@ -167,8 +184,27 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         if (string.IsNullOrWhiteSpace(nombre))
             errores.Add("El nombre de la regla es obligatorio.");
 
-        errores.AddRange(CatalogoReglasPersonalizadas.ValidarDefinicion(
-            request.FuenteDatos, request.Condiciones, request.Agregacion, request.RiesgoBase));
+        if (request.RiesgoBase is < 1 or > 100)
+            errores.Add("El riesgo base debe estar entre 1 y 100.");
+
+        if (!CatalogoReglasPersonalizadas.Fuentes.ContainsKey(request.FuenteDatos))
+            errores.Add($"Fuente de datos desconocida: '{request.FuenteDatos}'.");
+
+        if (!string.IsNullOrWhiteSpace(request.ExpresionAvanzada))
+        {
+            // Modo avanzado: validar la expresión lógica
+            errores.AddRange(EvaluadorExpresion.Validar(request.ExpresionAvanzada, request.FuenteDatos));
+            // La agregación sigue siendo opcional sobre el resultado del filtro
+            if (request.Agregacion is not null)
+                errores.AddRange(CatalogoReglasPersonalizadas.ValidarDefinicion(
+                    request.FuenteDatos, [], request.Agregacion, request.RiesgoBase));
+        }
+        else
+        {
+            // Modo básico: validar condiciones + agregación
+            errores.AddRange(CatalogoReglasPersonalizadas.ValidarDefinicion(
+                request.FuenteDatos, request.Condiciones, request.Agregacion, request.RiesgoBase));
+        }
 
         return errores;
     }
@@ -183,6 +219,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         Agregacion = string.IsNullOrWhiteSpace(regla.AgregacionJson)
             ? null
             : JsonSerializer.Deserialize<AgregacionRegla>(regla.AgregacionJson, JsonOpts),
+        ExpresionAvanzada = regla.ExpresionAvanzada,
         RiesgoBase = regla.RiesgoBase,
         Activa = regla.Activa
     };

@@ -456,6 +456,10 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ExpresionAvanzada")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<string>("FuenteDatos")
                         .IsRequired()
                         .HasMaxLength(50)

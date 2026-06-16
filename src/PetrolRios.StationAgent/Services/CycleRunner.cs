@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Extensions.Options;
 using PetrolRios.StationAgent.Configuration;
 
 namespace PetrolRios.StationAgent.Services;
@@ -15,7 +14,7 @@ public sealed class CycleRunner
     private readonly ServerClient _serverClient;
     private readonly LocalStore _localStore;
     private readonly AgentState _state;
-    private readonly AgentOptions _options;
+    private readonly AgentConfigStore _config;
     private readonly ILogger<CycleRunner> _logger;
     private readonly string _watermarkFile;
     private DateTime _lastWatermark;
@@ -27,16 +26,16 @@ public sealed class CycleRunner
         ServerClient serverClient,
         LocalStore localStore,
         AgentState state,
-        IOptions<AgentOptions> options,
+        AgentConfigStore config,
         ILogger<CycleRunner> logger)
     {
         _extractor = extractor;
         _serverClient = serverClient;
         _localStore = localStore;
         _state = state;
-        _options = options.Value;
+        _config = config;
         _logger = logger;
-        _watermarkFile = Path.Combine(_options.LocalStorePath, "watermark.txt");
+        _watermarkFile = Path.Combine(_config.Actual.LocalStorePath, "watermark.txt");
         _lastWatermark = LoadWatermark();
     }
 
@@ -109,8 +108,9 @@ public sealed class CycleRunner
     {
         try
         {
-            if (!Directory.Exists(_options.LocalStorePath)) return 0;
-            return Directory.GetFiles(_options.LocalStorePath, "batch_*.json").Length;
+            var storePath = _config.Actual.LocalStorePath;
+            if (!Directory.Exists(storePath)) return 0;
+            return Directory.GetFiles(storePath, "batch_*.json").Length;
         }
         catch
         {

@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using PetrolRios.StationAgent;
 using PetrolRios.StationAgent.Configuration;
 using PetrolRios.StationAgent.Services;
@@ -18,9 +17,12 @@ try
         .WriteTo.Console()
         .WriteTo.File("logs/agent-.log", rollingInterval: RollingInterval.Day));
 
-    // Configuración del agente
+    // Defaults de appsettings.json (semilla del primer arranque)
     builder.Services.Configure<AgentOptions>(
         builder.Configuration.GetSection(AgentOptions.SectionName));
+
+    // Store de configuración editable y persistente (fuente única en runtime)
+    builder.Services.AddSingleton<AgentConfigStore>();
 
     var agentConfig = builder.Configuration.GetSection(AgentOptions.SectionName);
     var panelPuerto = int.TryParse(agentConfig["PanelPuerto"], out var p) ? p : 5180;
@@ -34,15 +36,12 @@ try
     builder.Services.AddSingleton<LocalStore>();
     builder.Services.AddSingleton<CycleRunner>();
 
-    // HttpClient para comunicación con el servidor central
-    builder.Services.AddHttpClient("servidor-central", client =>
-    {
-        client.BaseAddress = new Uri(agentConfig["ServerUrl"] ?? "http://localhost:5170");
-        client.Timeout = TimeSpan.FromSeconds(30);
-    });
+    // HttpClient sin BaseAddress fija: ServerClient construye la URL absoluta a
+    // partir del config store en cada petición (la URL del servidor es editable).
+    builder.Services.AddHttpClient("servidor-central");
     builder.Services.AddSingleton<ServerClient>(sp => new ServerClient(
         sp.GetRequiredService<IHttpClientFactory>().CreateClient("servidor-central"),
-        sp.GetRequiredService<IOptions<AgentOptions>>(),
+        sp.GetRequiredService<AgentConfigStore>(),
         sp.GetRequiredService<ILogger<ServerClient>>()));
 
     // Worker principal
@@ -56,23 +55,29 @@ try
 
     var app = builder.Build();
 
-    // Modo inicial según configuración
+    // Modo inicial: si no está configurado, arranca en MANUAL (no sincroniza solo
+    // hasta que el operador complete y guarde la configuración desde la interfaz).
+    var configStore = app.Services.GetRequiredService<AgentConfigStore>();
     var estadoInicial = app.Services.GetRequiredService<AgentState>();
-    estadoInicial.ModoAutomatico = agentConfig.GetValue("InicioAutomatico", true);
+    var inicial = configStore.Actual;
+    estadoInicial.ModoAutomatico = inicial.Configurado && inicial.InicioAutomatico;
 
     // ─────────── Panel de control local del agente ───────────
 
     app.MapGet("/", () => Results.Content(PanelHtml.Pagina, "text/html; charset=utf-8"));
 
-    app.MapGet("/api/estado", (AgentState state, CycleRunner runner, IOptions<AgentOptions> opts) =>
+    app.MapGet("/api/estado", (AgentState state, CycleRunner runner, AgentConfigStore cfg) =>
     {
-        var o = opts.Value;
+        var s = cfg.Actual;
         return Results.Json(new
         {
-            estacion = o.CodigoEstacion,
-            servidor = o.ServerUrl,
-            intervaloSegundos = o.IntervaloSegundos,
-            firebird = OcultarPassword(o.FirebirdConnectionString),
+            estacion = s.CodigoEstacion,
+            nombreEstacion = s.NombreEstacion,
+            zonaEstacion = s.ZonaEstacion,
+            servidor = s.ServerUrl,
+            intervaloSegundos = s.IntervaloSegundos,
+            firebird = OcultarPassword(s.ConstruirFirebirdConnectionString()),
+            configurado = s.Configurado,
             modoAutomatico = state.ModoAutomatico,
             inicioAgente = state.InicioAgente,
             uptimeSegundos = Math.Round((DateTime.UtcNow - state.InicioAgente).TotalSeconds),
@@ -90,8 +95,75 @@ try
         });
     });
 
-    app.MapPost("/api/sincronizar", async (CycleRunner runner, AgentState state, CancellationToken ct) =>
+    // Configuración completa (para el formulario de la interfaz; sin password en claro)
+    app.MapGet("/api/config", (AgentConfigStore cfg) =>
     {
+        var s = cfg.Actual;
+        return Results.Json(new
+        {
+            s.CodigoEstacion,
+            s.NombreEstacion,
+            s.ZonaEstacion,
+            s.ServerUrl,
+            s.Email,
+            tienePassword = !string.IsNullOrEmpty(s.Password),
+            s.ServerTimeoutSegundos,
+            s.FirebirdHost,
+            s.FirebirdPort,
+            s.FirebirdDatabase,
+            s.FirebirdUser,
+            tieneFirebirdPassword = !string.IsNullOrEmpty(s.FirebirdPassword),
+            s.FirebirdCharset,
+            s.FirebirdDialect,
+            s.FirebirdWireCrypt,
+            s.IntervaloSegundos,
+            s.InicioAutomatico,
+            s.Configurado
+        });
+    });
+
+    // Guardar configuración. Los campos de password vacíos conservan el valor actual.
+    app.MapPost("/api/config", (GuardarConfigRequest req, AgentConfigStore cfg, AgentState state) =>
+    {
+        var actual = cfg.Actual;
+        var nueva = new AgentSettings
+        {
+            CodigoEstacion = (req.CodigoEstacion ?? actual.CodigoEstacion).Trim().ToUpperInvariant(),
+            NombreEstacion = (req.NombreEstacion ?? actual.NombreEstacion).Trim(),
+            ZonaEstacion = (req.ZonaEstacion ?? actual.ZonaEstacion).Trim(),
+            ServerUrl = (req.ServerUrl ?? actual.ServerUrl).Trim(),
+            Email = (req.Email ?? actual.Email).Trim(),
+            Password = string.IsNullOrEmpty(req.Password) ? actual.Password : req.Password,
+            ServerTimeoutSegundos = req.ServerTimeoutSegundos ?? actual.ServerTimeoutSegundos,
+            FirebirdHost = (req.FirebirdHost ?? actual.FirebirdHost).Trim(),
+            FirebirdPort = req.FirebirdPort ?? actual.FirebirdPort,
+            FirebirdDatabase = (req.FirebirdDatabase ?? actual.FirebirdDatabase).Trim(),
+            FirebirdUser = (req.FirebirdUser ?? actual.FirebirdUser).Trim(),
+            FirebirdPassword = string.IsNullOrEmpty(req.FirebirdPassword) ? actual.FirebirdPassword : req.FirebirdPassword,
+            FirebirdCharset = (req.FirebirdCharset ?? actual.FirebirdCharset).Trim(),
+            FirebirdDialect = req.FirebirdDialect ?? actual.FirebirdDialect,
+            FirebirdWireCrypt = (req.FirebirdWireCrypt ?? actual.FirebirdWireCrypt).Trim(),
+            IntervaloSegundos = req.IntervaloSegundos ?? actual.IntervaloSegundos,
+            InicioAutomatico = req.InicioAutomatico ?? actual.InicioAutomatico,
+            LocalStorePath = actual.LocalStorePath,
+            PanelPuerto = actual.PanelPuerto
+        };
+
+        if (string.IsNullOrWhiteSpace(nueva.CodigoEstacion))
+            return Results.BadRequest(new { mensaje = "El código de estación es obligatorio." });
+        if (string.IsNullOrWhiteSpace(nueva.NombreEstacion))
+            return Results.BadRequest(new { mensaje = "El nombre de la estación es obligatorio." });
+
+        cfg.Guardar(nueva);
+        state.ModoAutomatico = nueva.InicioAutomatico;
+        state.RegistrarEvento("OK", $"Configuración guardada — estación '{nueva.NombreEstacion}' ({nueva.CodigoEstacion})");
+        return Results.Json(new { ok = true });
+    });
+
+    app.MapPost("/api/sincronizar", async (CycleRunner runner, AgentState state, AgentConfigStore cfg, CancellationToken ct) =>
+    {
+        if (!cfg.Actual.Configurado)
+            return Results.Json(new { ok = false, resultado = "Configure el agente antes de sincronizar." });
         state.RegistrarEvento("INFO", "Sincronización manual solicitada desde el panel");
         var resultado = await runner.RunCycleAsync(ct);
         return Results.Json(new { ok = state.UltimoCicloExitoso, resultado });
@@ -147,3 +219,22 @@ static string OcultarPassword(string connectionString) =>
         connectionString, @"(?i)(password\s*=\s*)[^;]+", "$1•••••");
 
 internal sealed record ModoRequest(bool Automatico);
+
+internal sealed record GuardarConfigRequest(
+    string? CodigoEstacion,
+    string? NombreEstacion,
+    string? ZonaEstacion,
+    string? ServerUrl,
+    string? Email,
+    string? Password,
+    int? ServerTimeoutSegundos,
+    string? FirebirdHost,
+    int? FirebirdPort,
+    string? FirebirdDatabase,
+    string? FirebirdUser,
+    string? FirebirdPassword,
+    string? FirebirdCharset,
+    int? FirebirdDialect,
+    string? FirebirdWireCrypt,
+    int? IntervaloSegundos,
+    bool? InicioAutomatico);

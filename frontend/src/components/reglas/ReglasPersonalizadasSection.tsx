@@ -17,6 +17,10 @@ import {
   X,
   Save,
   SigmaSquare,
+  Code2,
+  SlidersHorizontal,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 const inputClass =
@@ -45,6 +49,8 @@ interface FormularioRegla {
   nombre: string;
   descripcion: string;
   fuenteDatos: string;
+  modoAvanzado: boolean;
+  expresion: string;
   condiciones: CondicionRegla[];
   usarAgregacion: boolean;
   agregacion: AgregacionRegla;
@@ -55,6 +61,8 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
   nombre: "",
   descripcion: "",
   fuenteDatos: fuente,
+  modoAvanzado: false,
+  expresion: "",
   condiciones: [],
   usarAgregacion: false,
   agregacion: { agruparPor: "", funcion: "Conteo", campo: null, operador: ">", umbral: 1 },
@@ -106,6 +114,7 @@ export function ReglasPersonalizadasSection() {
         fuenteDatos: regla.fuenteDatos,
         condiciones: regla.condiciones,
         agregacion: regla.agregacion,
+        expresionAvanzada: regla.expresionAvanzada,
         riesgoBase: regla.riesgoBase,
         activa: !regla.activa,
       }),
@@ -129,6 +138,8 @@ export function ReglasPersonalizadasSection() {
       nombre: regla.nombre,
       descripcion: regla.descripcion,
       fuenteDatos: regla.fuenteDatos,
+      modoAvanzado: !!regla.expresionAvanzada,
+      expresion: regla.expresionAvanzada ?? "",
       condiciones: [...regla.condiciones],
       usarAgregacion: regla.agregacion !== null,
       agregacion: regla.agregacion ?? {
@@ -158,8 +169,9 @@ export function ReglasPersonalizadasSection() {
         nombre: form.nombre,
         descripcion: form.descripcion,
         fuenteDatos: form.fuenteDatos,
-        condiciones: form.condiciones,
+        condiciones: form.modoAvanzado ? [] : form.condiciones,
         agregacion: form.usarAgregacion ? form.agregacion : null,
+        expresionAvanzada: form.modoAvanzado ? form.expresion : null,
         riesgoBase: form.riesgoBase,
         activa: true,
       },
@@ -224,6 +236,8 @@ export function ReglasPersonalizadasSection() {
                       ...formularioVacio(e.target.value),
                       nombre: form.nombre,
                       descripcion: form.descripcion,
+                      modoAvanzado: form.modoAvanzado,
+                      expresion: form.expresion,
                       riesgoBase: form.riesgoBase,
                     })
                   }
@@ -247,7 +261,42 @@ export function ReglasPersonalizadasSection() {
               </label>
             </div>
 
-            {/* Condiciones */}
+            {/* Selector de modo: básico (visual) vs avanzado (expresión) */}
+            <div className="mt-5 flex gap-2 rounded-lg border border-border bg-background p-1">
+              <button
+                onClick={() => setForm({ ...form, modoAvanzado: false })}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  !form.modoAvanzado
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <SlidersHorizontal size={15} /> Modo básico (visual)
+              </button>
+              <button
+                onClick={() => setForm({ ...form, modoAvanzado: true })}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  form.modoAvanzado
+                    ? "bg-violet-600 text-white"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <Code2 size={15} /> Modo avanzado (expresión)
+              </button>
+            </div>
+
+            {/* MODO AVANZADO: editor de expresión */}
+            {form.modoAvanzado && (
+              <EditorExpresion
+                fuente={form.fuenteDatos}
+                campos={camposFuente(form.fuenteDatos)}
+                expresion={form.expresion}
+                onChange={(expr) => setForm({ ...form, expresion: expr })}
+              />
+            )}
+
+            {/* MODO BÁSICO: condiciones visuales */}
+            {!form.modoAvanzado && (
             <div className="mt-5">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -357,8 +406,9 @@ export function ReglasPersonalizadasSection() {
                 })}
               </div>
             </div>
+            )}
 
-            {/* Agregación */}
+            {/* Agregación (disponible en ambos modos) */}
             <div className="mt-5">
               <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <input
@@ -608,11 +658,165 @@ export function ReglasPersonalizadasSection() {
 }
 
 function resumenRegla(regla: ReglaPersonalizadaResponse): string {
-  const condiciones = regla.condiciones
-    .map((c) => `${c.campo} ${c.operador} ${c.valor}`.trim())
-    .join(" Y ");
+  const filtro = regla.expresionAvanzada
+    ? regla.expresionAvanzada
+    : regla.condiciones
+        .map((c) => `${c.campo} ${c.operador} ${c.valor}`.trim())
+        .join(" Y ") || "todos los registros";
   const agregacion = regla.agregacion
     ? ` → ${regla.agregacion.funcion}${regla.agregacion.campo ? `(${regla.agregacion.campo})` : ""} por ${regla.agregacion.agruparPor} ${regla.agregacion.operador} ${regla.agregacion.umbral}`
     : "";
-  return `${regla.fuenteDatos}: ${condiciones || "todos los registros"}${agregacion}`;
+  const prefijo = regla.expresionAvanzada ? "⚡ " : "";
+  return `${prefijo}${regla.fuenteDatos}: ${filtro}${agregacion}`;
+}
+
+/// <summary>Editor del modo avanzado: expresión + referencia de campos/operadores + validación en vivo.</summary>
+function EditorExpresion({
+  fuente,
+  campos,
+  expresion,
+  onChange,
+}: {
+  fuente: string;
+  campos: { nombre: string; etiqueta: string; tipo: string }[];
+  expresion: string;
+  onChange: (expr: string) => void;
+}) {
+  const [validacion, setValidacion] = useState<{
+    valida: boolean;
+    errores: string[];
+  } | null>(null);
+  const [validando, setValidando] = useState(false);
+
+  async function validar() {
+    if (!expresion.trim()) return;
+    setValidando(true);
+    try {
+      const r = await reglasPersonalizadasService.validarExpresion(fuente, expresion);
+      setValidacion(r);
+    } catch {
+      setValidacion({ valida: false, errores: ["No se pudo validar."] });
+    }
+    setValidando(false);
+  }
+
+  function insertar(texto: string) {
+    onChange((expresion ? expresion + " " : "") + texto);
+    setValidacion(null);
+  }
+
+  return (
+    <div className="mt-5 space-y-3">
+      <div className="rounded-lg border border-violet-500/30 bg-violet-500/5 p-3 text-xs text-muted-foreground">
+        Escriba una <span className="font-medium text-foreground">expresión lógica</span> que
+        combine campos con operadores. Ejemplos:
+        <span className="ml-1 font-mono text-violet-300">
+          TotalNeto &gt; 400 &amp;&amp; CodigoPago == 'EF'
+        </span>
+        {" · "}
+        <span className="font-mono text-violet-300">Descuento / Subtotal &gt; 0.1</span>
+        {" · "}
+        <span className="font-mono text-violet-300">vacio(Placa) || longitud(RucCliente) &lt; 10</span>
+      </div>
+
+      <textarea
+        value={expresion}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setValidacion(null);
+        }}
+        rows={3}
+        placeholder="Ej.: TotalNeto > 400 && (CodigoPago == 'EF' || Descuento / Subtotal > 0.15)"
+        className="w-full rounded-md border border-border bg-[#0a0f1c] px-3 py-2.5 font-mono text-sm text-foreground focus:border-violet-500 focus:outline-none"
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={validar}
+          disabled={validando || !expresion.trim()}
+          className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+        >
+          <CheckCircle2 size={13} /> Validar expresión
+        </button>
+        {validacion?.valida && (
+          <span className="flex items-center gap-1 text-xs font-medium text-risk-low">
+            <CheckCircle2 size={13} /> Expresión válida
+          </span>
+        )}
+      </div>
+
+      {validacion && !validacion.valida && (
+        <div className="rounded-md border border-risk-critical/30 bg-risk-critical/10 px-3 py-2">
+          {validacion.errores.map((e, i) => (
+            <p key={i} className="flex items-start gap-1.5 text-xs text-risk-critical">
+              <AlertCircle size={13} className="mt-0.5 shrink-0" /> {e}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Referencia: campos, operadores y funciones disponibles */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border bg-background p-3">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Campos ({fuente})
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {campos.map((c) => (
+              <button
+                key={c.nombre}
+                onClick={() => insertar(c.nombre)}
+                title={c.etiqueta}
+                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground hover:bg-primary hover:text-primary-foreground"
+              >
+                {c.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-background p-3">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Operadores
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {[">", ">=", "<", "<=", "==", "!=", "&&", "||", "!", "+", "-", "*", "/", "(", ")"].map(
+              (op) => (
+                <button
+                  key={op}
+                  onClick={() => insertar(op)}
+                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground hover:bg-primary hover:text-primary-foreground"
+                >
+                  {op}
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-background p-3">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Funciones
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {[
+              "vacio()",
+              "contiene(,)",
+              "empieza(,)",
+              "abs()",
+              "longitud()",
+              "minusculas()",
+              "redondear()",
+            ].map((fn) => (
+              <button
+                key={fn}
+                onClick={() => insertar(fn)}
+                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground hover:bg-primary hover:text-primary-foreground"
+              >
+                {fn}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

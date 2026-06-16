@@ -1,8 +1,6 @@
-using System.Data;
 using Dapper;
 using FirebirdSql.Data.FirebirdClient;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.StationAgent.Configuration;
 
@@ -11,19 +9,22 @@ namespace PetrolRios.StationAgent.Services;
 /// <summary>
 /// Extrae transacciones de la base Firebird local usando Dapper.
 /// Solo lectura — nunca modifica la base de datos de la estación.
+/// Lee la cadena de conexión del <see cref="AgentConfigStore"/> en cada uso,
+/// de modo que ajustar los parámetros de Firebird desde la interfaz aplica al vuelo.
 /// </summary>
 public sealed class FirebirdExtractor
 {
-    private readonly string _connectionString;
+    private readonly AgentConfigStore _config;
     private readonly ILogger<FirebirdExtractor> _logger;
 
-    public FirebirdExtractor(IOptions<AgentOptions> options, ILogger<FirebirdExtractor> logger)
+    public FirebirdExtractor(AgentConfigStore config, ILogger<FirebirdExtractor> logger)
     {
-        _connectionString = options.Value.FirebirdConnectionString;
+        _config = config;
         _logger = logger;
     }
 
-    private FbConnection CreateConnection() => new(_connectionString);
+    private FbConnection CreateConnection() =>
+        new(_config.Actual.ConstruirFirebirdConnectionString());
 
     /// <summary>
     /// Prueba la conexión a la base Firebird local (panel de control del agente).
@@ -40,8 +41,24 @@ public sealed class FirebirdExtractor
         }
         catch (Exception ex)
         {
-            return (false, ex.Message, null);
+            return (false, InterpretarError(ex), null);
         }
+    }
+
+    /// <summary>Traduce errores comunes de Firebird a mensajes accionables en campo.</summary>
+    private static string InterpretarError(Exception ex)
+    {
+        var m = ex.Message;
+        if (m.Contains("user name and password", StringComparison.OrdinalIgnoreCase))
+            return "Usuario/contraseña de Firebird incorrectos, o WireCrypt mal configurado " +
+                   "(use 'Disabled' para Firebird 2.5, 'Enabled' para Firebird 3+).";
+        if (m.Contains("unavailable", StringComparison.OrdinalIgnoreCase) ||
+            m.Contains("connection", StringComparison.OrdinalIgnoreCase))
+            return "No se pudo conectar al servidor Firebird. Verifique host, puerto y que el servicio esté encendido.";
+        if (m.Contains("No such file", StringComparison.OrdinalIgnoreCase) ||
+            m.Contains("not found", StringComparison.OrdinalIgnoreCase))
+            return "No se encontró el archivo de base de datos. Verifique la ruta de CONTAC.FDB.";
+        return m;
     }
 
     /// <summary>

@@ -10,6 +10,10 @@ public sealed record ReglaPersonalizadaResponse
     public string FuenteDatos { get; init; } = string.Empty;
     public IReadOnlyList<CondicionRegla> Condiciones { get; init; } = [];
     public AgregacionRegla? Agregacion { get; init; }
+
+    /// <summary>Expresión del modo avanzado (null en modo básico).</summary>
+    public string? ExpresionAvanzada { get; init; }
+
     public double RiesgoBase { get; init; }
     public bool Activa { get; init; }
 }
@@ -21,9 +25,18 @@ public sealed record GuardarReglaPersonalizadaRequest
     public required string FuenteDatos { get; init; }
     public List<CondicionRegla> Condiciones { get; init; } = [];
     public AgregacionRegla? Agregacion { get; init; }
+
+    /// <summary>Si viene no vacía, la regla es de modo avanzado (expresión lógica).</summary>
+    public string? ExpresionAvanzada { get; init; }
+
     public double RiesgoBase { get; init; } = 50;
     public bool Activa { get; init; } = true;
 }
+
+/// <summary>Solicitud para validar/probar una expresión avanzada sin guardarla.</summary>
+public sealed record ValidarExpresionRequest(string FuenteDatos, string Expresion);
+
+public sealed record ValidarExpresionResponse(bool Valida, IReadOnlyList<string> Errores);
 
 /// <summary>Catálogo para el builder: fuentes, campos, operadores y funciones disponibles.</summary>
 public sealed record CatalogoReglasResponse

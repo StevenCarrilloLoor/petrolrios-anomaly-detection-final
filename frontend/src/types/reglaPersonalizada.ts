@@ -19,6 +19,7 @@ export interface ReglaPersonalizadaResponse {
   fuenteDatos: string;
   condiciones: CondicionRegla[];
   agregacion: AgregacionRegla | null;
+  expresionAvanzada: string | null;
   riesgoBase: number;
   activa: boolean;
 }
@@ -29,8 +30,14 @@ export interface GuardarReglaPersonalizadaRequest {
   fuenteDatos: string;
   condiciones: CondicionRegla[];
   agregacion: AgregacionRegla | null;
+  expresionAvanzada: string | null;
   riesgoBase: number;
   activa: boolean;
+}
+
+export interface ValidarExpresionResponse {
+  valida: boolean;
+  errores: string[];
 }
 
 export interface CampoCatalogo {

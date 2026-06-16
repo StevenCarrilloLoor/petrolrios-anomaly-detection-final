@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using PetrolRios.StationAgent.Configuration;
 
 namespace PetrolRios.StationAgent.Services;
@@ -14,9 +13,9 @@ public sealed class LocalStore
     private readonly string _storePath;
     private readonly ILogger<LocalStore> _logger;
 
-    public LocalStore(IOptions<AgentOptions> options, ILogger<LocalStore> logger)
+    public LocalStore(AgentConfigStore config, ILogger<LocalStore> logger)
     {
-        _storePath = options.Value.LocalStorePath;
+        _storePath = config.Actual.LocalStorePath;
         _logger = logger;
         Directory.CreateDirectory(_storePath);
     }

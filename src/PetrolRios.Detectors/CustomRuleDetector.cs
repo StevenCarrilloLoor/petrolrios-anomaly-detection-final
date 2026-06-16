@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PetrolRios.Application.Interfaces;
 using PetrolRios.Application.ReglasPersonalizadas;
+using PetrolRios.Application.ReglasPersonalizadas.Expresiones;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
@@ -64,9 +65,22 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         var registros = ObtenerFuente(context, regla.FuenteDatos);
         if (registros.Count == 0) return;
 
-        var filtrados = registros
-            .Where(r => condiciones.All(c => EvaluarCondicion(regla.FuenteDatos, r, c)))
-            .ToList();
+        List<object> filtrados;
+        if (!string.IsNullOrWhiteSpace(regla.ExpresionAvanzada))
+        {
+            // Modo avanzado: filtra con la expresión lógica (compilada una vez por regla)
+            var evaluador = EvaluadorExpresion.Compilar(regla.ExpresionAvanzada);
+            filtrados = registros
+                .Where(r => evaluador.Evaluar(new ContextoRegistro(regla.FuenteDatos, r)))
+                .ToList();
+        }
+        else
+        {
+            // Modo básico: condiciones simples combinadas con AND
+            filtrados = registros
+                .Where(r => condiciones.All(c => EvaluarCondicion(regla.FuenteDatos, r, c)))
+                .ToList();
+        }
 
         if (filtrados.Count == 0) return;
 
@@ -171,21 +185,23 @@ public sealed class CustomRuleDetector : IAnomalyDetector
 
         var (score, nivel) = _scoring.Calculate(regla.RiesgoBase, monto ?? 0, reincidencias);
 
-        var detalleCondiciones = string.Join(" y ",
-            condiciones.Select(c => $"{c.Campo} {c.Operador} {FormatearValor(c)}"));
+        var esAvanzada = !string.IsNullOrWhiteSpace(regla.ExpresionAvanzada);
+        var detalle = esAvanzada
+            ? regla.ExpresionAvanzada!
+            : string.Join(" y ", condiciones.Select(c => $"{c.Campo} {c.Operador} {FormatearValor(c)}"));
 
         var metadata = new Dictionary<string, object>
         {
             ["ReglaPersonalizada"] = regla.Nombre,
             ["Fuente"] = regla.FuenteDatos,
-            ["Condiciones"] = detalleCondiciones
+            [esAvanzada ? "Expresion" : "Condiciones"] = detalle
         };
         AgregarValoresClave(regla.FuenteDatos, registro, condiciones, metadata);
 
         return new DetectedAnomaly
         {
             TipoDetector = TipoDetector.Personalizada,
-            Descripcion = $"Regla '{regla.Nombre}': registro de {regla.FuenteDatos} cumple {detalleCondiciones}" +
+            Descripcion = $"Regla '{regla.Nombre}': registro de {regla.FuenteDatos} cumple [{detalle}]" +
                           (monto is not null ? $". Monto: ${monto:F2}" : ""),
             Score = score,
             NivelRiesgo = nivel,
@@ -254,4 +270,23 @@ public sealed class CustomRuleDetector : IAnomalyDetector
 
     private static string FormatearValor(CondicionRegla c) =>
         c.Operador is "vacio" or "noVacio" ? "" : $"'{c.Valor}'";
+
+    /// <summary>
+    /// Adapta un registro de la fuente a <see cref="IContextoEvaluacion"/> para que
+    /// el evaluador de expresiones resuelva campos por nombre usando el catálogo.
+    /// </summary>
+    private sealed class ContextoRegistro(string fuente, object registro) : IContextoEvaluacion
+    {
+        public Valor ObtenerCampo(string nombre)
+        {
+            var valor = CatalogoReglasPersonalizadas.GetValor(fuente, nombre, registro);
+            var campo = CatalogoReglasPersonalizadas.BuscarCampo(fuente, nombre);
+            if (campo is null)
+                throw new ExpresionException($"El campo '{nombre}' no existe en la fuente '{fuente}'.");
+
+            return campo.Tipo == CatalogoReglasPersonalizadas.TipoNumero
+                ? Valor.DeNumero(Convert.ToDouble(valor ?? 0, CultureInfo.InvariantCulture))
+                : Valor.DeTexto(Convert.ToString(valor, CultureInfo.InvariantCulture)?.Trim() ?? "");
+        }
+    }
 }

@@ -336,3 +336,76 @@ Docker arriba). Frontend compila y empaqueta limpio. Migración EF nueva
 `AgregarHeartbeatYReglasPersonalizadas` (columnas de heartbeat + tabla
 `reglas_personalizadas`). Verificado en vivo: heartbeat "En línea", edición de estación,
 y la regla personalizada generando alertas reales.
+
+## 18. El agente como aplicación individual (instalable por estación)
+
+El agente dejó de depender de un `appsettings` fijo: ahora es una **aplicación autónoma**
+que se instala en la computadora de cada estación (la que tiene la base Firebird, pero
+**no** la base central). El flujo en campo es: copiar el `.exe`, ejecutarlo, se abre el
+panel local en `http://localhost:5180`, se escribe el **nombre de la estación** y los datos
+de conexión, se guarda, y el agente empieza a enviar — sin tocar archivos ni reiniciar nada.
+
+- **Configuración editable y persistente en disco** (`AgentConfigStore` →
+  `config/agent-config.json`, junto al `.exe`). Reemplaza a `IOptions`: cualquier cambio
+  (URL del servidor, ruta Firebird, intervalo, nombre) se aplica **en caliente**, sin
+  recompilar ni reiniciar el servicio. `ServerClient` arma la URL del servidor en cada
+  petición, por eso cambiar la URL surte efecto al instante.
+- **Nombre de estación desde el propio agente.** Lo que se escribe en el panel se envía en
+  cada ingesta/heartbeat y **se refleja en la página de Conexiones del servidor central**.
+  Si la estación aún no existía, se **auto-registra** con ese nombre en su primer contacto;
+  si ya existía con nombre por defecto (`Estación {código}`), se actualiza; si el supervisor
+  ya le puso un nombre manual, no se sobrescribe.
+- **Panel con dos pestañas (Monitoreo / Configuración)** y un **banner de bienvenida**
+  cuando el agente aún no está configurado. El formulario está dividido en secciones:
+  *Identidad* (código, nombre, zona), *Servidor central* (URL, usuario, contraseña,
+  timeout), *Base Firebird* y *Operación* (intervalo, modo automático).
+- **Opciones avanzadas de conexión "por si algo falla en campo".** La sección Firebird
+  expone host, puerto, ruta del `CONTAC.FDB`, usuario, contraseña, **charset**, **dialect**
+  y **WireCrypt** (con la pista *"Disabled para Firebird 2.5 con Legacy_Auth"*, que es la
+  causa #1 de fallo de conexión a Contaplus). Botones **Probar Firebird** y **Probar
+  servidor** diagnostican cada extremo por separado, y los errores se traducen a mensajes
+  entendibles (archivo no encontrado, WireCrypt incompatible, servidor inalcanzable).
+- **Arranque seguro:** mientras no esté configurado, el agente queda en modo manual (no
+  intenta sincronizar contra una base inexistente); el heartbeat se envía siempre para que
+  el panel central lo vea aunque todavía no mande transacciones.
+- **Publicación self-contained:** un solo `.exe` (sin instalar .NET) vía `publicar.bat`, e
+  instalador opcional con Inno Setup (`agente.iss`) para dejarlo como servicio de Windows.
+
+## 19. Generador de reglas avanzado (modo expresión)
+
+Al "modo básico" visual se le sumó un **modo avanzado** donde el usuario escribe la regla
+como una **expresión lógica de programación**, mucho más abierta y combinable.
+
+- **Motor de expresiones propio y seguro** (`Tokenizer` → `Parser` descendente recursivo →
+  `EvaluadorExpresion`). **No** ejecuta código arbitrario: solo evalúa la expresión contra
+  los campos del registro, con precedencia correcta (`||`, `&&`, comparaciones, `+ -`,
+  `* /`, unario, paréntesis).
+- **Operadores y funciones:** `> >= < <= == != && || ! + - * /`, y funciones útiles —
+  `vacio()`, `contiene(,)`, `empieza(,)`, `termina(,)`, `longitud()`, `minusculas()`,
+  `mayusculas()`, `abs()`, `redondear()`. Permite cosas imposibles en el modo básico, como
+  **aritmética entre campos** (`Descuento / Subtotal > 0.1`) o condiciones compuestas con
+  paréntesis.
+- **Editor en la UI** con paletas de **campos / operadores / funciones** que se insertan al
+  hacer clic, botón **"Validar expresión"** que comprueba sintaxis y que todos los campos
+  referenciados existan en el catálogo de la fuente (validación en vivo, en verde/rojo).
+- **Integración con el detector:** `CustomRuleDetector` compila la expresión una sola vez y
+  filtra los registros; si la expresión está rota, **no tumba el ciclo** (se ignora la regla
+  y se sigue). Las reglas avanzadas se muestran en la lista con el prefijo ⚡.
+- Persistencia: columna `ExpresionAvanzada` en `reglas_personalizadas` (migración EF
+  `ReglasPersonalizadasAvanzadas`).
+
+## 20. Resultado de verificación (ronda 4)
+
+Build sin warnings; **113 pruebas unitarias en verde** (Domain 4, Detectors 84 — incluidos
+los nuevos `ExpresionAvanzadaTests` del motor de expresiones —, Api 25). Frontend compila y
+empaqueta limpio. Verificado en vivo de punta a punta:
+
+1. **Agente individual:** se configuró el nombre *"Estación Santo Domingo Centro"* en el
+   panel del agente (`localhost:5180`), se guardó (persistió a disco), y la página de
+   **Conexiones del servidor central mostró `EST-001 · Estación Santo Domingo Centro ·
+   zona Centro · agente v2.1 · En línea`** — exactamente el flujo pedido (ejecutar el exe →
+   poner el nombre → aparece conectado en el central).
+2. **Regla avanzada:** se creó *"Efectivo alto con descuento agresivo"* con la expresión
+   `TotalNeto > 400 && CodigoPago == 'EF' && Descuento / Subtotal > 0.1`; el validador la
+   marcó **"Expresión válida"**, se guardó y quedó listada con el indicador ⚡, lista para
+   evaluarse en el siguiente ciclo del motor.

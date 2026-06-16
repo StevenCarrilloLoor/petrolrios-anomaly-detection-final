@@ -6,6 +6,8 @@ namespace PetrolRios.Application.DTOs.Ingesta;
 public sealed record IngestaRequest
 {
     public required string CodigoEstacion { get; init; }
+    public string? NombreEstacion { get; init; }
+    public string? ZonaEstacion { get; init; }
     public required List<TransaccionIngestaItem> Transacciones { get; init; }
 }
 
@@ -26,5 +28,7 @@ public sealed record IngestaResponse
 public sealed record HeartbeatRequest
 {
     public required string CodigoEstacion { get; init; }
+    public string? NombreEstacion { get; init; }
+    public string? ZonaEstacion { get; init; }
     public string? VersionAgente { get; init; }
 }

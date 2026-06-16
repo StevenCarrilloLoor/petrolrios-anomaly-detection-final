@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using PetrolRios.StationAgent.Configuration;
 using PetrolRios.StationAgent.Services;
 
@@ -7,53 +6,60 @@ namespace PetrolRios.StationAgent;
 /// <summary>
 /// Worker del agente de estación. En modo automático ejecuta un ciclo de
 /// sincronización cada N segundos; en modo manual queda a la espera de que el
-/// operador dispare la sincronización desde el panel local.
+/// operador dispare la sincronización desde el panel local. El intervalo, el
+/// modo y demás parámetros se leen del <see cref="AgentConfigStore"/> en cada
+/// vuelta, de modo que los cambios desde la interfaz aplican sin reiniciar.
 /// </summary>
 public sealed class Worker : BackgroundService
 {
     private readonly CycleRunner _cycleRunner;
     private readonly ServerClient _serverClient;
     private readonly AgentState _state;
-    private readonly AgentOptions _options;
+    private readonly AgentConfigStore _config;
     private readonly ILogger<Worker> _logger;
 
     public Worker(
         CycleRunner cycleRunner,
         ServerClient serverClient,
         AgentState state,
-        IOptions<AgentOptions> options,
+        AgentConfigStore config,
         ILogger<Worker> logger)
     {
         _cycleRunner = cycleRunner;
         _serverClient = serverClient;
         _state = state;
-        _options = options.Value;
+        _config = config;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var inicial = _config.Actual;
         _logger.LogInformation(
             "Agente de estación {Codigo} iniciado. Intervalo: {Intervalo}s. Panel: http://localhost:{Puerto}",
-            _options.CodigoEstacion, _options.IntervaloSegundos, _options.PanelPuerto);
+            inicial.CodigoEstacion, inicial.IntervaloSegundos, inicial.PanelPuerto);
         _state.RegistrarEvento("INFO",
-            $"Agente {_options.CodigoEstacion} iniciado (intervalo {_options.IntervaloSegundos}s)");
+            $"Agente {inicial.CodigoEstacion} iniciado (intervalo {inicial.IntervaloSegundos}s)");
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var settings = _config.Actual;
             try
             {
-                // Heartbeat SIEMPRE (también en modo manual): el panel central debe
-                // saber que el agente está vivo aunque no haya datos nuevos.
-                var latido = await _serverClient.SendHeartbeatAsync(stoppingToken);
-                if (latido)
-                    _state.UltimaConexionServidor = DateTime.UtcNow;
-                else
-                    _state.UltimaDesconexionServidor = DateTime.UtcNow;
-
-                if (_state.ModoAutomatico)
+                // El agente solo opera si está configurado (evita golpear el
+                // servidor con credenciales por defecto antes del primer setup).
+                if (settings.Configurado)
                 {
-                    await _cycleRunner.RunCycleAsync(stoppingToken);
+                    // Heartbeat SIEMPRE (también en modo manual): el panel central
+                    // debe saber que el agente está vivo aunque no haya datos nuevos.
+                    var latido = await _serverClient.SendHeartbeatAsync(stoppingToken);
+                    if (latido)
+                        _state.UltimaConexionServidor = DateTime.UtcNow;
+                    else
+                        _state.UltimaDesconexionServidor = DateTime.UtcNow;
+
+                    if (_state.ModoAutomatico)
+                        await _cycleRunner.RunCycleAsync(stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -66,9 +72,10 @@ public sealed class Worker : BackgroundService
                 _state.RegistrarEvento("ERROR", ex.Message);
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(_options.IntervaloSegundos), stoppingToken);
+            var intervalo = Math.Clamp(settings.IntervaloSegundos, 5, 3600);
+            await Task.Delay(TimeSpan.FromSeconds(intervalo), stoppingToken);
         }
 
-        _logger.LogInformation("Agente de estación {Codigo} detenido", _options.CodigoEstacion);
+        _logger.LogInformation("Agente de estación {Codigo} detenido", _config.Actual.CodigoEstacion);
     }
 }
