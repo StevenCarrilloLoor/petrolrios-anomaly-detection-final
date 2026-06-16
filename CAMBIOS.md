@@ -269,3 +269,70 @@ El agente dejó de ser una consola ciega; ahora levanta un **panel web local en
 3. **7.2 despliegue:** describir la distribución como ejecutables self-contained e
    instaladores Inno Setup, y la API sirviendo la SPA (un contenedor de despliegue).
 4. **Capturas:** regenerar Reglas, Conexiones y el panel del agente.
+
+---
+
+# Tercera ronda de mejoras (observaciones del usuario, junio 2026)
+
+## 13. Heartbeat del agente y estado de conexión real
+
+El agente ahora envía un **heartbeat** (`POST /api/v1/ingesta/heartbeat`) en cada ciclo,
+también en modo manual. Una estación se considera **"En línea"** si su agente latió en
+los últimos 3 minutos, **aunque no haya transacciones nuevas** — antes una estación con
+agente activo pero sin datos aparecía falsamente como "Sin conexión". La página de
+Conexiones distingue ahora "Señal de vida" (heartbeat) de "Última ingesta de datos", y
+muestra la versión del agente. Verificado en vivo: EST-001 marca "En línea · hace
+segundos · agente v2.0".
+
+## 14. Estaciones dinámicas (auto-registro + CRUD)
+
+- **Auto-registro:** las estaciones se crean solas la primera vez que su agente se
+  conecta (`Estacion.CreateDesdeAgente`), en lugar de quemar 10 estaciones fijas. El
+  dashboard muestra "Estaciones en Línea: X de N" (N = registradas reales, escalable).
+- **Editar / eliminar** (`EstacionesController`): el usuario corrige nombre y zona de
+  cada estación desde la página de Conexiones, y puede eliminar una estación que ya no
+  es parte del sistema. Si la estación tiene historial (alertas/transacciones) se
+  **desactiva** en lugar de borrarse, para conservar la trazabilidad de auditoría.
+
+## 15. Motor de reglas personalizadas (escalabilidad sin tocar código)
+
+El gran pedido de escalabilidad de la tesis: los usuarios **crean sus propias reglas de
+negocio** desde la interfaz, y funcionan para cualquier escenario.
+
+- **`CustomRuleDetector`** (5.º detector, Strategy Pattern): evalúa reglas definidas por
+  el usuario. Cada regla elige una **fuente de datos** (Facturas, Cierres de turno,
+  Despachos, Créditos, Tarjetas), aplica N **condiciones** combinadas con AND (operadores
+  numéricos y de texto, incluidos "contiene", "vacío", etc.) y, opcionalmente, **agrupa y
+  compara un agregado** (Conteo, Suma, Promedio) contra un umbral. Una regla mal definida
+  se ignora y se registra, sin tumbar el ciclo.
+- **`CatalogoReglasPersonalizadas`:** única fuente de verdad de fuentes/campos/operadores;
+  la usan el builder de la UI, la validación al guardar y el detector al evaluar (no hay
+  inyección arbitraria — todo se valida contra el catálogo).
+- **`ReglasPersonalizadasController`** (CRUD + `/catalogo`) con validación estricta y
+  auditoría. **Builder visual** en la página de Reglas: el usuario arma condiciones y
+  agregaciones con menús desplegables, sin escribir código ni SQL.
+- **Verificado en vivo end-to-end:** se creó "Facturas en efectivo mayores a $400" desde
+  la UI → se guardó y persistió → se editó el umbral a $300 → el ciclo del motor la
+  evaluó y generó la **alerta #83 "Regla Personalizada" (Crítico, score 96)** con
+  descripción autoexplicativa. 8 tests unitarios nuevos cubren el detector
+  (condiciones AND, agregación Conteo/Suma, regla inactiva, JSON inválido, campos vacíos).
+
+## 16. Branding profesional y tiempo real más dinámico
+
+- **Sin menciones de tesis en la UI:** se quitaron los "CU-XX", "OE2", "Proyecto de
+  titulación · UDLA" y el "10 estaciones" quemado — la interfaz se presenta como producto
+  de PetrolRíos S.A., no como entregable académico.
+- **Tiempo real:** la llegada de una alerta por SignalR ahora **invalida y refresca
+  automáticamente** las vistas de alertas, dashboard y conexiones (antes había que
+  recargar). Los logs de auditoría y la lista de alertas además sondean cada 10–15 s.
+- **Ciclos más cortos:** el job de detección pasó de cada 5 min a **cada minuto**; el
+  agente de 60 s a **30 s**. El sistema es mucho más dinámico sin colapsar.
+
+## 17. Resultado de verificación (ronda 3)
+
+Build sin warnings; **85 pruebas unitarias en verde** (Domain 4, Detectors 69 — los 8
+nuevos de reglas personalizadas incluidos —, Api 12 + 13 de integración que pasan con
+Docker arriba). Frontend compila y empaqueta limpio. Migración EF nueva
+`AgregarHeartbeatYReglasPersonalizadas` (columnas de heartbeat + tabla
+`reglas_personalizadas`). Verificado en vivo: heartbeat "En línea", edición de estación,
+y la regla personalizada generando alertas reales.

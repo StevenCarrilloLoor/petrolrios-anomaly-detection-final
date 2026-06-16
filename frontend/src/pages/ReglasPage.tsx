@@ -26,9 +26,8 @@ const ORDEN_DETECTORES: TipoDetector[] = [
   "ComplianceViolation",
 ];
 
-const DETECTOR_META: Record<
-  TipoDetector,
-  { icono: ReactNode; color: string; descripcion: string }
+const DETECTOR_META: Partial<
+  Record<TipoDetector, { icono: ReactNode; color: string; descripcion: string }>
 > = {
   CashFraud: {
     icono: <Banknote size={18} />,
@@ -138,6 +137,7 @@ export function ReglasPage() {
 
       {grupos.map(({ detector, reglas: reglasGrupo }) => {
         const meta = DETECTOR_META[detector];
+        if (!meta) return null;
         const activas = reglasGrupo.filter((r) => r.activa).length;
         return (
           <Card key={detector}>
