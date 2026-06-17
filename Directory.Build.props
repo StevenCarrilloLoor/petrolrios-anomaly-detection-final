@@ -1,0 +1,14 @@
+<Project>
+
+  <!--
+    Fuente única de la versión de TODO el sistema PetrolRíos (servidor y agente).
+    Subir aquí el número en cada release: fluye al .exe, al heartbeat del agente,
+    al manifiesto de actualización y a los instaladores (que la leen del .exe).
+  -->
+  <PropertyGroup>
+    <Version>2.2.0</Version>
+    <Company>PetrolRíos S.A.</Company>
+    <Product>PetrolRíos — Detección de Anomalías</Product>
+  </PropertyGroup>
+
+</Project>

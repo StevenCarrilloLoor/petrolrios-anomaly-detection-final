@@ -39,10 +39,14 @@ try
     // HttpClient sin BaseAddress fija: ServerClient construye la URL absoluta a
     // partir del config store en cada petición (la URL del servidor es editable).
     builder.Services.AddHttpClient("servidor-central");
+    builder.Services.AddHttpClient("actualizaciones");
     builder.Services.AddSingleton<ServerClient>(sp => new ServerClient(
         sp.GetRequiredService<IHttpClientFactory>().CreateClient("servidor-central"),
         sp.GetRequiredService<AgentConfigStore>(),
         sp.GetRequiredService<ILogger<ServerClient>>()));
+
+    // Servicio de actualización remota (control de versiones)
+    builder.Services.AddSingleton<UpdateService>();
 
     // Worker principal
     builder.Services.AddHostedService<Worker>();
@@ -91,6 +95,12 @@ try
             ultimaConexionServidor = state.UltimaConexionServidor,
             ultimaDesconexionServidor = state.UltimaDesconexionServidor,
             ultimaLatenciaServidorMs = state.UltimaLatenciaServidorMs,
+            versionAgente = VersionAgente.Actual,
+            actualizacionDisponible = state.ActualizacionDisponible,
+            versionDisponible = state.VersionDisponible,
+            notasActualizacion = state.NotasActualizacion,
+            actualizacionObligatoria = state.ActualizacionObligatoria,
+            aplicandoActualizacion = state.AplicandoActualizacion,
             eventos = state.Eventos
         });
     });
@@ -118,6 +128,8 @@ try
             s.FirebirdWireCrypt,
             s.IntervaloSegundos,
             s.InicioAutomatico,
+            s.UpdateFeedUrl,
+            s.UpdateFeedFallbackUrl,
             s.Configurado
         });
     });
@@ -146,7 +158,10 @@ try
             IntervaloSegundos = req.IntervaloSegundos ?? actual.IntervaloSegundos,
             InicioAutomatico = req.InicioAutomatico ?? actual.InicioAutomatico,
             LocalStorePath = actual.LocalStorePath,
-            PanelPuerto = actual.PanelPuerto
+            PanelPuerto = actual.PanelPuerto,
+            UpdateFeedUrl = (req.UpdateFeedUrl ?? actual.UpdateFeedUrl).Trim(),
+            UpdateFeedFallbackUrl = (req.UpdateFeedFallbackUrl ?? actual.UpdateFeedFallbackUrl).Trim(),
+            NombreServicioWindows = actual.NombreServicioWindows
         };
 
         if (string.IsNullOrWhiteSpace(nueva.CodigoEstacion))
@@ -202,6 +217,66 @@ try
         return Results.Json(new { ok, mensaje, latenciaMs = latencia });
     });
 
+    // Revisar manualmente el feed de actualización (botón "Buscar actualización")
+    app.MapPost("/api/revisar-actualizacion", async (UpdateService updater, AgentState state, CancellationToken ct) =>
+    {
+        var manifiesto = await updater.ConsultarAsync(ct);
+        if (manifiesto is null)
+            return Results.Json(new { ok = false, mensaje = "No se pudo contactar el feed de actualización." });
+
+        var hay = UpdateService.EsMasNueva(manifiesto.Version, VersionAgente.Actual);
+        state.ActualizacionDisponible = hay;
+        state.VersionDisponible = hay ? manifiesto.Version : null;
+        state.NotasActualizacion = hay ? manifiesto.Notas : null;
+        state.UrlActualizacion = hay ? manifiesto.Url : null;
+        state.Sha256Actualizacion = hay ? manifiesto.Sha256 : null;
+        state.ActualizacionObligatoria = hay && manifiesto.Obligatoria;
+
+        return Results.Json(new
+        {
+            ok = true,
+            hayActualizacion = hay,
+            versionInstalada = VersionAgente.Actual,
+            versionDisponible = manifiesto.Version,
+            mensaje = hay
+                ? $"Actualización {manifiesto.Version} disponible."
+                : $"El agente está al día (versión {VersionAgente.Actual})."
+        });
+    });
+
+    // Aplicar la actualización con un clic: descarga, verifica checksum, reemplaza y reinicia
+    app.MapPost("/api/actualizar", async (
+        UpdateService updater, AgentState state, IHostApplicationLifetime vida, CancellationToken ct) =>
+    {
+        if (!state.ActualizacionDisponible || string.IsNullOrWhiteSpace(state.UrlActualizacion))
+            return Results.Json(new { ok = false, mensaje = "No hay ninguna actualización pendiente." });
+        if (state.AplicandoActualizacion)
+            return Results.Json(new { ok = false, mensaje = "Ya hay una actualización en curso." });
+
+        state.AplicandoActualizacion = true;
+        var manifiesto = new ManifiestoActualizacion
+        {
+            Version = state.VersionDisponible ?? "",
+            Url = state.UrlActualizacion!,
+            Sha256 = state.Sha256Actualizacion,
+            Notas = state.NotasActualizacion
+        };
+
+        var (ok, mensaje) = await updater.AplicarAsync(manifiesto, ct);
+        state.RegistrarEvento(ok ? "OK" : "ERROR", $"Actualización: {mensaje}");
+
+        if (ok)
+        {
+            // Dar tiempo a responder al panel antes de cerrar para liberar el .exe
+            _ = Task.Run(async () => { await Task.Delay(1500); vida.StopApplication(); });
+        }
+        else
+        {
+            state.AplicandoActualizacion = false;
+        }
+        return Results.Json(new { ok, mensaje });
+    });
+
     Log.Information("Panel del agente disponible en http://localhost:{Puerto}", panelPuerto);
     app.Run();
 }
@@ -237,4 +312,6 @@ internal sealed record GuardarConfigRequest(
     int? FirebirdDialect,
     string? FirebirdWireCrypt,
     int? IntervaloSegundos,
-    bool? InicioAutomatico);
+    bool? InicioAutomatico,
+    string? UpdateFeedUrl,
+    string? UpdateFeedFallbackUrl);

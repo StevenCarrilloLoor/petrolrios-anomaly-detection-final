@@ -73,6 +73,9 @@ internal static class PanelHtml
   .banner{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.35);color:var(--warn);
           border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:none}
   .banner.show{display:block}
+  .banner-update{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#bfdbfe;
+                 display:none;align-items:center;justify-content:space-between;gap:14px}
+  .banner-update.show{display:flex}
   .hidden{display:none}
 </style>
 </head>
@@ -86,6 +89,12 @@ internal static class PanelHtml
   <div class="banner" id="banner-setup">
     ⚙️ Este agente aún no está configurado. Vaya a la pestaña <b>Configuración</b>, ingrese el
     <b>nombre de la estación</b> y los datos de conexión, pruebe y guarde para empezar a enviar datos.
+  </div>
+
+  <div class="banner banner-update" id="banner-update">
+    <div>⬆️ <b>Actualización disponible</b> — versión <span id="upd-version">—</span>.
+      <span id="upd-notas" class="sub"></span></div>
+    <button id="btn-aplicar-upd" onclick="aplicarActualizacion()">Aplicar y reiniciar</button>
   </div>
 
   <div class="tabs">
@@ -128,6 +137,7 @@ internal static class PanelHtml
         <div class="row"><span>Intervalo automático</span><span class="mono" id="cfg-intervalo">—</span></div>
         <div class="row"><span>Marca de agua (watermark)</span><span class="mono" id="cfg-watermark">—</span></div>
         <div class="row"><span>Agente iniciado</span><span class="mono" id="cfg-uptime">—</span></div>
+        <div class="row"><span>Versión del agente</span><span class="mono" id="cfg-version">—</span></div>
       </div>
     </div>
 
@@ -139,6 +149,7 @@ internal static class PanelHtml
       <button id="btn-sync" onclick="sincronizar()">⟳ Sincronizar ahora</button>
       <button class="sec" onclick="probar('firebird')">Probar conexión Firebird</button>
       <button class="sec" onclick="probar('servidor')">Probar conexión al servidor</button>
+      <button class="sec" id="btn-buscar-upd" onclick="buscarActualizacion()">Buscar actualización</button>
     </div>
     <div class="resultado" id="resultado"></div>
 
@@ -254,6 +265,22 @@ internal static class PanelHtml
         </div>
       </div>
 
+      <div class="form-section">
+        <h2>Actualizaciones</h2>
+        <div class="fields">
+          <div class="field" style="grid-column:1/-1">
+            <label>URL del feed de actualización</label>
+            <input id="f-updateurl" type="text" placeholder="(vacío = usar el servidor central)">
+            <span class="hint">Déjelo vacío para usar el servidor central. Puede apuntar a un JSON en GitHub si no hay servidor disponible.</span>
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <label>URL de respaldo (opcional)</label>
+            <input id="f-updateurl2" type="text" placeholder="https://raw.githubusercontent.com/.../agente-version.json">
+            <span class="hint">Se usa si la primaria falla.</span>
+          </div>
+        </div>
+      </div>
+
       <div class="acciones">
         <button onclick="guardarConfig()">💾 Guardar configuración</button>
         <button class="sec" onclick="probar('firebird')">Probar Firebird</button>
@@ -311,6 +338,20 @@ async function refrescar(){
     document.getElementById('cfg-intervalo').textContent = 'cada ' + e.intervaloSegundos + ' s';
     document.getElementById('cfg-watermark').textContent = fmtFecha(e.watermark);
     document.getElementById('cfg-uptime').textContent = fmtFecha(e.inicioAgente) + ' (hace ' + fmtUptime(e.uptimeSegundos) + ')';
+    document.getElementById('cfg-version').textContent = e.versionAgente || '—';
+
+    // Banner de actualización disponible
+    const bu = document.getElementById('banner-update');
+    if(e.actualizacionDisponible){
+      document.getElementById('upd-version').textContent = e.versionDisponible || '';
+      document.getElementById('upd-notas').textContent = e.notasActualizacion ? ('— ' + e.notasActualizacion) : '';
+      const btn = document.getElementById('btn-aplicar-upd');
+      btn.disabled = !!e.aplicandoActualizacion;
+      btn.textContent = e.aplicandoActualizacion ? 'Aplicando…' : 'Aplicar y reiniciar';
+      bu.classList.add('show');
+    } else {
+      bu.classList.remove('show');
+    }
 
     document.getElementById('log').innerHTML = (e.eventos || []).map(ev =>
       `<div class="ev-${ev.nivel === 'OK' ? 'ok' : ev.nivel === 'ERROR' ? 'err' : 'info'}">` +
@@ -340,6 +381,8 @@ async function cargarConfig(){
     document.getElementById('f-fbwirecrypt').value = c.firebirdWireCrypt || 'Disabled';
     document.getElementById('f-intervalo').value = c.intervaloSegundos || 30;
     document.getElementById('f-auto').value = String(c.inicioAutomatico);
+    document.getElementById('f-updateurl').value = c.updateFeedUrl || '';
+    document.getElementById('f-updateurl2').value = c.updateFeedFallbackUrl || '';
   }catch(e){}
 }
 
@@ -367,7 +410,9 @@ async function guardarConfig(){
     firebirdDialect: parseInt(document.getElementById('f-fbdialect').value) || 3,
     firebirdWireCrypt: document.getElementById('f-fbwirecrypt').value,
     intervaloSegundos: parseInt(document.getElementById('f-intervalo').value) || 30,
-    inicioAutomatico: document.getElementById('f-auto').value === 'true'
+    inicioAutomatico: document.getElementById('f-auto').value === 'true',
+    updateFeedUrl: document.getElementById('f-updateurl').value,
+    updateFeedFallbackUrl: document.getElementById('f-updateurl2').value
   };
   try{
     const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
@@ -402,6 +447,30 @@ async function probar(cual){
   mostrarResultado(id, true, 'Probando conexión…');
   try{ const r = await fetch('/api/probar-' + cual, {method:'POST'}); const j = await r.json(); mostrarResultado(id, j.ok, j.mensaje); }
   catch(e){ mostrarResultado(id, false, 'No se pudo contactar al agente'); }
+  refrescar();
+}
+
+async function buscarActualizacion(){
+  const btn = document.getElementById('btn-buscar-upd');
+  btn.disabled = true; btn.textContent = 'Buscando…';
+  try{
+    const r = await fetch('/api/revisar-actualizacion', {method:'POST'});
+    const j = await r.json();
+    mostrarResultado('resultado', j.ok, j.mensaje || 'No se pudo consultar.');
+  }catch(e){ mostrarResultado('resultado', false, 'No se pudo contactar al agente'); }
+  btn.disabled = false; btn.textContent = 'Buscar actualización';
+  refrescar();
+}
+
+async function aplicarActualizacion(){
+  if(!confirm('Se descargará e instalará la nueva versión y el agente se reiniciará. ¿Continuar?')) return;
+  const btn = document.getElementById('btn-aplicar-upd');
+  btn.disabled = true; btn.textContent = 'Aplicando…';
+  try{
+    const r = await fetch('/api/actualizar', {method:'POST'});
+    const j = await r.json();
+    mostrarResultado('resultado', j.ok, j.mensaje);
+  }catch(e){ mostrarResultado('resultado', true, 'El agente se está reiniciando para actualizar. Espere unos segundos y recargue.'); }
   refrescar();
 }
 

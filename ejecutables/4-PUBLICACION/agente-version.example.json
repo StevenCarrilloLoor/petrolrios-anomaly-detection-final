@@ -1,0 +1,8 @@
+{
+  "//": "MANIFIESTO DE ACTUALIZACION DEL AGENTE. Copie este archivo a config/agente-version.json junto al PetrolRios.Api.exe del servidor central y edite los campos para publicar una nueva version. Los agentes lo consultan en /api/v1/agente/version y avisan en su panel.",
+  "version": "2.2.0",
+  "url": "http://IP-DEL-SERVIDOR:5170/descargas/PetrolRios.StationAgent.exe",
+  "sha256": "ponga-aqui-el-sha256-del-exe-en-minusculas",
+  "notas": "Version 2.2.0 — control de versiones y mejoras de seguridad.",
+  "obligatoria": false
+}

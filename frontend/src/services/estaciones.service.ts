@@ -23,8 +23,19 @@ export interface EliminarEstacionResponse {
   mensaje: string;
 }
 
+export interface ManifiestoVersionResponse {
+  version: string;
+  url: string;
+  sha256?: string | null;
+  notas?: string | null;
+  obligatoria: boolean;
+}
+
 export const estacionesService = {
   getAll: () => api.get<EstacionResponse[]>("/estaciones").then((r) => r.data),
+
+  getVersionAgente: () =>
+    api.get<ManifiestoVersionResponse>("/agente/version").then((r) => r.data),
 
   update: (id: number, data: ActualizarEstacionRequest) =>
     api.put<EstacionResponse>(`/estaciones/${id}`, data).then((r) => r.data),

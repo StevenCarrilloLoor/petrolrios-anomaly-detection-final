@@ -24,6 +24,21 @@ import type { ReactNode } from "react";
 
 const REFRESCO_MS = 10_000;
 
+/** Devuelve true si `disponible` es una versión mayor a `instalada` (semver simple). */
+function hayVersionMasNueva(disponible?: string, instalada?: string | null): boolean {
+  if (!disponible || !instalada) return false;
+  const partes = (v: string) =>
+    v.split("+")[0].split("-")[0].split(".").map((n) => parseInt(n, 10) || 0);
+  const a = partes(disponible);
+  const b = partes(instalada);
+  for (let i = 0; i < 3; i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
 export function ConexionesPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -49,6 +64,12 @@ export function ConexionesPage() {
     queryKey: ["monitoreo", "conexiones"],
     queryFn: monitoreoService.getConexiones,
     refetchInterval: REFRESCO_MS,
+  });
+
+  const { data: ultimaVersion } = useQuery({
+    queryKey: ["agente", "version"],
+    queryFn: estacionesService.getVersionAgente,
+    refetchInterval: 60_000,
   });
 
   const invalidar = () => {
@@ -267,6 +288,11 @@ export function ConexionesPage() {
                             {c.codigo}
                             {c.zona ? ` · zona ${c.zona}` : ""}
                             {c.versionAgente ? ` · agente v${c.versionAgente}` : ""}
+                            {hayVersionMasNueva(ultimaVersion?.version, c.versionAgente) && (
+                              <span className="ml-2 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-400">
+                                actualización v{ultimaVersion?.version} disponible
+                              </span>
+                            )}
                           </p>
                         </>
                       )}

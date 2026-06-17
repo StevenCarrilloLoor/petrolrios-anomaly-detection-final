@@ -26,6 +26,17 @@ public sealed class AgentState
     public DateTime? UltimaDesconexionServidor { get; set; }
     public double? UltimaLatenciaServidorMs { get; set; }
 
+    // ─── Actualización remota (control de versiones) ───
+    /// <summary>true si el feed de actualización ofrece una versión mayor a la instalada.</summary>
+    public bool ActualizacionDisponible { get; set; }
+    public string? VersionDisponible { get; set; }
+    public string? NotasActualizacion { get; set; }
+    public string? UrlActualizacion { get; set; }
+    public string? Sha256Actualizacion { get; set; }
+    public bool ActualizacionObligatoria { get; set; }
+    /// <summary>true mientras se descarga/aplica una actualización (evita doble clic).</summary>
+    public volatile bool AplicandoActualizacion;
+
     /// <summary>Indica si hay un ciclo corriendo (evita ejecuciones simultáneas).</summary>
     public readonly SemaphoreSlim CandadoCiclo = new(1, 1);
 

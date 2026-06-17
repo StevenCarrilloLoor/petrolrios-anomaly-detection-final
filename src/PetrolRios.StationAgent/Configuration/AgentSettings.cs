@@ -41,6 +41,26 @@ public sealed class AgentSettings
     public string LocalStorePath { get; set; } = "pending";
     public int PanelPuerto { get; set; } = 5180;
 
+    // ─── Actualización remota (control de versiones) ───
+    /// <summary>
+    /// URL del manifiesto de actualización. Si queda vacía, se usa el servidor
+    /// central: {ServerUrl}/api/v1/agente/version. Puede apuntarse a un JSON en
+    /// GitHub (raw) o cualquier host estático cuando no haya servidor central.
+    /// </summary>
+    public string UpdateFeedUrl { get; set; } = "";
+
+    /// <summary>URL de respaldo del manifiesto (p. ej. GitHub) si la primaria falla.</summary>
+    public string UpdateFeedFallbackUrl { get; set; } = "";
+
+    /// <summary>Nombre del servicio de Windows, para reiniciarlo tras actualizar.</summary>
+    public string NombreServicioWindows { get; set; } = "PetrolRios Station Agent";
+
+    /// <summary>Resuelve la URL efectiva del feed (primaria o derivada del servidor central).</summary>
+    public string ResolverUpdateFeedUrl() =>
+        string.IsNullOrWhiteSpace(UpdateFeedUrl)
+            ? $"{ServerUrl.TrimEnd('/')}/api/v1/agente/version"
+            : UpdateFeedUrl.Trim();
+
     /// <summary>true cuando el usuario completó la configuración inicial desde la interfaz.</summary>
     public bool Configurado { get; set; }
 

@@ -87,7 +87,7 @@ public sealed class ServerClient
                 CodigoEstacion = settings.CodigoEstacion,
                 NombreEstacion = settings.NombreEstacion,
                 ZonaEstacion = settings.ZonaEstacion,
-                VersionAgente = "2.1"
+                VersionAgente = PetrolRios.StationAgent.VersionAgente.Actual
             };
             var response = await _httpClient.PostAsJsonAsync(
                 Url(settings.ServerUrl, "/api/v1/ingesta/heartbeat"), payload, ct);
