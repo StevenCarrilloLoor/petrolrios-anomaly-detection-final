@@ -33,10 +33,45 @@ public sealed class AuthService : IAuthService
             .FirstOrDefaultAsync(u => u.Email == request.Email && u.Activo, ct)
             ?? throw new UnauthorizedAccessException("Credenciales inválidas.");
 
+        // Bloqueo por intentos fallidos (anti fuerza bruta)
+        if (usuario.EstaBloqueado())
+            throw new UnauthorizedAccessException(
+                "La cuenta está bloqueada temporalmente por varios intentos fallidos. Intente más tarde.");
+
         if (!BCrypt.Net.BCrypt.Verify(request.Password, usuario.PasswordHash))
+        {
+            var maxIntentos = _config.GetValue("Seguridad:MaxIntentosLogin", 5);
+            var minutosBloqueo = _config.GetValue("Seguridad:MinutosBloqueo", 15);
+            usuario.RegistrarFalloLogin(maxIntentos, minutosBloqueo);
+            await _dbContext.SaveChangesAsync(ct);
             throw new UnauthorizedAccessException("Credenciales inválidas.");
+        }
+
+        // Login correcto: limpiar contador de fallos
+        if (usuario.AccessFailedCount > 0 || usuario.LockoutEnd is not null)
+        {
+            usuario.ResetearFallos();
+            await _dbContext.SaveChangesAsync(ct);
+        }
 
         return await GenerateAuthResponseAsync(usuario, ct);
+    }
+
+    public async Task CambiarPasswordAsync(int usuarioId, string passwordActual, string passwordNueva, CancellationToken ct = default)
+    {
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct)
+            ?? throw new UnauthorizedAccessException("Usuario no encontrado.");
+
+        if (!BCrypt.Net.BCrypt.Verify(passwordActual, usuario.PasswordHash))
+            throw new UnauthorizedAccessException("La contraseña actual es incorrecta.");
+
+        if (string.IsNullOrWhiteSpace(passwordNueva) || passwordNueva.Length < 8)
+            throw new ArgumentException("La nueva contraseña debe tener al menos 8 caracteres.");
+        if (passwordNueva == passwordActual)
+            throw new ArgumentException("La nueva contraseña debe ser distinta de la actual.");
+
+        usuario.UpdatePassword(BCrypt.Net.BCrypt.HashPassword(passwordNueva));
+        await _dbContext.SaveChangesAsync(ct);
     }
 
     public async Task<LoginResponse> RefreshAsync(RefreshRequest request, CancellationToken ct = default)
@@ -89,6 +124,7 @@ public sealed class AuthService : IAuthService
             jwt,
             refreshTokenStr,
             DateTime.UtcNow.AddMinutes(expirationMinutes),
-            new UsuarioInfo(usuario.Id, usuario.Email, usuario.NombreCompleto, rolNombre));
+            new UsuarioInfo(usuario.Id, usuario.Email, usuario.NombreCompleto, rolNombre),
+            usuario.DebeCambiarPassword);
     }
 }

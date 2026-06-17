@@ -568,16 +568,25 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("Activo")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("DebeCambiarPassword")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime?>("LockoutEnd")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("NombreCompleto")
                         .IsRequired()
@@ -591,6 +600,12 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("RolId")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("TotpHabilitado")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("TotpSecret")
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

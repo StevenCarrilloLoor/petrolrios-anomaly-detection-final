@@ -51,6 +51,27 @@ public sealed class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Cambiar la propia contraseña (obligatorio tras el primer ingreso con
+    /// credenciales por defecto). Requiere la contraseña actual.
+    /// </summary>
+    [HttpPost("cambiar-password")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> CambiarPassword([FromBody] CambiarPasswordRequest request, CancellationToken ct)
+    {
+        var usuarioId = int.TryParse(
+            User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : 0;
+        if (usuarioId == 0) return Unauthorized();
+
+        await _authService.CambiarPasswordAsync(usuarioId, request.PasswordActual, request.PasswordNueva, ct);
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Cambio de contraseña", "Usuario", usuarioId, usuarioIdExplicito: usuarioId, ct: ct);
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Cerrar sesión revocando el refresh token.
     /// </summary>
     [HttpPost("logout")]

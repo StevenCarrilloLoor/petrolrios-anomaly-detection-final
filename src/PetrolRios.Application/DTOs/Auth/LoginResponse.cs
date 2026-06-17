@@ -4,7 +4,10 @@ public sealed record LoginResponse(
     string Token,
     string RefreshToken,
     DateTime Expiration,
-    UsuarioInfo Usuario);
+    UsuarioInfo Usuario,
+    bool DebeCambiarPassword = false);
+
+public sealed record CambiarPasswordRequest(string PasswordActual, string PasswordNueva);
 
 public sealed record UsuarioInfo(
     int Id,

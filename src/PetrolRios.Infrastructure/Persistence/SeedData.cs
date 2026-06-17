@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
@@ -11,13 +12,14 @@ public static class SeedData
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<PetrolRiosDbContext>();
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
         await context.Database.MigrateAsync();
 
         if (!await context.Roles.AnyAsync())
         {
             await SeedRolesAsync(context);
-            await SeedUsuarioAdminAsync(context);
+            await SeedUsuarioAdminAsync(context, config);
             await SeedEstacionesAsync(context);
             await SeedReglasDeteccionAsync(context);
             await SeedAgentUsersAsync(context);
@@ -128,15 +130,23 @@ public static class SeedData
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedUsuarioAdminAsync(PetrolRiosDbContext context)
+    private static async Task SeedUsuarioAdminAsync(PetrolRiosDbContext context, IConfiguration config)
     {
         var adminRol = await context.Roles.FirstAsync(r => r.Nombre == "Administrador");
-        // BCrypt hash de "Admin123!"
+
+        // La contraseña inicial NO está quemada: se toma de configuración/variable de
+        // entorno (Seguridad:AdminPasswordInicial). En desarrollo cae a un valor demo,
+        // pero SIEMPRE se obliga a cambiarla en el primer ingreso.
+        var passwordInicial = config["Seguridad:AdminPasswordInicial"];
+        if (string.IsNullOrWhiteSpace(passwordInicial))
+            passwordInicial = "Admin123!"; // solo demo/desarrollo
+
         var admin = Usuario.Create(
             "admin@petrolrios.com",
             "Administrador del Sistema",
-            BCrypt.Net.BCrypt.HashPassword("Admin123!"),
+            BCrypt.Net.BCrypt.HashPassword(passwordInicial),
             adminRol.Id);
+        admin.DebeCambiarPassword = true;
         await context.Usuarios.AddAsync(admin);
     }
 
