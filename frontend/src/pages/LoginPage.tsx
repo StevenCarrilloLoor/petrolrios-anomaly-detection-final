@@ -14,6 +14,8 @@ export function LoginPage() {
   const [pide2fa, setPide2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mostrarReenviar, setMostrarReenviar] = useState(false);
+  const [avisoReenvio, setAvisoReenvio] = useState<string | null>(null);
   const [modoQr, setModoQr] = useState(false);
   const [qrImg, setQrImg] = useState<string | null>(null);
   const [qrMsg, setQrMsg] = useState("Generando código…");
@@ -39,6 +41,9 @@ export function LoginPage() {
             if (est.estado === "aprobado" && est.login) {
               establecerSesion(est.login);
               navigate("/dashboard", { replace: true });
+            } else if (est.estado === "noverificado") {
+              setQrMsg("La cuenta que aprobó aún no verificó su correo electrónico.");
+              if (pollRef.current) window.clearInterval(pollRef.current);
             } else if (est.estado === "expirado" || est.estado === "noexiste") {
               setQrMsg("El código expiró. Genere uno nuevo.");
               if (pollRef.current) window.clearInterval(pollRef.current);
@@ -79,14 +84,31 @@ export function LoginPage() {
         return;
       }
       navigate("/dashboard", { replace: true });
-    } catch {
-      setError(
-        pide2fa
-          ? "Código de verificación inválido. Intente de nuevo."
-          : "Credenciales inválidas. Intente de nuevo.",
-      );
+    } catch (e) {
+      const detalle = (e as { response?: { data?: { detail?: string } } })
+        ?.response?.data?.detail;
+      if (detalle && /verific/i.test(detalle)) {
+        setError(detalle);
+        setMostrarReenviar(true);
+      } else {
+        setError(
+          pide2fa
+            ? "Código de verificación inválido. Intente de nuevo."
+            : "Credenciales inválidas. Intente de nuevo.",
+        );
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function reenviarVerificacion() {
+    setAvisoReenvio("Enviando…");
+    try {
+      await authService.reenviarVerificacion(email);
+      setAvisoReenvio("Si la cuenta existe y no está verificada, te enviamos un nuevo correo.");
+    } catch {
+      setAvisoReenvio("No se pudo reenviar. Intenta más tarde.");
     }
   }
 
@@ -149,6 +171,20 @@ export function LoginPage() {
           {error && (
             <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               {error}
+              {mostrarReenviar && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={reenviarVerificacion}
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    Reenviar correo de verificación
+                  </button>
+                  {avisoReenvio && (
+                    <p className="mt-1 text-xs text-muted-foreground">{avisoReenvio}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

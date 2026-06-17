@@ -53,6 +53,12 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedAccessException("Credenciales inválidas.");
         }
 
+        // Verificación de correo obligatoria: no se permite iniciar sesión hasta
+        // confirmar el correo con el enlace recibido.
+        if (!usuario.EmailVerificado)
+            throw new UnauthorizedAccessException(
+                "Debes verificar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.");
+
         // Segundo factor (2FA / TOTP) si el usuario lo tiene activado
         if (usuario.TotpHabilitado)
         {
@@ -155,6 +161,13 @@ public sealed class AuthService : IAuthService
             .FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct);
         if (usuario is null)
             return new QrEstadoResponse("noexiste");
+
+        // Misma regla que el login normal: el correo debe estar verificado.
+        if (!usuario.EmailVerificado)
+        {
+            _qrLogin.Consumir(codigo);
+            return new QrEstadoResponse("noverificado");
+        }
 
         _qrLogin.Consumir(codigo); // un solo uso
         var login = await GenerateAuthResponseAsync(usuario, ct);

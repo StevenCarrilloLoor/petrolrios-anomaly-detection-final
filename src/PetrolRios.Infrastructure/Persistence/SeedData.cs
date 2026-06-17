@@ -100,21 +100,25 @@ public static class SeedData
         if (!await context.Usuarios.AnyAsync(u => u.Email == "auditor@petrolrios.com")
             && roles.TryGetValue("Auditor", out var auditorRolId))
         {
-            await context.Usuarios.AddAsync(Usuario.Create(
+            var auditor = Usuario.Create(
                 "auditor@petrolrios.com",
                 "Maria Fernanda Auditora",
                 BCrypt.Net.BCrypt.HashPassword("Auditor123!"),
-                auditorRolId));
+                auditorRolId);
+            auditor.MarcarEmailVerificado();
+            await context.Usuarios.AddAsync(auditor);
         }
 
         if (!await context.Usuarios.AnyAsync(u => u.Email == "supervisor@petrolrios.com")
             && roles.TryGetValue("Supervisor", out var supervisorRolId))
         {
-            await context.Usuarios.AddAsync(Usuario.Create(
+            var supervisor = Usuario.Create(
                 "supervisor@petrolrios.com",
                 "Carlos Supervisor de Auditoria",
                 BCrypt.Net.BCrypt.HashPassword("Supervisor123!"),
-                supervisorRolId));
+                supervisorRolId);
+            supervisor.MarcarEmailVerificado();
+            await context.Usuarios.AddAsync(supervisor);
         }
     }
 
@@ -321,6 +325,7 @@ public static class SeedData
                 $"Agente Estacion {est.Codigo}",
                 BCrypt.Net.BCrypt.HashPassword("Agent123!"),
                 auditorRol.Id);
+            agent.MarcarEmailVerificado(); // cuenta de servicio del agente
             await context.Usuarios.AddAsync(agent);
         }
     }
