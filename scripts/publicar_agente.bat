@@ -29,8 +29,9 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [3/3] Agregando instrucciones para la estacion...
+echo [3/3] Agregando instrucciones e instalador de servicio...
 copy /Y "scripts\agente-LEEME.txt" "%SALIDA%\LEEME.txt" > nul
+copy /Y "ejecutables\4-PUBLICACION\instalar_agente_servicio.bat" "%SALIDA%\instalar_agente_servicio.bat" > nul
 
 echo.
 echo ============================================================
