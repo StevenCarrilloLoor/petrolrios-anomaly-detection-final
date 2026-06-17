@@ -8,6 +8,8 @@ import { Spinner } from "@/components/ui/Spinner";
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [codigoTotp, setCodigoTotp] = useState("");
+  const [pide2fa, setPide2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
@@ -22,10 +24,23 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login({ email, password });
+      const resp = await login({
+        email,
+        password,
+        codigoTotp: pide2fa ? codigoTotp : undefined,
+      });
+      if (resp.requiere2Fa) {
+        setPide2fa(true);
+        setError(null);
+        return;
+      }
       navigate("/dashboard", { replace: true });
     } catch {
-      setError("Credenciales inválidas. Intente de nuevo.");
+      setError(
+        pide2fa
+          ? "Código de verificación inválido. Intente de nuevo."
+          : "Credenciales inválidas. Intente de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
@@ -125,13 +140,39 @@ export function LoginPage() {
                 disabled={loading}
               />
             </div>
+            {pide2fa && (
+              <div>
+                <label className="mb-1 block text-sm font-medium" htmlFor="totp">
+                  Código de verificación (2FA)
+                </label>
+                <input
+                  id="totp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={codigoTotp}
+                  onChange={(e) =>
+                    setCodigoTotp(e.target.value.replace(/\D/g, ""))
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-center text-lg tracking-[0.4em] outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                  placeholder="000000"
+                  autoFocus
+                  required
+                  disabled={loading}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ingrese el código de 6 dígitos de su app autenticadora.
+                </p>
+              </div>
+            )}
             <button
               type="submit"
               disabled={loading}
               className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {loading && <Spinner size="sm" />}
-              Iniciar Sesión
+              {pide2fa ? "Verificar y entrar" : "Iniciar Sesión"}
             </button>
           </form>
         </div>

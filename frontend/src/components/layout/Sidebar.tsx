@@ -8,6 +8,7 @@ import {
   Users,
   FileText,
   Shield,
+  ShieldCheck,
   BarChart3,
   Radio,
 } from "lucide-react";
@@ -66,6 +67,12 @@ const navSections: NavSection[] = [
         icon: <FileText size={20} />,
         roles: ["Administrador"],
       },
+    ],
+  },
+  {
+    title: "Mi cuenta",
+    items: [
+      { to: "/seguridad", label: "Seguridad (2FA)", icon: <ShieldCheck size={20} /> },
     ],
   },
 ];

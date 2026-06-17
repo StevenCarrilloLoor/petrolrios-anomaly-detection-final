@@ -6,7 +6,7 @@ import {
   useEffect,
 } from "react";
 import type { ReactNode } from "react";
-import type { LoginRequest, UsuarioInfo } from "@/types/auth";
+import type { LoginRequest, LoginResponse, UsuarioInfo } from "@/types/auth";
 import { authService } from "@/services/auth.service";
 import {
   createSignalRConnection,
@@ -17,7 +17,7 @@ interface AuthContextType {
   user: UsuarioInfo | null;
   token: string | null;
   isAuthenticated: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
+  login: (credentials: LoginRequest) => Promise<LoginResponse>;
   logout: () => void;
 }
 
@@ -41,11 +41,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (credentials: LoginRequest) => {
     const response = await authService.login(credentials);
+    // Si el servidor pide 2FA, aún no hay token: el formulario pedirá el código.
+    if (response.requiere2Fa || !response.token) {
+      return response;
+    }
     localStorage.setItem("token", response.token);
     localStorage.setItem("refreshToken", response.refreshToken);
     localStorage.setItem("user", JSON.stringify(response.usuario));
     setToken(response.token);
     setUser(response.usuario);
+    return response;
   }, []);
 
   const logout = useCallback(() => {

@@ -12,17 +12,20 @@ public sealed class AuthService : IAuthService
     private readonly PetrolRiosDbContext _dbContext;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IJwtService _jwtService;
+    private readonly ITotpService _totpService;
     private readonly IConfiguration _config;
 
     public AuthService(
         PetrolRiosDbContext dbContext,
         IUnitOfWork unitOfWork,
         IJwtService jwtService,
+        ITotpService totpService,
         IConfiguration config)
     {
         _dbContext = dbContext;
         _unitOfWork = unitOfWork;
         _jwtService = jwtService;
+        _totpService = totpService;
         _config = config;
     }
 
@@ -47,6 +50,24 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedAccessException("Credenciales inválidas.");
         }
 
+        // Segundo factor (2FA / TOTP) si el usuario lo tiene activado
+        if (usuario.TotpHabilitado)
+        {
+            if (string.IsNullOrWhiteSpace(request.CodigoTotp))
+            {
+                // Contraseña correcta pero falta el código: el frontend lo pedirá.
+                return new LoginResponse("", "", DateTime.UtcNow, default!, false, Requiere2Fa: true);
+            }
+            if (!_totpService.Validar(usuario.TotpSecret!, request.CodigoTotp))
+            {
+                var maxIntentos = _config.GetValue("Seguridad:MaxIntentosLogin", 5);
+                var minutosBloqueo = _config.GetValue("Seguridad:MinutosBloqueo", 15);
+                usuario.RegistrarFalloLogin(maxIntentos, minutosBloqueo);
+                await _dbContext.SaveChangesAsync(ct);
+                throw new UnauthorizedAccessException("Código de verificación (2FA) inválido.");
+            }
+        }
+
         // Login correcto: limpiar contador de fallos
         if (usuario.AccessFailedCount > 0 || usuario.LockoutEnd is not null)
         {
@@ -55,6 +76,53 @@ public sealed class AuthService : IAuthService
         }
 
         return await GenerateAuthResponseAsync(usuario, ct);
+    }
+
+    // ─── 2FA (TOTP) ───
+
+    public async Task<Iniciar2faResponse> Iniciar2faAsync(int usuarioId, CancellationToken ct = default)
+    {
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct)
+            ?? throw new UnauthorizedAccessException("Usuario no encontrado.");
+
+        var secreto = _totpService.GenerarSecreto();
+        usuario.ConfigurarTotp(secreto); // queda sin activar hasta confirmar el primer código
+        await _dbContext.SaveChangesAsync(ct);
+
+        var uri = _totpService.ConstruirUriOtpauth(secreto, usuario.Email);
+        return new Iniciar2faResponse(secreto, uri);
+    }
+
+    public async Task Confirmar2faAsync(int usuarioId, string codigo, CancellationToken ct = default)
+    {
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct)
+            ?? throw new UnauthorizedAccessException("Usuario no encontrado.");
+        if (string.IsNullOrWhiteSpace(usuario.TotpSecret))
+            throw new InvalidOperationException("Primero inicie la configuración del 2FA.");
+        if (!_totpService.Validar(usuario.TotpSecret, codigo))
+            throw new UnauthorizedAccessException("El código no es válido. Verifique la hora del dispositivo e intente de nuevo.");
+
+        usuario.ActivarTotp();
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    public async Task Desactivar2faAsync(int usuarioId, string codigo, CancellationToken ct = default)
+    {
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct)
+            ?? throw new UnauthorizedAccessException("Usuario no encontrado.");
+        if (usuario.TotpHabilitado && !_totpService.Validar(usuario.TotpSecret!, codigo))
+            throw new UnauthorizedAccessException("Código inválido; no se desactivó el 2FA.");
+
+        usuario.DeshabilitarTotp();
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> Estado2faAsync(int usuarioId, CancellationToken ct = default)
+    {
+        return await _dbContext.Usuarios
+            .Where(u => u.Id == usuarioId)
+            .Select(u => u.TotpHabilitado)
+            .FirstOrDefaultAsync(ct);
     }
 
     public async Task CambiarPasswordAsync(int usuarioId, string passwordActual, string passwordNueva, CancellationToken ct = default)

@@ -71,6 +71,53 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Estado del 2FA del usuario actual.</summary>
+    [HttpGet("2fa/estado")]
+    [Authorize]
+    public async Task<IActionResult> Estado2fa(CancellationToken ct)
+    {
+        var id = UsuarioActual();
+        if (id == 0) return Unauthorized();
+        return Ok(new Estado2faResponse(await _authService.Estado2faAsync(id, ct)));
+    }
+
+    /// <summary>Inicia el enrolamiento de 2FA: devuelve el secreto y la URI para el QR.</summary>
+    [HttpPost("2fa/iniciar")]
+    [Authorize]
+    public async Task<IActionResult> Iniciar2fa(CancellationToken ct)
+    {
+        var id = UsuarioActual();
+        if (id == 0) return Unauthorized();
+        return Ok(await _authService.Iniciar2faAsync(id, ct));
+    }
+
+    /// <summary>Confirma y activa el 2FA verificando el primer código de la app autenticadora.</summary>
+    [HttpPost("2fa/confirmar")]
+    [Authorize]
+    public async Task<IActionResult> Confirmar2fa([FromBody] Confirmar2faRequest request, CancellationToken ct)
+    {
+        var id = UsuarioActual();
+        if (id == 0) return Unauthorized();
+        await _authService.Confirmar2faAsync(id, request.Codigo, ct);
+        await this.RegistrarAuditoriaAsync(_logService, "Activación de 2FA", "Usuario", id, usuarioIdExplicito: id, ct: ct);
+        return NoContent();
+    }
+
+    /// <summary>Desactiva el 2FA (requiere un código válido si estaba activo).</summary>
+    [HttpPost("2fa/desactivar")]
+    [Authorize]
+    public async Task<IActionResult> Desactivar2fa([FromBody] Confirmar2faRequest request, CancellationToken ct)
+    {
+        var id = UsuarioActual();
+        if (id == 0) return Unauthorized();
+        await _authService.Desactivar2faAsync(id, request.Codigo, ct);
+        await this.RegistrarAuditoriaAsync(_logService, "Desactivación de 2FA", "Usuario", id, usuarioIdExplicito: id, ct: ct);
+        return NoContent();
+    }
+
+    private int UsuarioActual() =>
+        int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : 0;
+
     /// <summary>
     /// Cerrar sesión revocando el refresh token.
     /// </summary>

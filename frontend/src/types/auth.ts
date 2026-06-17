@@ -1,6 +1,7 @@
 export interface LoginRequest {
   email: string;
   password: string;
+  codigoTotp?: string;
 }
 
 export interface UsuarioInfo {
@@ -15,6 +16,13 @@ export interface LoginResponse {
   refreshToken: string;
   expiration: string;
   usuario: UsuarioInfo;
+  debeCambiarPassword?: boolean;
+  requiere2Fa?: boolean;
+}
+
+export interface Iniciar2faResponse {
+  secreto: string;
+  uriOtpauth: string;
 }
 
 export interface RefreshRequest {
