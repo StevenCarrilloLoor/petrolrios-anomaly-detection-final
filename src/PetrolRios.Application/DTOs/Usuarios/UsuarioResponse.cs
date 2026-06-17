@@ -8,6 +8,7 @@ public sealed record UsuarioResponse
     public string Rol { get; init; } = string.Empty;
     public int RolId { get; init; }
     public bool Activo { get; init; }
+    public bool EmailVerificado { get; init; }
     public DateTime CreatedAt { get; init; }
 }
 

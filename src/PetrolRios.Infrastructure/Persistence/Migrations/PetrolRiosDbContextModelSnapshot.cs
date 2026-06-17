@@ -585,6 +585,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<bool>("EmailVerificado")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
 
@@ -600,6 +603,12 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("RolId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("TokenVerificacionEmail")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("TokenVerificacionExpira")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("TotpHabilitado")
                         .HasColumnType("boolean");

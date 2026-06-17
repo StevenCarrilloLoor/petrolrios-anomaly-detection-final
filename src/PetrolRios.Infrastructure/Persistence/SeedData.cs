@@ -147,6 +147,7 @@ public static class SeedData
             BCrypt.Net.BCrypt.HashPassword(passwordInicial),
             adminRol.Id);
         admin.DebeCambiarPassword = true;
+        admin.MarcarEmailVerificado(); // cuenta del sistema
         await context.Usuarios.AddAsync(admin);
     }
 

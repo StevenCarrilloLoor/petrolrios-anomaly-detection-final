@@ -22,6 +22,9 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // Secretos locales (SMTP/App Password) — archivo git-ignoreado, opcional.
+    builder.Configuration.AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: true);
+
     // Serilog
     builder.Host.UseSerilog((context, config) => config
         .ReadFrom.Configuration(context.Configuration)

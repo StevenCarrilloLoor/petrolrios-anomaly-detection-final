@@ -33,4 +33,10 @@ export const authService = {
       })
       .then((r) => r.data),
   qrAprobar: (codigo: string) => api.post("/auth/qr/aprobar", { codigo }),
+
+  // Verificación de correo
+  verificarEmail: (token: string) =>
+    api.post<{ ok: boolean; mensaje: string }>("/auth/verificar-email", { token }).then((r) => r.data),
+  reenviarVerificacion: (email: string) =>
+    api.post("/auth/reenviar-verificacion", { email }),
 };

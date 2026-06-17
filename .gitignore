@@ -73,3 +73,6 @@ _arranque/firebird_data/
 agent-config.json
 **/config/agent-config.json
 !agent-config.example.json
+
+# Secretos locales (SMTP/App Password) — nunca al repo
+**/appsettings.Secrets.json

@@ -15,6 +15,10 @@ public sealed record Iniciar2faResponse(string Secreto, string UriOtpauth);
 public sealed record Confirmar2faRequest(string Codigo);
 public sealed record Estado2faResponse(bool Habilitado);
 
+// ─── Verificación de correo ───
+public sealed record VerificarEmailRequest(string Token);
+public sealed record ReenviarVerificacionRequest(string Email);
+
 // ─── Login por QR (estilo Steam) ───
 public sealed record QrIniciarResponse(string Codigo, int ExpiraSegundos);
 public sealed record QrAprobarRequest(string Codigo);

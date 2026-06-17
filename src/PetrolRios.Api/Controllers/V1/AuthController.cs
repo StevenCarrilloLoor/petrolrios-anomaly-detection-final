@@ -11,11 +11,13 @@ namespace PetrolRios.Api.Controllers.V1;
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IUsuarioService _usuarioService;
     private readonly ILogService _logService;
 
-    public AuthController(IAuthService authService, ILogService logService)
+    public AuthController(IAuthService authService, IUsuarioService usuarioService, ILogService logService)
     {
         _authService = authService;
+        _usuarioService = usuarioService;
         _logService = logService;
     }
 
@@ -113,6 +115,29 @@ public sealed class AuthController : ControllerBase
         await _authService.Desactivar2faAsync(id, request.Codigo, ct);
         await this.RegistrarAuditoriaAsync(_logService, "Desactivación de 2FA", "Usuario", id, usuarioIdExplicito: id, ct: ct);
         return NoContent();
+    }
+
+    // ─── Verificación de correo ───
+
+    /// <summary>Verifica el correo del usuario a partir del token del enlace recibido por email.</summary>
+    [HttpPost("verificar-email")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerificarEmail([FromBody] VerificarEmailRequest request, CancellationToken ct)
+    {
+        var ok = await _usuarioService.VerificarEmailAsync(request.Token, ct);
+        return ok
+            ? Ok(new { ok = true, mensaje = "Correo verificado correctamente." })
+            : BadRequest(new { ok = false, mensaje = "El enlace es inválido o expiró." });
+    }
+
+    /// <summary>Reenvía el correo de verificación a una cuenta no verificada.</summary>
+    [HttpPost("reenviar-verificacion")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ReenviarVerificacion([FromBody] ReenviarVerificacionRequest request, CancellationToken ct)
+    {
+        await _usuarioService.ReenviarVerificacionAsync(request.Email, ct);
+        // Respuesta neutra para no revelar si el correo existe.
+        return Ok(new { ok = true, mensaje = "Si la cuenta existe y no está verificada, se envió un correo." });
     }
 
     // ─── Login por QR (estilo Steam) ───

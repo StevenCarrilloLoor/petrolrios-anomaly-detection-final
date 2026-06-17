@@ -9,4 +9,10 @@ public interface IUsuarioService
     Task<UsuarioResponse> CreateAsync(CrearUsuarioRequest request, CancellationToken ct = default);
     Task<UsuarioResponse> UpdateAsync(int id, ActualizarUsuarioRequest request, CancellationToken ct = default);
     Task DeleteAsync(int id, CancellationToken ct = default);
+
+    /// <summary>Verifica el correo de un usuario a partir del token recibido por email.</summary>
+    Task<bool> VerificarEmailAsync(string token, CancellationToken ct = default);
+
+    /// <summary>Reenvía el correo de verificación a un usuario (si existe y no está verificado).</summary>
+    Task ReenviarVerificacionAsync(string email, CancellationToken ct = default);
 }
