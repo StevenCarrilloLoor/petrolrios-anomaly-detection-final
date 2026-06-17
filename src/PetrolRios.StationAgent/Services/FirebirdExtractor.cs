@@ -69,24 +69,39 @@ public sealed class FirebirdExtractor
     {
         var items = new List<TransaccionBatchItem>();
 
-        items.AddRange(await ExtractTypeAsync<FacturaDto>("Factura", GetFacturasSql, watermark, r => r.FechaDocumento, ct));
-        items.AddRange(await ExtractTypeAsync<DetalleFacturaDto>("DetalleFactura", GetDetallesSql, watermark, r => r.FechaDespacho, ct));
-        items.AddRange(await ExtractTypeAsync<CierreTurnoDto>("CierreTurno", GetCierresSql, watermark, r => r.FechaFin, ct));
-        items.AddRange(await ExtractTypeAsync<DepositoTurnoDto>("DepositoTurno", GetDepositosSql, watermark, r => r.FechaDeposito, ct));
-        items.AddRange(await ExtractTypeAsync<AnulacionDto>("Anulacion", GetAnulacionesSql, watermark, r => r.FechaAnulacion, ct));
-        items.AddRange(await ExtractTypeAsync<CreditoDto>("Credito", GetCreditosSql, watermark, r => r.FechaCabecera, ct));
-        items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>("TarjetaTurno", GetTarjetasSql, watermark, _ => DateTime.UtcNow, ct));
+        // Abrir UNA sola conexión para todo el ciclo. Si la conexión falla
+        // (WireCrypt, credenciales, archivo no encontrado, servicio caído), la
+        // excepción se PROPAGA para que el ciclo la reporte como ERROR. Antes cada
+        // consulta abría su conexión y tragaba el error devolviendo vacío, por lo
+        // que un Firebird caído se veía como "0 transacciones / OK" (punto ciego).
+        using var connection = CreateConnection();
+        try
+        {
+            await connection.OpenAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudo abrir la conexión a Firebird");
+            throw new InvalidOperationException($"Firebird: {InterpretarError(ex)}", ex);
+        }
+
+        items.AddRange(await ExtractTypeAsync<FacturaDto>(connection, "Factura", GetFacturasSql, watermark, r => r.FechaDocumento, ct));
+        items.AddRange(await ExtractTypeAsync<DetalleFacturaDto>(connection, "DetalleFactura", GetDetallesSql, watermark, r => r.FechaDespacho, ct));
+        items.AddRange(await ExtractTypeAsync<CierreTurnoDto>(connection, "CierreTurno", GetCierresSql, watermark, r => r.FechaFin, ct));
+        items.AddRange(await ExtractTypeAsync<DepositoTurnoDto>(connection, "DepositoTurno", GetDepositosSql, watermark, r => r.FechaDeposito, ct));
+        items.AddRange(await ExtractTypeAsync<AnulacionDto>(connection, "Anulacion", GetAnulacionesSql, watermark, r => r.FechaAnulacion, ct));
+        items.AddRange(await ExtractTypeAsync<CreditoDto>(connection, "Credito", GetCreditosSql, watermark, r => r.FechaCabecera, ct));
+        items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>(connection, "TarjetaTurno", GetTarjetasSql, watermark, _ => DateTime.UtcNow, ct));
 
         _logger.LogInformation("Extraídas {Count} transacciones desde watermark {Watermark:O}", items.Count, watermark);
         return items;
     }
 
     private async Task<IEnumerable<TransaccionBatchItem>> ExtractTypeAsync<T>(
-        string tipoTransaccion, string sql, DateTime watermark, Func<T, DateTime> fechaSelector, CancellationToken ct)
+        FbConnection connection, string tipoTransaccion, string sql, DateTime watermark, Func<T, DateTime> fechaSelector, CancellationToken ct)
     {
         try
         {
-            using var connection = CreateConnection();
             var rows = await connection.QueryAsync<T>(
                 new CommandDefinition(sql, new { Watermark = watermark }, cancellationToken: ct));
 
@@ -99,6 +114,8 @@ public sealed class FirebirdExtractor
         }
         catch (Exception ex)
         {
+            // Falla de UNA tabla/consulta (p. ej. tabla ausente): se tolera y se
+            // sigue con las demás. La conexión ya está validada arriba.
             _logger.LogError(ex, "Error extrayendo {Tipo} desde Firebird", tipoTransaccion);
             return [];
         }
