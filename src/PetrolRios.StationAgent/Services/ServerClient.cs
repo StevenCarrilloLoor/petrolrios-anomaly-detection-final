@@ -123,6 +123,40 @@ public sealed class ServerClient
         }
     }
 
+    /// <summary>
+    /// Verifica unas credenciales arbitrarias contra el servidor central y devuelve
+    /// el rol del usuario. Se usa para autenticar el panel del agente con RBAC real.
+    /// <c>Alcanzable</c> indica si se pudo contactar al servidor (para decidir si
+    /// recurrir al respaldo local cuando está caído).
+    /// </summary>
+    public async Task<(bool Ok, string? Rol, bool Alcanzable, string Mensaje)> VerificarUsuarioAsync(
+        string email, string password, CancellationToken ct)
+    {
+        var settings = _config.Actual;
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Clamp(settings.ServerTimeoutSegundos, 5, 30)) };
+            var resp = await http.PostAsJsonAsync(
+                Url(settings.ServerUrl, "/api/v1/auth/login"),
+                new { Email = email, Password = password }, ct);
+
+            if (!resp.IsSuccessStatusCode)
+                return (false, null, true, "Credenciales inválidas.");
+
+            var body = await resp.Content.ReadFromJsonAsync<JsonElement>(ct);
+            var rol = body.TryGetProperty("usuario", out var u) && u.TryGetProperty("rol", out var r)
+                ? r.GetString()
+                : null;
+            return (true, rol, true, "OK");
+        }
+        catch (Exception ex)
+        {
+            // No alcanzable (red/servidor caído) → permite el respaldo local
+            _logger.LogDebug(ex, "No se pudo verificar el usuario contra el central");
+            return (false, null, false, "Servidor central no disponible.");
+        }
+    }
+
     private async Task EnsureAuthenticatedAsync(AgentSettings settings, CancellationToken ct)
     {
         if (_token is not null && DateTime.UtcNow < _tokenExpiration.AddMinutes(-5))

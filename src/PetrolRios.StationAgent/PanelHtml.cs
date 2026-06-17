@@ -77,13 +77,46 @@ internal static class PanelHtml
                  display:none;align-items:center;justify-content:space-between;gap:14px}
   .banner-update.show{display:flex}
   .hidden{display:none}
+  /* Login overlay */
+  #overlay-login{position:fixed;inset:0;background:rgba(8,12,22,.96);display:none;
+                 align-items:center;justify-content:center;z-index:50;padding:20px}
+  #overlay-login.show{display:flex}
+  .login-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+              padding:28px;width:100%;max-width:380px}
+  .login-card h2{font-size:18px;margin-bottom:6px}
+  .login-card p{font-size:12px;color:var(--muted);margin-bottom:18px}
+  .login-card label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  .login-card input{width:100%;background:#0a0f1c;border:1px solid var(--border);border-radius:8px;
+                    color:var(--text);padding:10px 12px;font-size:14px}
+  .login-card button{width:100%;margin-top:16px}
+  .sesion-pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .link{background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0}
 </style>
 </head>
 <body>
+
+<!-- Pantalla de inicio de sesión del panel -->
+<div id="overlay-login">
+  <div class="login-card">
+    <h2>🔒 Acceso al agente</h2>
+    <p>Inicie sesión con su cuenta de <b>Administrador</b> o <b>Supervisor</b> de PetrolRíos.
+       Las credenciales se verifican contra el servidor central.</p>
+    <label>Usuario (email)</label>
+    <input id="login-usuario" type="text" autocomplete="username" placeholder="usuario@petrolrios.com">
+    <label>Contraseña</label>
+    <input id="login-password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')hacerLogin()">
+    <button onclick="hacerLogin()">Iniciar sesión</button>
+    <div class="resultado" id="resultado-login"></div>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <h1>⛽ Station Agent <span id="estacion"></span><small>PetrolRíos · Sistema de Detección de Anomalías</small></h1>
-    <div class="pill"><span class="dot" id="dot-modo"></span><span id="txt-modo">—</span></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <span class="sesion-pill" id="sesion-info"></span>
+      <div class="pill"><span class="dot" id="dot-modo"></span><span id="txt-modo">—</span></div>
+    </div>
   </header>
 
   <div class="banner" id="banner-setup">
@@ -281,6 +314,22 @@ internal static class PanelHtml
         </div>
       </div>
 
+      <div class="form-section">
+        <h2>Seguridad del panel (acceso offline)</h2>
+        <div class="fields">
+          <div class="field">
+            <label>Usuario local de respaldo</label>
+            <input id="f-localuser" type="text" placeholder="admin-local">
+            <span class="hint">Para entrar al panel si el servidor central no está disponible.</span>
+          </div>
+          <div class="field">
+            <label>Contraseña local de respaldo</label>
+            <input id="f-localpass" type="password" placeholder="(sin cambios)" autocomplete="new-password">
+            <span class="hint">Déjela vacía para conservar la actual. Se guarda cifrada (PBKDF2).</span>
+          </div>
+        </div>
+      </div>
+
       <div class="acciones">
         <button onclick="guardarConfig()">💾 Guardar configuración</button>
         <button class="sec" onclick="probar('firebird')">Probar Firebird</button>
@@ -311,7 +360,9 @@ function cambiarTab(tab){
 
 async function refrescar(){
   try{
-    const r = await fetch('/api/estado'); const e = await r.json();
+    const r = await fetch('/api/estado');
+    if(r.status === 401){ document.getElementById('overlay-login').classList.add('show'); sesionActiva=false; return; }
+    const e = await r.json();
     modoAuto = e.modoAutomatico;
     document.getElementById('estacion').textContent = '· ' + (e.nombreEstacion || e.estacion);
     document.getElementById('dot-modo').className = 'dot' + (modoAuto ? '' : ' warn');
@@ -383,6 +434,7 @@ async function cargarConfig(){
     document.getElementById('f-auto').value = String(c.inicioAutomatico);
     document.getElementById('f-updateurl').value = c.updateFeedUrl || '';
     document.getElementById('f-updateurl2').value = c.updateFeedFallbackUrl || '';
+    document.getElementById('f-localuser').value = c.panelLocalUsuario || '';
   }catch(e){}
 }
 
@@ -412,7 +464,9 @@ async function guardarConfig(){
     intervaloSegundos: parseInt(document.getElementById('f-intervalo').value) || 30,
     inicioAutomatico: document.getElementById('f-auto').value === 'true',
     updateFeedUrl: document.getElementById('f-updateurl').value,
-    updateFeedFallbackUrl: document.getElementById('f-updateurl2').value
+    updateFeedFallbackUrl: document.getElementById('f-updateurl2').value,
+    panelLocalUsuario: document.getElementById('f-localuser').value,
+    panelLocalPassword: document.getElementById('f-localpass').value
   };
   try{
     const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
@@ -420,6 +474,8 @@ async function guardarConfig(){
       mostrarResultado('resultado-config', true, 'Configuración guardada. El agente ya está operando con estos datos.');
       document.getElementById('f-password').value = '';
       document.getElementById('f-fbpassword').value = '';
+      document.getElementById('f-localpass').value = '';
+      verificarSesion();
     } else {
       const j = await r.json();
       mostrarResultado('resultado-config', false, j.mensaje || 'No se pudo guardar.');
@@ -474,8 +530,63 @@ async function aplicarActualizacion(){
   refrescar();
 }
 
-refrescar();
-setInterval(() => { if(tabActual==='monitoreo') refrescar(); }, 5000);
+// ─── Sesión / login del panel ───
+let sesionActiva = false;
+
+async function verificarSesion(){
+  try{
+    const r = await fetch('/api/sesion');
+    const s = await r.json();
+    sesionActiva = s.autenticado || s.requiereBootstrap;
+    const overlay = document.getElementById('overlay-login');
+    if(sesionActiva){
+      overlay.classList.remove('show');
+      const info = document.getElementById('sesion-info');
+      if(s.autenticado){
+        info.innerHTML = '👤 ' + (s.usuario||'') + ' · ' + (s.rol||'') +
+          ' · <button class="link" onclick="hacerLogout()">salir</button>';
+      } else {
+        info.innerHTML = '<span style="color:var(--warn)">configuración inicial</span>';
+      }
+      return true;
+    } else {
+      overlay.classList.add('show');
+      return false;
+    }
+  }catch(e){ document.getElementById('overlay-login').classList.add('show'); return false; }
+}
+
+async function hacerLogin(){
+  const usuario = document.getElementById('login-usuario').value;
+  const password = document.getElementById('login-password').value;
+  mostrarResultado('resultado-login', true, 'Verificando…');
+  try{
+    const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({usuario, password})});
+    const j = await r.json();
+    if(j.ok){
+      document.getElementById('login-password').value='';
+      document.getElementById('resultado-login').className='resultado';
+      await verificarSesion();
+      refrescar();
+    } else {
+      mostrarResultado('resultado-login', false, j.mensaje || 'No se pudo iniciar sesión.');
+    }
+  }catch(e){ mostrarResultado('resultado-login', false, 'No se pudo contactar al agente.'); }
+}
+
+async function hacerLogout(){
+  try{ await fetch('/api/logout', {method:'POST'}); }catch(e){}
+  await verificarSesion();
+}
+
+async function iniciar(){
+  const ok = await verificarSesion();
+  if(ok) refrescar();
+}
+iniciar();
+setInterval(() => { if(sesionActiva && tabActual==='monitoreo') refrescar(); }, 5000);
+setInterval(verificarSesion, 60000);
 </script>
 </body>
 </html>

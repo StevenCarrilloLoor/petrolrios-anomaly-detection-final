@@ -1,5 +1,6 @@
 using PetrolRios.StationAgent;
 using PetrolRios.StationAgent.Configuration;
+using PetrolRios.StationAgent.Security;
 using PetrolRios.StationAgent.Services;
 using Serilog;
 
@@ -48,6 +49,9 @@ try
     // Servicio de actualización remota (control de versiones)
     builder.Services.AddSingleton<UpdateService>();
 
+    // Autenticación del panel local (RBAC contra el central + respaldo local)
+    builder.Services.AddSingleton<PanelAuth>();
+
     // Worker principal
     builder.Services.AddHostedService<Worker>();
 
@@ -68,7 +72,76 @@ try
 
     // ─────────── Panel de control local del agente ───────────
 
+    // Middleware: protege todos los /api/* salvo los de autenticación. Sin sesión
+    // válida no se puede ver ni cambiar nada del agente (cierra el hueco de que
+    // cualquiera en la máquina lo reconfigure).
+    app.Use(async (ctx, next) =>
+    {
+        var path = ctx.Request.Path;
+        if (path.StartsWithSegments("/api"))
+        {
+            var publica = path.StartsWithSegments("/api/login")
+                || path.StartsWithSegments("/api/logout")
+                || path.StartsWithSegments("/api/sesion");
+            if (!publica)
+            {
+                var auth = ctx.RequestServices.GetRequiredService<PanelAuth>();
+                // Bootstrap: en el primer despliegue (agente sin configurar y sin
+                // contraseña local) se permite el setup inicial sin sesión; una vez
+                // configurado, el panel queda bloqueado y exige autenticación.
+                var bootstrap = auth.RequiereBootstrap;
+                if (!bootstrap && auth.Validar(ctx.Request.Cookies[PanelAuth.CookieNombre]) is null)
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    await ctx.Response.WriteAsJsonAsync(new { ok = false, mensaje = "Inicie sesión para administrar el agente." });
+                    return;
+                }
+            }
+        }
+        await next();
+    });
+
     app.MapGet("/", () => Results.Content(PanelHtml.Pagina, "text/html; charset=utf-8"));
+
+    // ─────────── Autenticación del panel (RBAC) ───────────
+
+    // Helper: valida la cookie de sesión del panel.
+    static PanelAuth.Sesion? SesionDe(HttpContext ctx, PanelAuth auth) =>
+        auth.Validar(ctx.Request.Cookies[PanelAuth.CookieNombre]);
+
+    app.MapGet("/api/sesion", (HttpContext ctx, PanelAuth auth) =>
+    {
+        var s = SesionDe(ctx, auth);
+        return Results.Json(new
+        {
+            autenticado = s is not null,
+            usuario = s?.Usuario,
+            rol = s?.Rol,
+            requiereBootstrap = auth.RequiereBootstrap
+        });
+    });
+
+    app.MapPost("/api/login", async (LoginPanelRequest req, HttpContext ctx, PanelAuth auth, CancellationToken ct) =>
+    {
+        var (ok, token, rol, mensaje) = await auth.LoginAsync(req.Usuario ?? "", req.Password ?? "", ct);
+        if (!ok)
+            return Results.Json(new { ok = false, mensaje });
+
+        ctx.Response.Cookies.Append(PanelAuth.CookieNombre, token!, new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddHours(8)
+        });
+        return Results.Json(new { ok = true, rol, mensaje });
+    });
+
+    app.MapPost("/api/logout", (HttpContext ctx, PanelAuth auth) =>
+    {
+        auth.Cerrar(ctx.Request.Cookies[PanelAuth.CookieNombre]);
+        ctx.Response.Cookies.Delete(PanelAuth.CookieNombre);
+        return Results.Json(new { ok = true });
+    });
 
     app.MapGet("/api/estado", (AgentState state, CycleRunner runner, AgentConfigStore cfg) =>
     {
@@ -130,6 +203,8 @@ try
             s.InicioAutomatico,
             s.UpdateFeedUrl,
             s.UpdateFeedFallbackUrl,
+            s.PanelLocalUsuario,
+            tienePanelLocalPassword = !string.IsNullOrEmpty(s.PanelLocalPasswordHash),
             s.Configurado
         });
     });
@@ -161,7 +236,13 @@ try
             PanelPuerto = actual.PanelPuerto,
             UpdateFeedUrl = (req.UpdateFeedUrl ?? actual.UpdateFeedUrl).Trim(),
             UpdateFeedFallbackUrl = (req.UpdateFeedFallbackUrl ?? actual.UpdateFeedFallbackUrl).Trim(),
-            NombreServicioWindows = actual.NombreServicioWindows
+            NombreServicioWindows = actual.NombreServicioWindows,
+            PanelLocalUsuario = string.IsNullOrWhiteSpace(req.PanelLocalUsuario)
+                ? actual.PanelLocalUsuario : req.PanelLocalUsuario.Trim(),
+            // Si llega una contraseña local nueva, se guarda como hash PBKDF2 (nunca en claro).
+            PanelLocalPasswordHash = string.IsNullOrEmpty(req.PanelLocalPassword)
+                ? actual.PanelLocalPasswordHash
+                : PetrolRios.StationAgent.Security.PasswordHasher.Hash(req.PanelLocalPassword)
         };
 
         if (string.IsNullOrWhiteSpace(nueva.CodigoEstacion))
@@ -295,6 +376,8 @@ static string OcultarPassword(string connectionString) =>
 
 internal sealed record ModoRequest(bool Automatico);
 
+internal sealed record LoginPanelRequest(string? Usuario, string? Password);
+
 internal sealed record GuardarConfigRequest(
     string? CodigoEstacion,
     string? NombreEstacion,
@@ -314,4 +397,6 @@ internal sealed record GuardarConfigRequest(
     int? IntervaloSegundos,
     bool? InicioAutomatico,
     string? UpdateFeedUrl,
-    string? UpdateFeedFallbackUrl);
+    string? UpdateFeedFallbackUrl,
+    string? PanelLocalUsuario,
+    string? PanelLocalPassword);

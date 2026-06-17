@@ -55,6 +55,13 @@ public sealed class AgentSettings
     /// <summary>Nombre del servicio de Windows, para reiniciarlo tras actualizar.</summary>
     public string NombreServicioWindows { get; set; } = "PetrolRios Station Agent";
 
+    // ─── Seguridad del panel local ───
+    /// <summary>Usuario de la contraseña local de respaldo (para acceso offline al panel).</summary>
+    public string PanelLocalUsuario { get; set; } = "admin-local";
+
+    /// <summary>Hash PBKDF2 de la contraseña local de respaldo. Vacío = sin respaldo local.</summary>
+    public string PanelLocalPasswordHash { get; set; } = "";
+
     /// <summary>Resuelve la URL efectiva del feed (primaria o derivada del servidor central).</summary>
     public string ResolverUpdateFeedUrl() =>
         string.IsNullOrWhiteSpace(UpdateFeedUrl)
