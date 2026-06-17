@@ -19,4 +19,11 @@ public interface IAuthService
     QrIniciarResponse QrIniciar();
     Task<bool> QrAprobarAsync(string codigo, int usuarioId, CancellationToken ct = default);
     Task<QrEstadoResponse> QrEstadoAsync(string codigo, CancellationToken ct = default);
+
+    // Login con código del autenticador (sin contraseña)
+    Task<LoginResponse> LoginConTotpAsync(string email, string codigoTotp, CancellationToken ct = default);
+
+    // Recuperación de contraseña por correo
+    Task SolicitarResetPasswordAsync(string email, CancellationToken ct = default);
+    Task<bool> RestablecerPasswordAsync(string token, string nuevaPassword, CancellationToken ct = default);
 }

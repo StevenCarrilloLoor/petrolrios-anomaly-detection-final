@@ -39,4 +39,14 @@ export const authService = {
     api.post<{ ok: boolean; mensaje: string }>("/auth/verificar-email", { token }).then((r) => r.data),
   reenviarVerificacion: (email: string) =>
     api.post("/auth/reenviar-verificacion", { email }),
+
+  // Login con autenticador (sin contraseña)
+  loginTotp: (email: string, codigoTotp: string) =>
+    api.post<LoginResponse>("/auth/login-totp", { email, codigoTotp }).then((r) => r.data),
+
+  // Recuperación de contraseña
+  olvidePassword: (email: string) =>
+    api.post<{ ok: boolean; mensaje: string }>("/auth/olvide-password", { email }).then((r) => r.data),
+  restablecerPassword: (token: string, nuevaPassword: string) =>
+    api.post<{ ok: boolean; mensaje: string }>("/auth/restablecer-password", { token, nuevaPassword }).then((r) => r.data),
 };

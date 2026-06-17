@@ -16,6 +16,7 @@ import { LogsPage } from "@/pages/LogsPage";
 import { SeguridadPage } from "@/pages/SeguridadPage";
 import { AprobarQrPage } from "@/pages/AprobarQrPage";
 import { VerificarCorreoPage } from "@/pages/VerificarCorreoPage";
+import { RestablecerPasswordPage } from "@/pages/RestablecerPasswordPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/verificar-correo" element={<VerificarCorreoPage />} />
+              <Route path="/restablecer-password" element={<RestablecerPasswordPage />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>

@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import QRCode from "qrcode";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService } from "@/services/auth.service";
-import { Shield, Activity, Bell, Search, QrCode, ArrowLeft } from "lucide-react";
+import { Shield, Activity, Bell, Search, QrCode, ArrowLeft, KeyRound } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function LoginPage() {
@@ -16,6 +16,9 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [mostrarReenviar, setMostrarReenviar] = useState(false);
   const [avisoReenvio, setAvisoReenvio] = useState<string | null>(null);
+  const [modoTotp, setModoTotp] = useState(false);
+  const [modoOlvide, setModoOlvide] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [modoQr, setModoQr] = useState(false);
   const [qrImg, setQrImg] = useState<string | null>(null);
   const [qrMsg, setQrMsg] = useState("Generando código…");
@@ -109,6 +112,37 @@ export function LoginPage() {
       setAvisoReenvio("Si la cuenta existe y no está verificada, te enviamos un nuevo correo.");
     } catch {
       setAvisoReenvio("No se pudo reenviar. Intenta más tarde.");
+    }
+  }
+
+  async function entrarConTotp(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const resp = await authService.loginTotp(email, codigoTotp);
+      establecerSesion(resp);
+      navigate("/dashboard", { replace: true });
+    } catch (e2) {
+      const d = (e2 as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(d || "Código del autenticador inválido.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function enviarOlvide(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setAviso(null);
+    setLoading(true);
+    try {
+      await authService.olvidePassword(email);
+      setAviso("Si la cuenta existe, te enviamos un enlace para restablecer la contraseña. Revisa tu correo.");
+    } catch {
+      setAviso("Si la cuenta existe, te enviamos un enlace. Revisa tu correo.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -213,6 +247,78 @@ export function LoginPage() {
                 <ArrowLeft size={14} /> Volver al inicio con contraseña
               </button>
             </div>
+          ) : modoOlvide ? (
+            <form onSubmit={enviarOlvide} className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
+              </p>
+              {aviso && (
+                <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-600">{aviso}</div>
+              )}
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="usuario@petrolrios.com"
+                required
+                disabled={loading}
+                className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {loading && <Spinner size="sm" />} Enviar enlace de recuperación
+              </button>
+              <button
+                type="button"
+                onClick={() => { setModoOlvide(false); setAviso(null); setError(null); }}
+                className="flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                <ArrowLeft size={14} /> Volver
+              </button>
+            </form>
+          ) : modoTotp ? (
+            <form onSubmit={entrarConTotp} className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Para cuentas con 2FA activo: ingresa tu correo y el código de tu app autenticadora.
+              </p>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="usuario@petrolrios.com"
+                required
+                disabled={loading}
+                className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={codigoTotp}
+                onChange={(e) => setCodigoTotp(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                required
+                disabled={loading}
+                className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-center text-lg tracking-[0.4em]"
+              />
+              <button
+                type="submit"
+                disabled={loading || codigoTotp.length !== 6}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {loading && <Spinner size="sm" />} Entrar con el código
+              </button>
+              <button
+                type="button"
+                onClick={() => { setModoTotp(false); setError(null); }}
+                className="flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                <ArrowLeft size={14} /> Volver
+              </button>
+            </form>
           ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -284,6 +390,15 @@ export function LoginPage() {
 
             {!pide2fa && (
               <>
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => { setModoOlvide(true); setError(null); }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
                 <div className="flex items-center gap-3 py-1">
                   <span className="h-px flex-1 bg-border" />
                   <span className="text-xs text-muted-foreground">o</span>
@@ -295,6 +410,13 @@ export function LoginPage() {
                   className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
                 >
                   <QrCode size={16} /> Entrar con código QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setModoTotp(true); setError(null); setCodigoTotp(""); }}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
+                >
+                  <KeyRound size={16} /> Entrar con código del autenticador
                 </button>
               </>
             )}

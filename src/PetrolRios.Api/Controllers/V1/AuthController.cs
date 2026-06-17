@@ -117,6 +117,38 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Iniciar sesión con el código del autenticador (TOTP), sin contraseña.</summary>
+    [HttpPost("login-totp")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> LoginTotp([FromBody] LoginTotpRequest request, CancellationToken ct)
+    {
+        var response = await _authService.LoginConTotpAsync(request.Email, request.CodigoTotp, ct);
+        await this.RegistrarAuditoriaAsync(_logService, "Inicio de sesión (autenticador)", "Usuario",
+            response.Usuario.Id, usuarioIdExplicito: response.Usuario.Id, ct: ct);
+        return Ok(response);
+    }
+
+    /// <summary>Solicitar recuperación de contraseña: envía un enlace al correo.</summary>
+    [HttpPost("olvide-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> OlvidePassword([FromBody] OlvidePasswordRequest request, CancellationToken ct)
+    {
+        await _authService.SolicitarResetPasswordAsync(request.Email, ct);
+        return Ok(new { ok = true, mensaje = "Si la cuenta existe, te enviamos un enlace para restablecer la contraseña." });
+    }
+
+    /// <summary>Restablecer la contraseña usando el token recibido por correo.</summary>
+    [HttpPost("restablecer-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RestablecerPassword([FromBody] RestablecerPasswordRequest request, CancellationToken ct)
+    {
+        var ok = await _authService.RestablecerPasswordAsync(request.Token, request.NuevaPassword, ct);
+        return ok
+            ? Ok(new { ok = true, mensaje = "Contraseña actualizada. Ya puedes iniciar sesión." })
+            : BadRequest(new { ok = false, mensaje = "El enlace es inválido o expiró." });
+    }
+
     // ─── Verificación de correo ───
 
     /// <summary>Verifica el correo del usuario a partir del token del enlace recibido por email.</summary>

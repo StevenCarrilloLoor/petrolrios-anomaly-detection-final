@@ -14,6 +14,8 @@ public sealed class AuthService : IAuthService
     private readonly IJwtService _jwtService;
     private readonly ITotpService _totpService;
     private readonly QrLoginService _qrLogin;
+    private readonly PasswordResetService _passwordReset;
+    private readonly IEmailNotificacionService _email;
     private readonly IConfiguration _config;
 
     public AuthService(
@@ -22,6 +24,8 @@ public sealed class AuthService : IAuthService
         IJwtService jwtService,
         ITotpService totpService,
         QrLoginService qrLogin,
+        PasswordResetService passwordReset,
+        IEmailNotificacionService email,
         IConfiguration config)
     {
         _dbContext = dbContext;
@@ -29,6 +33,8 @@ public sealed class AuthService : IAuthService
         _jwtService = jwtService;
         _totpService = totpService;
         _qrLogin = qrLogin;
+        _passwordReset = passwordReset;
+        _email = email;
         _config = config;
     }
 
@@ -172,6 +178,79 @@ public sealed class AuthService : IAuthService
         _qrLogin.Consumir(codigo); // un solo uso
         var login = await GenerateAuthResponseAsync(usuario, ct);
         return new QrEstadoResponse("aprobado", login);
+    }
+
+    // ─── Login con código del autenticador (TOTP) sin contraseña ───
+
+    public async Task<LoginResponse> LoginConTotpAsync(string email, string codigoTotp, CancellationToken ct = default)
+    {
+        var usuario = await _dbContext.Usuarios
+            .Include(u => u.Rol)
+            .FirstOrDefaultAsync(u => u.Email == email && u.Activo, ct)
+            ?? throw new UnauthorizedAccessException("Credenciales inválidas.");
+
+        if (usuario.EstaBloqueado())
+            throw new UnauthorizedAccessException("La cuenta está bloqueada temporalmente. Intente más tarde.");
+        if (!usuario.EmailVerificado)
+            throw new UnauthorizedAccessException("Debes verificar tu correo electrónico antes de iniciar sesión.");
+        if (!usuario.TotpHabilitado || string.IsNullOrWhiteSpace(usuario.TotpSecret))
+            throw new UnauthorizedAccessException("Esta cuenta no tiene activado el autenticador (2FA).");
+
+        if (!_totpService.Validar(usuario.TotpSecret, codigoTotp))
+        {
+            var maxIntentos = _config.GetValue("Seguridad:MaxIntentosLogin", 5);
+            var minutosBloqueo = _config.GetValue("Seguridad:MinutosBloqueo", 15);
+            usuario.RegistrarFalloLogin(maxIntentos, minutosBloqueo);
+            await _dbContext.SaveChangesAsync(ct);
+            throw new UnauthorizedAccessException("Código del autenticador inválido.");
+        }
+
+        if (usuario.AccessFailedCount > 0 || usuario.LockoutEnd is not null)
+        {
+            usuario.ResetearFallos();
+            await _dbContext.SaveChangesAsync(ct);
+        }
+        return await GenerateAuthResponseAsync(usuario, ct);
+    }
+
+    // ─── Recuperación de contraseña por correo ───
+
+    public async Task SolicitarResetPasswordAsync(string email, CancellationToken ct = default)
+    {
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Activo, ct);
+        if (usuario is null) return; // respuesta neutra: no revelar si el correo existe
+
+        var token = _passwordReset.Crear(usuario.Id);
+        if (!_email.Habilitado) return;
+
+        var frontendUrl = (_config["App:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
+        var enlace = $"{frontendUrl}/restablecer-password?token={token}";
+        var cuerpo =
+            "<div style='font-family:Segoe UI,Arial,sans-serif;color:#0f172a'>" +
+            "<h2>Recuperar contraseña — PetrolRíos</h2>" +
+            $"<p>Hola {usuario.NombreCompleto}, recibimos una solicitud para restablecer tu contraseña.</p>" +
+            $"<p style='margin:24px 0'><a href='{enlace}' style='background:#2563eb;color:#fff;text-decoration:none;" +
+            "padding:12px 22px;border-radius:8px;font-weight:600'>Restablecer mi contraseña</a></p>" +
+            $"<p style='font-size:12px;color:#64748b'>Si el botón no funciona, copia este enlace:<br>{enlace}</p>" +
+            "<p style='font-size:12px;color:#64748b'>El enlace caduca en 1 hora. Si no lo solicitaste, ignora este correo.</p></div>";
+
+        await _email.EnviarAsync("Recuperar contraseña — PetrolRíos", cuerpo, new[] { usuario.Email }, ct);
+    }
+
+    public async Task<bool> RestablecerPasswordAsync(string token, string nuevaPassword, CancellationToken ct = default)
+    {
+        var usuarioId = _passwordReset.Validar(token);
+        if (usuarioId is null) return false;
+        if (string.IsNullOrWhiteSpace(nuevaPassword) || nuevaPassword.Length < 8)
+            throw new ArgumentException("La nueva contraseña debe tener al menos 8 caracteres.");
+
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct);
+        if (usuario is null) return false;
+
+        usuario.UpdatePassword(BCrypt.Net.BCrypt.HashPassword(nuevaPassword));
+        await _dbContext.SaveChangesAsync(ct);
+        _passwordReset.Consumir(token);
+        return true;
     }
 
     public async Task CambiarPasswordAsync(int usuarioId, string passwordActual, string passwordNueva, CancellationToken ct = default)

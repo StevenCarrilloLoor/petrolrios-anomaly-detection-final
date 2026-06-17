@@ -434,3 +434,101 @@ estación sea "copiar una carpeta y ejecutar", se agregó un empaque limpio:
 - **Verificado:** la publicación corrió en Windows con **build correcto**; la carpeta
   `dist/agente` quedó con un único `PetrolRios.StationAgent.exe` autocontenido más
   `agent-config.example.json`, `appsettings.json`, `web.config` y `LEEME.txt`.
+
+## 22. Auto-actualización remota del agente (control de versiones)
+
+- **Versión única** en `Directory.Build.props` (fluye al `.exe`, al heartbeat, al manifiesto
+  y a los instaladores). Se eliminó el `"2.1"` quemado: el agente reporta su versión real.
+- **Endpoint `GET /api/v1/agente/version`** (anónimo) sirve un **manifiesto editable** (versión,
+  URL, sha256, notas) desde `config/agente-version.json` o `appsettings`.
+- **Agente:** `UpdateService` consulta el feed (URL configurable + respaldo, p. ej. GitHub),
+  compara semver y aplica **con un clic**: descarga, **verifica el checksum**, intercambia el
+  `.exe` y reinicia el servicio/proceso. El panel muestra el aviso "actualización disponible".
+- **Panel central (Conexiones):** badge "actualización vX disponible" por estación.
+
+## 23. Seguridad — fase 1 (accesos del servidor + correo de alertas)
+
+- **Dashboard de Hangfire cerrado** (`HangfireLocalAuthorizationFilter`): solo local o
+  Administrador autenticado (antes estaba abierto a cualquiera).
+- **JWT con _fail-fast_ en producción**: el servidor no arranca si la clave es débil
+  (< 32) o la de desarrollo. **HTTPS/HSTS** en producción (configurable).
+- **Notificador SMTP de alertas críticas** (`IEmailNotificacionService`): configurable y
+  **apagado por defecto**; sin credenciales quemadas; nunca tumba el ciclo de detección.
+
+## 24. Seguridad — fase 2 (panel del agente con autenticación y RBAC)
+
+- El panel del agente **exige iniciar sesión**; configurar/sincronizar/actualizar quedan
+  bloqueados sin sesión válida (cierra el hueco de que cualquiera reconfigure el agente).
+- **RBAC real:** las credenciales se verifican contra el servidor central y solo
+  **Administrador/Supervisor** pueden administrar el agente (el rango de la empresa importa).
+- **Respaldo local offline** (contraseña local cifrada con PBKDF2) para entrar cuando el
+  central no está disponible; arranque inicial seguro (bootstrap solo antes de configurar).
+
+## 25. Seguridad — fase 3 (sin contraseñas quemadas + bloqueo + cambio obligatorio)
+
+- La **contraseña inicial del admin** sale de configuración/variable de entorno; ya no está
+  quemada, y se obliga a **cambiarla** en el primer ingreso.
+- **Bloqueo de cuenta por intentos fallidos** (anti fuerza bruta), configurable.
+- Endpoint `POST /api/v1/auth/cambiar-password` y página de **Seguridad (mi cuenta)** en el
+  frontend; campos de seguridad en `Usuario` + migración `SeguridadUsuario`.
+
+## 26. Bugfix — el agente ya no enmascara fallos de Firebird
+
+- Descubierto en pruebas en vivo: cada consulta abría su conexión y **tragaba** la excepción
+  devolviendo vacío, por lo que un Firebird caído se veía como "OK Sin transacciones nuevas"
+  (punto ciego de monitoreo). Ahora se abre **una** conexión y, si falla (WireCrypt,
+  credenciales, archivo, servicio caído), la excepción **se propaga** y el ciclo la reporta
+  como ERROR. Los fallos por tabla individual se siguen tolerando.
+- **Verificado end-to-end:** Firebird OK (40.033 documentos), 14 anomalías inyectadas →
+  el agente las extrajo → el motor generó 12 alertas nuevas.
+
+## 27. Autenticador 2FA (TOTP) en el programa principal
+
+- **`TotpService`** propio (RFC 6238, HMAC-SHA1, 6 dígitos, ventana 30 s), compatible con
+  Google Authenticator / Authy / Microsoft Authenticator, sin dependencias externas.
+- **Login con segundo factor**: si el usuario tiene 2FA, pide el código de 6 dígitos.
+- **Pantalla "Seguridad (mi cuenta)"** con enrolamiento por **QR** (librería `qrcode`) y
+  desactivación; endpoints `/auth/2fa/iniciar|confirmar|desactivar|estado`.
+
+## 28. Login por QR estilo Steam
+
+- La pantalla de login muestra un **QR**; un usuario ya autenticado lo **aprueba** desde otro
+  dispositivo (`/aprobar-qr`) y la pantalla entra sola, sin teclear contraseña.
+- `QrLoginService` (estado en memoria, código de un solo uso, expiración 2 min) + endpoints
+  `/auth/qr/iniciar|estado|aprobar`. Respeta la verificación de correo.
+- *Nota:* en `localhost` el QR no se escanea desde el celular (localhost = el propio teléfono);
+  funciona con el servidor en una IP/dominio real.
+
+## 29. Verificación de correo real y obligatoria
+
+- Al crear un usuario se **envía un correo** con botón "Verificar correo electrónico" (enlace a
+  `/verificar-correo?token=...`); endpoints `/auth/verificar-email` y `/auth/reenviar-verificacion`.
+- **Obligatoria:** no se permite iniciar sesión (ni por contraseña ni por QR) hasta confirmar
+  el correo; mensaje claro + botón "Reenviar correo de verificación".
+- **SMTP real (Gmail)** configurado en `appsettings.Secrets.json` **git-ignoreado** (la App
+  Password nunca se sube al repo). Migración `VerificacionEmail`.
+- **Probado en vivo:** cuenta creada → correo enviado por Gmail SMTP → llegó a la bandeja real
+  → el enlace verificó la cuenta.
+
+## 30. Login con autenticador y recuperación de contraseña
+
+- **Entrar con el código del autenticador** (sin contraseña): `POST /auth/login-totp` para
+  cuentas con 2FA activo; opción en la pantalla de login.
+- **¿Olvidaste tu contraseña?**: envía un enlace al correo (`/auth/olvide-password`), y la
+  página `/restablecer-password?token=...` permite fijar una nueva (`/auth/restablecer-password`).
+  Tokens de un solo uso en memoria (`PasswordResetService`), válidos 1 hora.
+
+## 31. Guía de instalación (INSTALACION.md)
+
+- Documento `INSTALACION.md` con requisitos, publicación de ejecutables, configuración sin
+  secretos quemados, seguridad del panel del agente, notificaciones por correo, actualización
+  remota y solución de problemas, para el **servidor central** y el **agente**.
+
+## 32. Resultado de verificación (rondas 5–6)
+
+Build sin warnings; **126 pruebas unitarias en verde** (Domain 8, Detectors 89 — incluidos los
+nuevos de expresiones, TOTP y QR —, Api 29 con las de integración). Frontend compila y empaqueta
+limpio. Verificado en vivo: dashboard, conexiones (API v2.2.0, SignalR activo), detección
+end-to-end con Firebird real, panel del agente con login RBAC, 2FA con QR, **verificación de
+correo real contra Gmail**, y recuperación/login por autenticador. Migraciones EF nuevas:
+`SeguridadUsuario` y `VerificacionEmail`.

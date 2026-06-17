@@ -19,6 +19,11 @@ public sealed record Estado2faResponse(bool Habilitado);
 public sealed record VerificarEmailRequest(string Token);
 public sealed record ReenviarVerificacionRequest(string Email);
 
+// ─── Login con autenticador y recuperación de contraseña ───
+public sealed record LoginTotpRequest(string Email, string CodigoTotp);
+public sealed record OlvidePasswordRequest(string Email);
+public sealed record RestablecerPasswordRequest(string Token, string NuevaPassword);
+
 // ─── Login por QR (estilo Steam) ───
 public sealed record QrIniciarResponse(string Codigo, int ExpiraSegundos);
 public sealed record QrAprobarRequest(string Codigo);
