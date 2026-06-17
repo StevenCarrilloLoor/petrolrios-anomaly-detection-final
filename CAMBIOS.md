@@ -524,6 +524,24 @@ estación sea "copiar una carpeta y ejecutar", se agregó un empaque limpio:
   secretos quemados, seguridad del panel del agente, notificaciones por correo, actualización
   remota y solución de problemas, para el **servidor central** y el **agente**.
 
+## 32b. Correcciones de bugs y pulido (ronda 7)
+
+- **Login ya no revienta (500) con 2FA:** el controlador devolvía NRE al pedir el código;
+  ahora retorna `Requiere2Fa` sin tocar el usuario nulo.
+- **Agente "Probar servidor":** se quitó la mutación de `HttpClient.Timeout` tras usar el
+  cliente (causaba *"instance has already started a request"*); el timeout se aplica por
+  petición con `CancellationToken`.
+- **Editar usuario:** `UpdateAsync` ahora actualiza nombre y rol (`Usuario.ActualizarPerfil`);
+  antes solo cambiaba el estado.
+- **Alta de usuarios:** campo **"Confirmar contraseña"** con validación y mensajes de error;
+  baja con confirmación y aviso de resultado.
+- **Pantalla de login** rediseñada (gradiente y decoración, más profesional) y se quitó el
+  número fijo de estaciones (es incremental).
+- **Hash de contraseñas:** se corrigió un hash `$2b$` (generado fuera de la app) que la
+  librería del proyecto no procesaba; los hashes deben ser compatibles con BCrypt.Net.
+- Verificado en vivo: admin login 200, editar rol persiste, borrado 204, agente probar
+  servidor OK.
+
 ## 32. Resultado de verificación (rondas 5–6)
 
 Build sin warnings; **126 pruebas unitarias en verde** (Domain 8, Detectors 89 — incluidos los
