@@ -56,6 +56,14 @@ public sealed class AgentSettings
     public string NombreServicioWindows { get; set; } = "PetrolRios Station Agent";
 
     // ─── Seguridad del panel local ───
+    /// <summary>
+    /// Si es false (por defecto), el panel del agente está abierto (solo localhost):
+    /// permite configurar y conectar sin fricción en el primer despliegue. Cuando un
+    /// administrador lo activa, el panel exige iniciar sesión (RBAC contra el central
+    /// o respaldo local) para administrar el agente.
+    /// </summary>
+    public bool RequiereLoginPanel { get; set; } = false;
+
     /// <summary>Usuario de la contraseña local de respaldo (para acceso offline al panel).</summary>
     public string PanelLocalUsuario { get; set; } = "admin-local";
 

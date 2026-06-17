@@ -21,6 +21,17 @@ public sealed class CycleRunner
 
     public DateTime Watermark => _lastWatermark;
 
+    /// <summary>
+    /// Reinicia la marca de agua a una fecha dada para volver a extraer y enviar las
+    /// transacciones desde ese momento (utilidad de mantenimiento del panel).
+    /// </summary>
+    public void ReiniciarWatermark(DateTime fechaUtc)
+    {
+        _lastWatermark = DateTime.SpecifyKind(fechaUtc, DateTimeKind.Utc);
+        SaveWatermark(_lastWatermark);
+        _state.RegistrarEvento("INFO", $"Marca de agua reiniciada a {_lastWatermark:yyyy-MM-dd HH:mm} — se reenviarán datos desde esa fecha");
+    }
+
     public CycleRunner(
         FirebirdExtractor extractor,
         ServerClient serverClient,

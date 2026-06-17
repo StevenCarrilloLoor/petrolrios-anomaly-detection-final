@@ -85,16 +85,20 @@ try
                 || path.StartsWithSegments("/api/sesion");
             if (!publica)
             {
-                var auth = ctx.RequestServices.GetRequiredService<PanelAuth>();
-                // Bootstrap: en el primer despliegue (agente sin configurar y sin
-                // contraseña local) se permite el setup inicial sin sesión; una vez
-                // configurado, el panel queda bloqueado y exige autenticación.
-                var bootstrap = auth.RequiereBootstrap;
-                if (!bootstrap && auth.Validar(ctx.Request.Cookies[PanelAuth.CookieNombre]) is null)
+                // El login del panel es OPT-IN: solo se exige si un administrador lo
+                // activó (RequiereLoginPanel). Por defecto el panel está abierto (solo
+                // localhost) para poder configurar y conectar el agente sin fricción en
+                // el primer despliegue, incluso antes de saber la URL del central.
+                var cfg = ctx.RequestServices.GetRequiredService<AgentConfigStore>();
+                if (cfg.Actual.RequiereLoginPanel)
                 {
-                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    await ctx.Response.WriteAsJsonAsync(new { ok = false, mensaje = "Inicie sesión para administrar el agente." });
-                    return;
+                    var auth = ctx.RequestServices.GetRequiredService<PanelAuth>();
+                    if (auth.Validar(ctx.Request.Cookies[PanelAuth.CookieNombre]) is null)
+                    {
+                        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        await ctx.Response.WriteAsJsonAsync(new { ok = false, mensaje = "Inicie sesión para administrar el agente." });
+                        return;
+                    }
                 }
             }
         }
@@ -109,7 +113,7 @@ try
     static PanelAuth.Sesion? SesionDe(HttpContext ctx, PanelAuth auth) =>
         auth.Validar(ctx.Request.Cookies[PanelAuth.CookieNombre]);
 
-    app.MapGet("/api/sesion", (HttpContext ctx, PanelAuth auth) =>
+    app.MapGet("/api/sesion", (HttpContext ctx, PanelAuth auth, AgentConfigStore cfg) =>
     {
         var s = SesionDe(ctx, auth);
         return Results.Json(new
@@ -117,7 +121,8 @@ try
             autenticado = s is not null,
             usuario = s?.Usuario,
             rol = s?.Rol,
-            requiereBootstrap = auth.RequiereBootstrap
+            // Si el login no está activado, el panel está abierto (solo localhost).
+            requiereLogin = cfg.Actual.RequiereLoginPanel
         });
     });
 
@@ -203,6 +208,7 @@ try
             s.InicioAutomatico,
             s.UpdateFeedUrl,
             s.UpdateFeedFallbackUrl,
+            s.RequiereLoginPanel,
             s.PanelLocalUsuario,
             tienePanelLocalPassword = !string.IsNullOrEmpty(s.PanelLocalPasswordHash),
             s.Configurado
@@ -237,6 +243,7 @@ try
             UpdateFeedUrl = (req.UpdateFeedUrl ?? actual.UpdateFeedUrl).Trim(),
             UpdateFeedFallbackUrl = (req.UpdateFeedFallbackUrl ?? actual.UpdateFeedFallbackUrl).Trim(),
             NombreServicioWindows = actual.NombreServicioWindows,
+            RequiereLoginPanel = req.RequiereLoginPanel ?? actual.RequiereLoginPanel,
             PanelLocalUsuario = string.IsNullOrWhiteSpace(req.PanelLocalUsuario)
                 ? actual.PanelLocalUsuario : req.PanelLocalUsuario.Trim(),
             // Si llega una contraseña local nueva, se guarda como hash PBKDF2 (nunca en claro).
@@ -263,6 +270,15 @@ try
         state.RegistrarEvento("INFO", "Sincronización manual solicitada desde el panel");
         var resultado = await runner.RunCycleAsync(ct);
         return Results.Json(new { ok = state.UltimoCicloExitoso, resultado });
+    });
+
+    // Re-sincronizar: reinicia la marca de agua a una fecha para reenviar datos.
+    app.MapPost("/api/reiniciar-watermark", (ReiniciarWatermarkRequest req, CycleRunner runner) =>
+    {
+        if (!DateTime.TryParse(req.Fecha, out var fecha))
+            return Results.Json(new { ok = false, mensaje = "Fecha inválida." });
+        runner.ReiniciarWatermark(fecha.ToUniversalTime());
+        return Results.Json(new { ok = true, mensaje = $"Marca de agua reiniciada a {fecha:yyyy-MM-dd HH:mm}. Los datos se reenviarán en el próximo ciclo." });
     });
 
     app.MapPost("/api/modo", (ModoRequest request, AgentState state) =>
@@ -378,6 +394,8 @@ internal sealed record ModoRequest(bool Automatico);
 
 internal sealed record LoginPanelRequest(string? Usuario, string? Password);
 
+internal sealed record ReiniciarWatermarkRequest(string? Fecha);
+
 internal sealed record GuardarConfigRequest(
     string? CodigoEstacion,
     string? NombreEstacion,
@@ -398,5 +416,6 @@ internal sealed record GuardarConfigRequest(
     bool? InicioAutomatico,
     string? UpdateFeedUrl,
     string? UpdateFeedFallbackUrl,
+    bool? RequiereLoginPanel,
     string? PanelLocalUsuario,
     string? PanelLocalPassword);

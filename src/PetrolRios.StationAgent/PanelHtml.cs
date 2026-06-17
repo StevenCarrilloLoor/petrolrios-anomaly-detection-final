@@ -184,6 +184,12 @@ internal static class PanelHtml
       <button class="sec" onclick="probar('servidor')">Probar conexión al servidor</button>
       <button class="sec" id="btn-buscar-upd" onclick="buscarActualizacion()">Buscar actualización</button>
     </div>
+    <div class="switch" style="margin-bottom:10px">
+      <span>Re-sincronizar desde</span>
+      <input id="f-rewatermark" type="datetime-local"
+             style="background:#0a0f1c;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px">
+      <button class="sec" onclick="reiniciarWatermark()">Re-enviar datos</button>
+    </div>
     <div class="resultado" id="resultado"></div>
 
     <div class="card" style="margin-top:14px">
@@ -315,12 +321,21 @@ internal static class PanelHtml
       </div>
 
       <div class="form-section">
-        <h2>Seguridad del panel (acceso offline)</h2>
+        <h2>Seguridad del panel</h2>
         <div class="fields">
+          <div class="field" style="grid-column:1/-1">
+            <label>Requerir inicio de sesión para administrar este agente</label>
+            <select id="f-requierelogin">
+              <option value="false">No — panel abierto (solo accesible desde esta máquina)</option>
+              <option value="true">Sí — pedir usuario Administrador/Supervisor (verificado contra el central)</option>
+            </select>
+            <span class="hint">Actívalo cuando el agente ya esté conectado al central. Por defecto el panel
+              está abierto para poder configurarlo y conectarlo sin fricción.</span>
+          </div>
           <div class="field">
             <label>Usuario local de respaldo</label>
             <input id="f-localuser" type="text" placeholder="admin-local">
-            <span class="hint">Para entrar al panel si el servidor central no está disponible.</span>
+            <span class="hint">Para entrar al panel si el servidor central no está disponible (cuando el login está activo).</span>
           </div>
           <div class="field">
             <label>Contraseña local de respaldo</label>
@@ -434,6 +449,7 @@ async function cargarConfig(){
     document.getElementById('f-auto').value = String(c.inicioAutomatico);
     document.getElementById('f-updateurl').value = c.updateFeedUrl || '';
     document.getElementById('f-updateurl2').value = c.updateFeedFallbackUrl || '';
+    document.getElementById('f-requierelogin').value = String(!!c.requiereLoginPanel);
     document.getElementById('f-localuser').value = c.panelLocalUsuario || '';
   }catch(e){}
 }
@@ -465,6 +481,7 @@ async function guardarConfig(){
     inicioAutomatico: document.getElementById('f-auto').value === 'true',
     updateFeedUrl: document.getElementById('f-updateurl').value,
     updateFeedFallbackUrl: document.getElementById('f-updateurl2').value,
+    requiereLoginPanel: document.getElementById('f-requierelogin').value === 'true',
     panelLocalUsuario: document.getElementById('f-localuser').value,
     panelLocalPassword: document.getElementById('f-localpass').value
   };
@@ -506,6 +523,19 @@ async function probar(cual){
   refrescar();
 }
 
+async function reiniciarWatermark(){
+  const f = document.getElementById('f-rewatermark').value;
+  if(!f){ mostrarResultado('resultado', false, 'Elija una fecha y hora.'); return; }
+  if(!confirm('Se reenviarán al servidor central todas las transacciones desde esa fecha. ¿Continuar?')) return;
+  try{
+    const r = await fetch('/api/reiniciar-watermark', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fecha: f})});
+    const j = await r.json();
+    mostrarResultado('resultado', j.ok, j.mensaje);
+  }catch(e){ mostrarResultado('resultado', false, 'No se pudo contactar al agente.'); }
+  refrescar();
+}
+
 async function buscarActualizacion(){
   const btn = document.getElementById('btn-buscar-upd');
   btn.disabled = true; btn.textContent = 'Buscando…';
@@ -537,16 +567,18 @@ async function verificarSesion(){
   try{
     const r = await fetch('/api/sesion');
     const s = await r.json();
-    sesionActiva = s.autenticado || s.requiereBootstrap;
+    // El login es opcional: si no está activado, el panel está siempre abierto.
+    const abierto = !s.requiereLogin || s.autenticado;
+    sesionActiva = abierto;
     const overlay = document.getElementById('overlay-login');
-    if(sesionActiva){
+    if(abierto){
       overlay.classList.remove('show');
       const info = document.getElementById('sesion-info');
       if(s.autenticado){
         info.innerHTML = '👤 ' + (s.usuario||'') + ' · ' + (s.rol||'') +
           ' · <button class="link" onclick="hacerLogout()">salir</button>';
       } else {
-        info.innerHTML = '<span style="color:var(--warn)">configuración inicial</span>';
+        info.innerHTML = '';
       }
       return true;
     } else {

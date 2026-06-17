@@ -435,44 +435,49 @@ estación sea "copiar una carpeta y ejecutar", se agregó un empaque limpio:
   `dist/agente` quedó con un único `PetrolRios.StationAgent.exe` autocontenido más
   `agent-config.example.json`, `appsettings.json`, `web.config` y `LEEME.txt`.
 
-## 22. Auto-actualización remota del agente (control de versiones)
+---
 
-- **Versión única** en `Directory.Build.props` (fluye al `.exe`, al heartbeat, al manifiesto
-  y a los instaladores). Se eliminó el `"2.1"` quemado: el agente reporta su versión real.
-- **Endpoint `GET /api/v1/agente/version`** (anónimo) sirve un **manifiesto editable** (versión,
-  URL, sha256, notas) desde `config/agente-version.json` o `appsettings`.
-- **Agente:** `UpdateService` consulta el feed (URL configurable + respaldo, p. ej. GitHub),
-  compara semver y aplica **con un clic**: descarga, **verifica el checksum**, intercambia el
-  `.exe` y reinicia el servicio/proceso. El panel muestra el aviso "actualización disponible".
-- **Panel central (Conexiones):** badge "actualización vX disponible" por estación.
+## 16. Despliegue sin fricción: panel del agente con login opcional (opt-in)
 
-## 23. Seguridad — fase 1 (accesos del servidor + correo de alertas)
+**Problema detectado en pruebas de campo.** Al endurecer la seguridad del panel se introdujo
+un fallo de despliegue: en una máquina nueva el panel exigía iniciar sesión contra el servidor
+central *antes* de poder configurarlo, pero el agente aún no tenía la conexión al central
+configurada. Resultado: imposible configurar la conexión en la misma interfaz (problema del
+huevo y la gallina).
 
-- **Dashboard de Hangfire cerrado** (`HangfireLocalAuthorizationFilter`): solo local o
-  Administrador autenticado (antes estaba abierto a cualquiera).
-- **JWT con _fail-fast_ en producción**: el servidor no arranca si la clave es débil
-  (< 32) o la de desarrollo. **HTTPS/HSTS** en producción (configurable).
-- **Notificador SMTP de alertas críticas** (`IEmailNotificacionService`): configurable y
-  **apagado por defecto**; sin credenciales quemadas; nunca tumba el ciclo de detección.
+**Solución (login opt-in por agente).** El panel del agente ahora arranca **abierto por
+defecto** (`AgentSettings.RequiereLoginPanel = false`) — solo accesible desde `localhost`, así
+que sigue protegido por la máquina. El administrador configura la conexión y, una vez enlazado
+con el central, **activa el inicio de sesión para ese agente en concreto** desde
+Configuración → Seguridad del panel. A partir de ese momento el panel exige login normal (RBAC
+contra el central, con respaldo local PBKDF2 para acceso offline).
 
-## 24. Seguridad — fase 2 (panel del agente con autenticación y RBAC)
+Cambios técnicos:
 
-- El panel del agente **exige iniciar sesión**; configurar/sincronizar/actualizar quedan
-  bloqueados sin sesión válida (cierra el hueco de que cualquiera reconfigure el agente).
-- **RBAC real:** las credenciales se verifican contra el servidor central y solo
-  **Administrador/Supervisor** pueden administrar el agente (el rango de la empresa importa).
-- **Respaldo local offline** (contraseña local cifrada con PBKDF2) para entrar cuando el
-  central no está disponible; arranque inicial seguro (bootstrap solo antes de configurar).
+- `AgentSettings.RequiereLoginPanel` (bool, default `false`): bandera persistida en
+  `agent-config.json`.
+- `Program.cs`: el middleware de autenticación solo exige sesión cuando
+  `RequiereLoginPanel = true`; `/api/sesion` devuelve `requiereLogin`; el GET/POST de
+  configuración y `GuardarConfigRequest` exponen y mapean la bandera.
+- `PanelHtml.cs`: `verificarSesion()` usa `!s.requiereLogin || s.autenticado`; nuevo selector
+  "Requerir inicio de sesión para administrar este agente" en Seguridad del panel.
 
-## 25. Seguridad — fase 3 (sin contraseñas quemadas + bloqueo + cambio obligatorio)
+### 16.1 Quality of life: re-sincronizar desde una fecha
 
-- La **contraseña inicial del admin** sale de configuración/variable de entorno; ya no está
-  quemada, y se obliga a **cambiarla** en el primer ingreso.
-- **Bloqueo de cuenta por intentos fallidos** (anti fuerza bruta), configurable.
-- Endpoint `POST /api/v1/auth/cambiar-password` y página de **Seguridad (mi cuenta)** en el
-  frontend; campos de seguridad en `Usuario` + migración `SeguridadUsuario`.
+Utilidad de mantenimiento solicitada para el panel: **"Re-sincronizar desde"** (pestaña
+Monitoreo). Permite fijar manualmente la marca de agua a una fecha/hora para volver a extraer y
+reenviar las transacciones desde ese momento (p. ej. tras corregir un problema de conexión o de
+datos en el central).
 
-## 26. Bugfix — el agente ya no enmascara fallos de Firebird
+- `CycleRunner.ReiniciarWatermark(DateTime)`: fija el watermark, lo persiste y registra el evento.
+- `Program.cs`: endpoint `/api/reiniciar-watermark` con `ReiniciarWatermarkRequest(string? Fecha)`.
+- `PanelHtml.cs`: control de fecha/hora + botón "Re-enviar datos" + función `reiniciarWatermark()`.
+
+**Verificado en vivo (Chrome, junio 2026):** build correcto con 126 pruebas en verde; el panel
+abre sin overlay de login por defecto; el selector "Requerir inicio de sesión" aparece en
+Seguridad del panel (en "No — panel abierto"); el control "Re-sincronizar desde" funciona en
+Monitoreo.
+ no enmascara fallos de Firebird
 
 - Descubierto en pruebas en vivo: cada consulta abría su conexión y **tragaba** la excepción
   devolviendo vacío, por lo que un Firebird caído se veía como "OK Sin transacciones nuevas"
