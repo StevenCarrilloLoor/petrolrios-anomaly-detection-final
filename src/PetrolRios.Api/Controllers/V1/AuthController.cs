@@ -32,6 +32,10 @@ public sealed class AuthController : ControllerBase
     {
         var response = await _authService.LoginAsync(request, ct);
 
+        // Si falta el 2FA, aún no hay usuario/token: el frontend pedirá el código.
+        if (response.Requiere2Fa || response.Usuario is null)
+            return Ok(response);
+
         await this.RegistrarAuditoriaAsync(_logService,
             "Inicio de sesión", "Usuario", response.Usuario.Id,
             new { response.Usuario.Email }, usuarioIdExplicito: response.Usuario.Id, ct: ct);

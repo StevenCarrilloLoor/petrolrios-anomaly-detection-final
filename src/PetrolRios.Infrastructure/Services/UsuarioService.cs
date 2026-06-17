@@ -118,9 +118,12 @@ public sealed class UsuarioService : IUsuarioService
         if (request.Activo.HasValue)
             usuario.Activo = request.Activo.Value;
 
-        // NombreCompleto y RolId tienen setters privados — necesitamos reflexión o un método Update
-        // Por ahora actualizamos lo que permiten los setters públicos
+        // Actualizar nombre y rol si vienen en la solicitud.
+        usuario.ActualizarPerfil(request.NombreCompleto, request.RolId);
+
         await _dbContext.SaveChangesAsync(ct);
+        // Recargar el rol por si cambió
+        await _dbContext.Entry(usuario).Reference(u => u.Rol).LoadAsync(ct);
         return MapToResponse(usuario);
     }
 

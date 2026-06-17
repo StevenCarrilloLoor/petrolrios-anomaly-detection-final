@@ -149,9 +149,12 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Panel institucional */}
-      <div className="hidden flex-col justify-between bg-slate-900 p-12 text-white lg:flex lg:w-1/2">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/20">
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-12 text-white lg:flex lg:w-1/2">
+        {/* Decoración */}
+        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-blue-600/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/20 ring-1 ring-blue-400/30">
             <Shield size={24} className="text-blue-400" />
           </div>
           <div>
@@ -162,30 +165,34 @@ export function LoginPage() {
           </div>
         </div>
 
-        <div className="space-y-8">
-          <h1 className="max-w-md text-3xl font-bold leading-snug">
-            Auditoría transaccional continua sobre 10 estaciones de servicio
+        <div className="relative space-y-8">
+          <h1 className="max-w-md text-4xl font-bold leading-tight">
+            Auditoría transaccional
+            <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">
+              {" "}continua{" "}
+            </span>
+            para toda tu red de estaciones
           </h1>
           <div className="space-y-5">
             <FeatureRow
               icon={<Activity size={18} />}
-              title="Cobertura del 100% de transacciones"
-              description="13,000–15,000 transacciones diarias analizadas por 4 detectores cada 5–10 minutos."
+              title="Cobertura total de transacciones"
+              description="Cada venta, turno y crédito analizado por varios detectores en ciclos de pocos minutos."
             />
             <FeatureRow
               icon={<Bell size={18} />}
               title="Alertas en tiempo real"
-              description="Notificaciones push vía SignalR, sin refrescar la página."
+              description="Notificaciones push instantáneas vía SignalR, sin recargar la página."
             />
             <FeatureRow
               icon={<Search size={18} />}
               title="Detección en minutos, no semanas"
-              description="Reducción del tiempo de detección de días/semanas a menos de 10 minutos."
+              description="El tiempo de detección baja de días o semanas a cuestión de minutos."
             />
           </div>
         </div>
 
-        <p className="text-xs text-slate-500">
+        <p className="relative text-xs text-slate-500">
           PetrolRíos S.A. · Plataforma de Auditoría Transaccional · {new Date().getFullYear()}
         </p>
       </div>

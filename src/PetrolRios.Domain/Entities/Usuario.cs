@@ -51,6 +51,15 @@ public class Usuario : BaseEntity
         ResetearFallos();
     }
 
+    /// <summary>Actualiza el nombre y/o el rol del usuario (edición desde el panel).</summary>
+    public void ActualizarPerfil(string? nombreCompleto, int? rolId)
+    {
+        if (!string.IsNullOrWhiteSpace(nombreCompleto))
+            NombreCompleto = nombreCompleto.Trim();
+        if (rolId.HasValue && rolId.Value > 0)
+            RolId = rolId.Value;
+    }
+
     // ─── Bloqueo por intentos fallidos ───
     public bool EstaBloqueado() => LockoutEnd.HasValue && LockoutEnd.Value > DateTime.UtcNow;
 

@@ -164,11 +164,15 @@ public sealed class ServerClient
 
         _logger.LogInformation("Autenticando agente {Estacion} contra el servidor", settings.CodigoEstacion);
 
-        _httpClient.Timeout = TimeSpan.FromSeconds(Math.Clamp(settings.ServerTimeoutSegundos, 5, 120));
+        // El timeout se aplica POR PETICIÓN con un CancellationToken, no mutando
+        // HttpClient.Timeout (eso lanza "instance has already started a request"
+        // una vez que el cliente ya se usó para los heartbeats).
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(settings.ServerTimeoutSegundos, 5, 120)));
 
         var loginPayload = new { Email = settings.Email, Password = settings.Password };
         var response = await _httpClient.PostAsJsonAsync(
-            Url(settings.ServerUrl, "/api/v1/auth/login"), loginPayload, ct);
+            Url(settings.ServerUrl, "/api/v1/auth/login"), loginPayload, cts.Token);
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(ct);

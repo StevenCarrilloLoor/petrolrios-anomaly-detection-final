@@ -20,12 +20,25 @@ export function UsuariosPage() {
     queryFn: usuariosService.getAll,
   });
 
+  const [mensaje, setMensaje] = useState<string | null>(null);
   const deleteMutation = useMutation({
     mutationFn: (id: number) => usuariosService.delete(id),
     onSuccess: () => {
+      setMensaje("Usuario desactivado correctamente.");
       void queryClient.invalidateQueries({ queryKey: ["usuarios"] });
     },
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setMensaje(d || "No se pudo eliminar el usuario.");
+    },
   });
+
+  function eliminar(id: number, nombre: string) {
+    if (window.confirm(`¿Desactivar al usuario "${nombre}"? No podrá iniciar sesión.`)) {
+      setMensaje(null);
+      deleteMutation.mutate(id);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -46,6 +59,10 @@ export function UsuariosPage() {
           <UserPlus size={16} /> Nuevo Usuario
         </button>
       </div>
+
+      {mensaje && (
+        <div className="rounded-md bg-muted p-3 text-sm text-foreground">{mensaje}</div>
+      )}
 
       {showCreate && (
         <CreateUsuarioForm onClose={() => setShowCreate(false)} />
@@ -110,8 +127,9 @@ export function UsuariosPage() {
                       <Edit size={16} />
                     </button>
                     <button
-                      onClick={() => deleteMutation.mutate(u.id)}
+                      onClick={() => eliminar(u.id, u.nombreCompleto)}
                       className="text-muted-foreground hover:text-destructive"
+                      title="Desactivar usuario"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -141,6 +159,8 @@ function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
     password: "",
     rolId: 1,
   });
+  const [confirma, setConfirma] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () => usuariosService.create(form),
@@ -148,11 +168,33 @@ function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
       void queryClient.invalidateQueries({ queryKey: ["usuarios"] });
       onClose();
     },
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(d || "No se pudo crear el usuario. Revisa los datos.");
+    },
   });
+
+  function crear() {
+    setError(null);
+    if (form.password.length < 8) {
+      setError("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (form.password !== confirma) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+    mutation.mutate();
+  }
 
   return (
     <div className="rounded-lg border border-border bg-background p-6">
       <h3 className="mb-4 text-lg font-semibold">Nuevo Usuario</h3>
+      {error && (
+        <div className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium">
@@ -183,6 +225,19 @@ function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
+            placeholder="Mín. 8 caracteres"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Confirmar contraseña
+          </label>
+          <input
+            type="password"
+            value={confirma}
+            onChange={(e) => setConfirma(e.target.value)}
+            placeholder="Repite la contraseña"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
           />
         </div>
@@ -205,16 +260,17 @@ function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
       </div>
       <div className="mt-4 flex gap-3">
         <button
-          onClick={() => mutation.mutate()}
+          onClick={crear}
           disabled={
             mutation.isPending ||
             !form.email ||
             !form.nombreCompleto ||
-            !form.password
+            !form.password ||
+            !confirma
           }
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          Crear
+          {mutation.isPending ? "Creando…" : "Crear"}
         </button>
         <button
           onClick={onClose}
