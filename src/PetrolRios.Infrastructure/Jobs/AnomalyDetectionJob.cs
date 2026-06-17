@@ -27,6 +27,7 @@ public sealed class AnomalyDetectionJob
     private readonly IUnitOfWork _unitOfWork;
     private readonly PetrolRiosDbContext _dbContext;
     private readonly IHubContext<AlertsHub> _hubContext;
+    private readonly IEmailNotificacionService _emailService;
     private readonly ILogger<AnomalyDetectionJob> _logger;
 
     public AnomalyDetectionJob(
@@ -34,12 +35,14 @@ public sealed class AnomalyDetectionJob
         IUnitOfWork unitOfWork,
         PetrolRiosDbContext dbContext,
         IHubContext<AlertsHub> hubContext,
+        IEmailNotificacionService emailService,
         ILogger<AnomalyDetectionJob> logger)
     {
         _detectors = detectors;
         _unitOfWork = unitOfWork;
         _dbContext = dbContext;
         _hubContext = hubContext;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -99,6 +102,10 @@ public sealed class AnomalyDetectionJob
 
                         // Notificar por SignalR
                         await NotifyAlertAsync(alerta, estacion.Id);
+
+                        // Notificación por correo para alertas críticas (opcional, como en la tesis)
+                        if (alerta.NivelRiesgo == NivelRiesgo.Critico)
+                            await NotificarCriticaPorCorreoAsync(alerta, estacion, ct);
                     }
                 }
 
@@ -217,6 +224,37 @@ public sealed class AnomalyDetectionJob
             .Where(item => item is not null)
             .Cast<T>()
             .ToList();
+    }
+
+    // Cache de destinatarios de correo por ciclo (supervisores y administradores activos).
+    private IReadOnlyList<string>? _destinatariosCorreo;
+
+    private async Task NotificarCriticaPorCorreoAsync(Alerta alerta, Estacion estacion, CancellationToken ct)
+    {
+        if (!_emailService.Habilitado) return;
+
+        _destinatariosCorreo ??= await _dbContext.Usuarios
+            .AsNoTracking()
+            .Where(u => u.Activo
+                && (u.Rol.Nombre == "Supervisor" || u.Rol.Nombre == "Administrador")
+                && u.Email != "")
+            .Select(u => u.Email)
+            .ToListAsync(ct);
+
+        if (_destinatariosCorreo.Count == 0) return;
+
+        var asunto = $"[PetrolRíos] Alerta CRÍTICA en {estacion.Nombre} (score {alerta.Score})";
+        var cuerpo =
+            $"<h2 style='color:#b91c1c'>Alerta crítica detectada</h2>" +
+            $"<p><b>Estación:</b> {estacion.Nombre} ({estacion.Codigo})</p>" +
+            $"<p><b>Detector:</b> {alerta.TipoDetector}</p>" +
+            $"<p><b>Nivel de riesgo:</b> {alerta.NivelRiesgo} — score {alerta.Score}/100</p>" +
+            $"<p><b>Descripción:</b> {alerta.Descripcion}</p>" +
+            $"<p><b>Fecha:</b> {alerta.FechaDeteccion:yyyy-MM-dd HH:mm} UTC</p>" +
+            $"<hr><p style='color:#64748b;font-size:12px'>Revise el detalle en el panel de PetrolRíos. " +
+            $"Este es un aviso automático; no responda a este correo.</p>";
+
+        await _emailService.EnviarAsync(asunto, cuerpo, _destinatariosCorreo, ct);
     }
 
     private async Task NotifyAlertAsync(Alerta alerta, int estacionId)

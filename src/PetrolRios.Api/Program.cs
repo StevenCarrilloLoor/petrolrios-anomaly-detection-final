@@ -38,6 +38,16 @@ try
     // JWT Authentication
     var jwtSecret = builder.Configuration["Jwt:SecretKey"]
         ?? throw new InvalidOperationException("Falta Jwt:SecretKey en la configuración.");
+
+    // Endurecimiento en producción: la clave JWT no puede ser débil ni la de desarrollo.
+    if (!builder.Environment.IsDevelopment())
+    {
+        const string claveDev = "DEV_ONLY_SuperSecretKey_AtLeast32Characters_Long!";
+        if (jwtSecret.Length < 32 || jwtSecret == claveDev)
+            throw new InvalidOperationException(
+                "Jwt:SecretKey de producción inválida. Configure una clave robusta (>=32 caracteres) " +
+                "mediante variable de entorno (Jwt__SecretKey) y nunca use la clave de desarrollo.");
+    }
     builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -146,6 +156,14 @@ try
     // Middleware global de excepciones (antes de todo)
     app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+    // HTTPS/HSTS en producción (configurable). En desarrollo se omite para no romper el flujo local.
+    if (!app.Environment.IsDevelopment()
+        && builder.Configuration.GetValue("Seguridad:ForzarHttps", true))
+    {
+        app.UseHsts();
+        app.UseHttpsRedirection();
+    }
+
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
@@ -171,9 +189,12 @@ try
     // SignalR hub
     app.MapHub<AlertsHub>("/hubs/alerts");
 
-    // Hangfire dashboard
+    // Hangfire dashboard — protegido: solo local o Administrador autenticado.
     var dashboardPath = builder.Configuration.GetValue<string>("Hangfire:DashboardPath") ?? "/hangfire";
-    app.UseHangfireDashboard(dashboardPath);
+    app.UseHangfireDashboard(dashboardPath, new DashboardOptions
+    {
+        Authorization = new[] { new PetrolRios.Api.Security.HangfireLocalAuthorizationFilter() }
+    });
 
     // Job recurrente de detección de anomalías
     var cronExpression = builder.Configuration.GetValue<string>("Hangfire:CronExpression") ?? "*/5 * * * *";

@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IIngestaService, IngestaService>();
         services.AddScoped<IReporteService, ReporteService>();
         services.AddScoped<IMonitoreoService, MonitoreoService>();
+        services.AddScoped<IEmailNotificacionService, EmailNotificacionService>();
 
         return services;
     }
