@@ -477,36 +477,34 @@ datos en el central).
 abre sin overlay de login por defecto; el selector "Requerir inicio de sesión" aparece en
 Seguridad del panel (en "No — panel abierto"); el control "Re-sincronizar desde" funciona en
 Monitoreo.
- no enmascara fallos de Firebird
 
-- Descubierto en pruebas en vivo: cada consulta abría su conexión y **tragaba** la excepción
-  devolviendo vacío, por lo que un Firebird caído se veía como "OK Sin transacciones nuevas"
-  (punto ciego de monitoreo). Ahora se abre **una** conexión y, si falla (WireCrypt,
-  credenciales, archivo, servicio caído), la excepción **se propaga** y el ciclo la reporta
-  como ERROR. Los fallos por tabla individual se siguen tolerando.
-- **Verificado end-to-end:** Firebird OK (40.033 documentos), 14 anomalías inyectadas →
-  el agente las extrajo → el motor generó 12 alertas nuevas.
+---
 
-## 27. Autenticador 2FA (TOTP) en el programa principal
+## 17. Agente multiplataforma: publicación para Windows, Linux y macOS
 
-- **`TotpService`** propio (RFC 6238, HMAC-SHA1, 6 dígitos, ventana 30 s), compatible con
-  Google Authenticator / Authy / Microsoft Authenticator, sin dependencias externas.
-- **Login con segundo factor**: si el usuario tiene 2FA, pide el código de 6 dígitos.
-- **Pantalla "Seguridad (mi cuenta)"** con enrolamiento por **QR** (librería `qrcode`) y
-  desactivación; endpoints `/auth/2fa/iniciar|confirmar|desactivar|estado`.
+El agente de estación es ASP.NET Core 9 (multiplataforma) y `AddWindowsService()` es
+no-op fuera de Windows, así que el binario corre igual en Linux y macOS sin cambiar la
+lógica. Lo que faltaba era el **empaque** para cada sistema. Se amplió la publicación:
 
-## 28. Login por QR estilo Steam
+- `scripts/publicar_agente.bat` ahora genera, desde la máquina Windows del desarrollador
+  (cross-publish con `dotnet publish -r <RID>`), cuatro paquetes autocontenidos de un solo
+  ejecutable (sin instalar .NET en la estación):
+  - `dist/agente-windows` (win-x64) — `PetrolRios.StationAgent.exe`
+  - `dist/agente-linux` (linux-x64, p. ej. Ubuntu) — `PetrolRios.StationAgent`
+  - `dist/agente-macos-intel` (osx-x64) — `PetrolRios.StationAgent`
+  - `dist/agente-macos-arm` (osx-arm64, Apple Silicon) — `PetrolRios.StationAgent`
+- **Instaladores de arranque automático por sistema:**
+  - Windows: `instalar_agente_servicio.bat` (servicio `sc create`).
+  - Linux: `instalar_agente_servicio.sh` (unidad **systemd**, `systemctl enable`).
+  - macOS: `instalar_agente_servicio_macos.sh` (**launchd**, `~/Library/LaunchAgents`).
+- **LEEME específico** por sistema (`agente-LEEME-windows/linux/macos.txt`) con los pasos
+  propios de cada uno: en Linux/macOS recuerda `chmod +x` y, en macOS, quitar la cuarentena
+  (`xattr`); rutas típicas del `CONTAC.FDB` y comandos de servicio.
 
-- La pantalla de login muestra un **QR**; un usuario ya autenticado lo **aprueba** desde otro
-  dispositivo (`/aprobar-qr`) y la pantalla entra sola, sin teclear contraseña.
-- `QrLoginService` (estado en memoria, código de un solo uso, expiración 2 min) + endpoints
-  `/auth/qr/iniciar|estado|aprobar`. Respeta la verificación de correo.
-- *Nota:* en `localhost` el QR no se escanea desde el celular (localhost = el propio teléfono);
-  funciona con el servidor en una IP/dominio real.
-
-## 29. Verificación de correo real y obligatoria
-
-- Al crear un usuario se **envía un correo** con botón "Verificar correo electrónico" (enlace a
+**Verificado (junio 2026):** la publicación corrió en Windows y generó los cuatro paquetes;
+`file` confirma el formato correcto de cada binario (PE32+ x86-64 para Windows, ELF x86-64
+para Linux, Mach-O x86_64 y arm64 para macOS), cada uno con su LEEME e instalador de servicio.
+uario se **envía un correo** con botón "Verificar correo electrónico" (enlace a
   `/verificar-correo?token=...`); endpoints `/auth/verificar-email` y `/auth/reenviar-verificacion`.
 - **Obligatoria:** no se permite iniciar sesión (ni por contraseña ni por QR) hasta confirmar
   el correo; mensaje claro + botón "Reenviar correo de verificación".

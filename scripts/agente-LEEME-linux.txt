@@ -1,0 +1,68 @@
+============================================================
+ AGENTE PETROLRIOS — INSTALACION EN UNA ESTACION (LINUX)
+============================================================
+
+Esta carpeta es TODO lo que necesita una estacion Linux
+(p.ej. Ubuntu). No requiere instalar .NET: el ejecutable es
+autocontenido.
+
+------------------------------------------------------------
+PASOS (la primera vez, en la computadora de la estacion)
+------------------------------------------------------------
+
+1. Copie esta carpeta completa a la computadora de la estacion
+   (la que tiene la base Firebird CONTAC.FDB).
+
+2. Abra una terminal en esta carpeta y de permiso de ejecucion:
+      chmod +x PetrolRios.StationAgent
+
+3. Ejecute el agente:
+      ./PetrolRios.StationAgent
+   Queda corriendo en la terminal y abre un panel local.
+
+4. Abra en el navegador:  http://localhost:5180
+
+5. Vaya a "Configuracion" y complete:
+   - Nombre de la estacion  (asi aparece en el panel central)
+   - URL del servidor central  (http://IP-DEL-SERVIDOR:5170)
+   - Ruta del CONTAC.FDB (en Linux suele ser algo como
+     /opt/firebird/data/CONTAC.FDB  o  /var/lib/firebird/...),
+     usuario y contrasena de Firebird
+   - Si la base es Firebird 2.5: WireCrypt = Disabled
+   Pulse "Probar Firebird" y "Probar servidor", luego
+   "Guardar configuracion".
+
+6. Listo. El agente envia datos automaticamente y la estacion
+   aparece "En linea" en el panel central.
+
+------------------------------------------------------------
+ARRANQUE AUTOMATICO (recomendado): servicio systemd
+------------------------------------------------------------
+
+Para que arranque solo con el sistema, en esta carpeta:
+      sudo ./instalar_agente_servicio.sh
+
+   Ver estado:  sudo systemctl status petrolrios-agente
+   Ver logs:    sudo journalctl -u petrolrios-agente -f
+   Detener:     sudo systemctl stop petrolrios-agente
+   Desinstalar: sudo systemctl disable --now petrolrios-agente
+
+------------------------------------------------------------
+DONDE QUEDA LA CONFIGURACION
+------------------------------------------------------------
+
+Al guardar, el agente crea  config/agent-config.json  con los
+datos de ESTA estacion (incluida la contrasena). Se queda solo
+en esta computadora; NO se sube al repositorio.
+
+------------------------------------------------------------
+PROBLEMAS COMUNES
+------------------------------------------------------------
+
+- "Permission denied" al ejecutar: faltó  chmod +x  (paso 2).
+- "No se pudo conectar a Firebird": revise la ruta del .FDB,
+  que el servidor Firebird este corriendo, el puerto (3050) y
+  el WireCrypt (Disabled para FB 2.5 con Legacy_Auth).
+- "No se pudo contactar al servidor": revise la URL/IP del
+  central y que ambos esten en la misma red (o VPN/ZeroTier).
+============================================================

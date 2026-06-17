@@ -1,0 +1,72 @@
+============================================================
+ AGENTE PETROLRIOS — INSTALACION EN UNA ESTACION (macOS)
+============================================================
+
+Esta carpeta es TODO lo que necesita una estacion Mac. No
+requiere instalar .NET: el ejecutable es autocontenido.
+
+IMPORTANTE: use la carpeta correcta segun el procesador:
+  - agente-macos-arm    -> Mac con Apple Silicon (M1/M2/M3/M4)
+  - agente-macos-intel  -> Mac con procesador Intel
+Si no esta seguro: menu Apple > "Acerca de este Mac".
+
+------------------------------------------------------------
+PASOS (la primera vez, en la computadora de la estacion)
+------------------------------------------------------------
+
+1. Copie esta carpeta completa a la computadora de la estacion
+   (la que tiene la base Firebird CONTAC.FDB).
+
+2. Abra la Terminal en esta carpeta y de permisos:
+      chmod +x PetrolRios.StationAgent
+      xattr -d com.apple.quarantine PetrolRios.StationAgent 2>/dev/null
+
+3. Ejecute el agente:
+      ./PetrolRios.StationAgent
+   (Si macOS bloquea la app: Ajustes del Sistema > Privacidad y
+    seguridad > "Abrir de todas formas".)
+
+4. Abra en el navegador:  http://localhost:5180
+
+5. Vaya a "Configuracion" y complete:
+   - Nombre de la estacion  (asi aparece en el panel central)
+   - URL del servidor central  (http://IP-DEL-SERVIDOR:5170)
+   - Ruta del CONTAC.FDB, usuario y contrasena de Firebird
+   - Si la base es Firebird 2.5: WireCrypt = Disabled
+   Pulse "Probar Firebird" y "Probar servidor", luego
+   "Guardar configuracion".
+
+6. Listo. El agente envia datos automaticamente y la estacion
+   aparece "En linea" en el panel central.
+
+------------------------------------------------------------
+ARRANQUE AUTOMATICO (recomendado): servicio launchd
+------------------------------------------------------------
+
+Para que arranque solo al iniciar sesion, en esta carpeta:
+      ./instalar_agente_servicio_macos.sh
+
+   Ver si corre: launchctl list | grep petrolrios
+   Detener:      launchctl unload ~/Library/LaunchAgents/com.petrolrios.agente.plist
+   Desinstalar:  el mismo unload y luego borre ese .plist
+
+------------------------------------------------------------
+DONDE QUEDA LA CONFIGURACION
+------------------------------------------------------------
+
+Al guardar, el agente crea  config/agent-config.json  con los
+datos de ESTA estacion (incluida la contrasena). Se queda solo
+en esta computadora; NO se sube al repositorio.
+
+------------------------------------------------------------
+PROBLEMAS COMUNES
+------------------------------------------------------------
+
+- "No se puede abrir porque proviene de un desarrollador no
+  identificado": ejecute el comando xattr del paso 2, o use
+  "Abrir de todas formas" en Privacidad y seguridad.
+- "No se pudo conectar a Firebird": revise la ruta del .FDB,
+  el puerto (3050) y el WireCrypt (Disabled para FB 2.5).
+- "No se pudo contactar al servidor": revise la URL/IP del
+  central y que ambos esten en la misma red (o VPN/ZeroTier).
+============================================================

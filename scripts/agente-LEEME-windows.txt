@@ -1,0 +1,58 @@
+============================================================
+ AGENTE PETROLRIOS — INSTALACION EN UNA ESTACION (WINDOWS)
+============================================================
+
+Esta carpeta es TODO lo que necesita una estacion Windows. No
+requiere instalar .NET: el ejecutable es autocontenido.
+
+------------------------------------------------------------
+PASOS (la primera vez, en la computadora de la estacion)
+------------------------------------------------------------
+
+1. Copie esta carpeta completa a la computadora de la estacion
+   (la que tiene la base Firebird CONTAC.FDB).
+
+2. Ejecute  PetrolRios.StationAgent.exe  (doble clic).
+   Se queda corriendo y abre un panel local en el navegador.
+
+3. Abra en el navegador:  http://localhost:5180
+
+4. Vaya a "Configuracion" y complete:
+   - Nombre de la estacion  (asi aparece en el panel central)
+   - URL del servidor central  (http://IP-DEL-SERVIDOR:5170)
+   - Ruta del CONTAC.FDB, usuario y contrasena de Firebird
+   - Si la base es Firebird 2.5: WireCrypt = Disabled
+   Pulse "Probar Firebird" y "Probar servidor", luego
+   "Guardar configuracion".
+
+5. Listo. El agente envia datos automaticamente y la estacion
+   aparece "En linea" en el panel central.
+
+------------------------------------------------------------
+ARRANQUE AUTOMATICO (opcional)
+------------------------------------------------------------
+
+Para que arranque solo con Windows, haga clic derecho en
+  instalar_agente_servicio.bat  ->  "Ejecutar como administrador".
+Lo registra como servicio de Windows.
+   Detener:     sc stop "PetrolRios Station Agent"
+   Desinstalar: sc delete "PetrolRios Station Agent"  (detener primero)
+
+------------------------------------------------------------
+DONDE QUEDA LA CONFIGURACION
+------------------------------------------------------------
+
+Al guardar, el agente crea  config\agent-config.json  con los
+datos de ESTA estacion (incluida la contrasena). Se queda solo
+en esta computadora; NO se sube al repositorio.
+
+------------------------------------------------------------
+PROBLEMAS COMUNES
+------------------------------------------------------------
+
+- "No se pudo conectar a Firebird": revise la ruta del .FDB,
+  que el servicio Firebird este corriendo, el puerto (3050) y
+  el WireCrypt (Disabled para FB 2.5 con Legacy_Auth).
+- "No se pudo contactar al servidor": revise la URL/IP del
+  central y que ambos esten en la misma red.
+============================================================
