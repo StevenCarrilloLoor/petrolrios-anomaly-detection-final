@@ -13,6 +13,7 @@ public sealed class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IJwtService _jwtService;
     private readonly ITotpService _totpService;
+    private readonly QrLoginService _qrLogin;
     private readonly IConfiguration _config;
 
     public AuthService(
@@ -20,12 +21,14 @@ public sealed class AuthService : IAuthService
         IUnitOfWork unitOfWork,
         IJwtService jwtService,
         ITotpService totpService,
+        QrLoginService qrLogin,
         IConfiguration config)
     {
         _dbContext = dbContext;
         _unitOfWork = unitOfWork;
         _jwtService = jwtService;
         _totpService = totpService;
+        _qrLogin = qrLogin;
         _config = config;
     }
 
@@ -123,6 +126,39 @@ public sealed class AuthService : IAuthService
             .Where(u => u.Id == usuarioId)
             .Select(u => u.TotpHabilitado)
             .FirstOrDefaultAsync(ct);
+    }
+
+    // ─── Login por QR (estilo Steam) ───
+
+    public QrIniciarResponse QrIniciar()
+    {
+        var (codigo, expira) = _qrLogin.Iniciar();
+        return new QrIniciarResponse(codigo, expira);
+    }
+
+    public async Task<bool> QrAprobarAsync(string codigo, int usuarioId, CancellationToken ct = default)
+    {
+        // Solo un usuario activo y existente puede aprobar.
+        var existe = await _dbContext.Usuarios.AnyAsync(u => u.Id == usuarioId && u.Activo, ct);
+        if (!existe) return false;
+        return _qrLogin.Aprobar(codigo, usuarioId);
+    }
+
+    public async Task<QrEstadoResponse> QrEstadoAsync(string codigo, CancellationToken ct = default)
+    {
+        var (estado, usuarioId) = _qrLogin.Consultar(codigo);
+        if (estado != QrLoginService.EstadoQr.Aprobado || usuarioId is null)
+            return new QrEstadoResponse(estado.ToString().ToLowerInvariant());
+
+        var usuario = await _dbContext.Usuarios
+            .Include(u => u.Rol)
+            .FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct);
+        if (usuario is null)
+            return new QrEstadoResponse("noexiste");
+
+        _qrLogin.Consumir(codigo); // un solo uso
+        var login = await GenerateAuthResponseAsync(usuario, ct);
+        return new QrEstadoResponse("aprobado", login);
     }
 
     public async Task CambiarPasswordAsync(int usuarioId, string passwordActual, string passwordNueva, CancellationToken ct = default)

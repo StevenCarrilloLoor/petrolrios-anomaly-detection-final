@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import QRCode from "qrcode";
 import { useAuth } from "@/contexts/AuthContext";
-import { Shield, Activity, Bell, Search } from "lucide-react";
+import { authService } from "@/services/auth.service";
+import { Shield, Activity, Bell, Search, QrCode, ArrowLeft } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function LoginPage() {
@@ -12,8 +14,50 @@ export function LoginPage() {
   const [pide2fa, setPide2fa] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const [modoQr, setModoQr] = useState(false);
+  const [qrImg, setQrImg] = useState<string | null>(null);
+  const [qrMsg, setQrMsg] = useState("Generando código…");
+  const pollRef = useRef<number | null>(null);
+  const { login, establecerSesion, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!modoQr) return;
+    let activo = true;
+
+    async function iniciar() {
+      try {
+        const { codigo } = await authService.qrIniciar();
+        const url = `${window.location.origin}/aprobar-qr?codigo=${codigo}`;
+        if (!activo) return;
+        setQrImg(await QRCode.toDataURL(url, { width: 220, margin: 1 }));
+        setQrMsg("Escanee el código con un dispositivo donde ya tenga sesión y apruebe el acceso.");
+
+        pollRef.current = window.setInterval(async () => {
+          try {
+            const est = await authService.qrEstado(codigo);
+            if (est.estado === "aprobado" && est.login) {
+              establecerSesion(est.login);
+              navigate("/dashboard", { replace: true });
+            } else if (est.estado === "expirado" || est.estado === "noexiste") {
+              setQrMsg("El código expiró. Genere uno nuevo.");
+              if (pollRef.current) window.clearInterval(pollRef.current);
+            }
+          } catch {
+            /* reintentar en el próximo tick */
+          }
+        }, 2500);
+      } catch {
+        setQrMsg("No se pudo generar el código QR.");
+      }
+    }
+    void iniciar();
+
+    return () => {
+      activo = false;
+      if (pollRef.current) window.clearInterval(pollRef.current);
+    };
+  }, [modoQr, establecerSesion, navigate]);
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -107,6 +151,33 @@ export function LoginPage() {
               {error}
             </div>
           )}
+
+          {modoQr ? (
+            <div className="flex flex-col items-center space-y-4 text-center">
+              {qrImg ? (
+                <img
+                  src={qrImg}
+                  alt="Código QR para iniciar sesión"
+                  className="rounded-lg bg-white p-2"
+                />
+              ) : (
+                <div className="flex h-[220px] w-[220px] items-center justify-center">
+                  <Spinner />
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">{qrMsg}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setModoQr(false);
+                  setQrImg(null);
+                }}
+                className="flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                <ArrowLeft size={14} /> Volver al inicio con contraseña
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium" htmlFor="email">
@@ -174,7 +245,25 @@ export function LoginPage() {
               {loading && <Spinner size="sm" />}
               {pide2fa ? "Verificar y entrar" : "Iniciar Sesión"}
             </button>
+
+            {!pide2fa && (
+              <>
+                <div className="flex items-center gap-3 py-1">
+                  <span className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted-foreground">o</span>
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModoQr(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
+                >
+                  <QrCode size={16} /> Entrar con código QR
+                </button>
+              </>
+            )}
           </form>
+          )}
         </div>
       </div>
     </div>

@@ -15,6 +15,12 @@ public sealed record Iniciar2faResponse(string Secreto, string UriOtpauth);
 public sealed record Confirmar2faRequest(string Codigo);
 public sealed record Estado2faResponse(bool Habilitado);
 
+// ─── Login por QR (estilo Steam) ───
+public sealed record QrIniciarResponse(string Codigo, int ExpiraSegundos);
+public sealed record QrAprobarRequest(string Codigo);
+/// <summary>Estado: "pendiente" | "aprobado" | "expirado" | "noexiste". Cuando es aprobado, trae el login.</summary>
+public sealed record QrEstadoResponse(string Estado, LoginResponse? Login = null);
+
 public sealed record UsuarioInfo(
     int Id,
     string Email,

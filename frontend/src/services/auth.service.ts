@@ -20,4 +20,17 @@ export const authService = {
     api.post("/auth/2fa/confirmar", { codigo }),
   desactivar2fa: (codigo: string) =>
     api.post("/auth/2fa/desactivar", { codigo }),
+
+  // Login por QR (estilo Steam)
+  qrIniciar: () =>
+    api
+      .post<{ codigo: string; expiraSegundos: number }>("/auth/qr/iniciar")
+      .then((r) => r.data),
+  qrEstado: (codigo: string) =>
+    api
+      .get<{ estado: string; login: LoginResponse | null }>("/auth/qr/estado", {
+        params: { codigo },
+      })
+      .then((r) => r.data),
+  qrAprobar: (codigo: string) => api.post("/auth/qr/aprobar", { codigo }),
 };

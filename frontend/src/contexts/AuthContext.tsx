@@ -18,6 +18,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   login: (credentials: LoginRequest) => Promise<LoginResponse>;
+  establecerSesion: (response: LoginResponse) => void;
   logout: () => void;
 }
 
@@ -53,6 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response;
   }, []);
 
+  const establecerSesion = useCallback((response: LoginResponse) => {
+    localStorage.setItem("token", response.token);
+    localStorage.setItem("refreshToken", response.refreshToken);
+    localStorage.setItem("user", JSON.stringify(response.usuario));
+    setToken(response.token);
+    setUser(response.usuario);
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
@@ -72,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, isAuthenticated: !!token && !!user, login, logout }}
+      value={{ user, token, isAuthenticated: !!token && !!user, login, establecerSesion, logout }}
     >
       {children}
     </AuthContext.Provider>

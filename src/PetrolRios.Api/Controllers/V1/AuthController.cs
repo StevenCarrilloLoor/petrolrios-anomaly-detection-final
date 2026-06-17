@@ -115,6 +115,32 @@ public sealed class AuthController : ControllerBase
         return NoContent();
     }
 
+    // ─── Login por QR (estilo Steam) ───
+
+    /// <summary>La pantalla que quiere entrar genera un código para mostrar como QR.</summary>
+    [HttpPost("qr/iniciar")]
+    [AllowAnonymous]
+    public IActionResult QrIniciar() => Ok(_authService.QrIniciar());
+
+    /// <summary>Polling del estado del código. Cuando está aprobado, devuelve el login.</summary>
+    [HttpGet("qr/estado")]
+    [AllowAnonymous]
+    public async Task<IActionResult> QrEstado([FromQuery] string codigo, CancellationToken ct)
+        => Ok(await _authService.QrEstadoAsync(codigo, ct));
+
+    /// <summary>Un usuario ya autenticado aprueba el inicio de sesión escaneado.</summary>
+    [HttpPost("qr/aprobar")]
+    [Authorize]
+    public async Task<IActionResult> QrAprobar([FromBody] QrAprobarRequest request, CancellationToken ct)
+    {
+        var id = UsuarioActual();
+        if (id == 0) return Unauthorized();
+        var ok = await _authService.QrAprobarAsync(request.Codigo, id, ct);
+        if (!ok) return BadRequest(new { mensaje = "Código inválido o expirado." });
+        await this.RegistrarAuditoriaAsync(_logService, "Aprobación de inicio por QR", "Usuario", id, usuarioIdExplicito: id, ct: ct);
+        return NoContent();
+    }
+
     private int UsuarioActual() =>
         int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : 0;
 

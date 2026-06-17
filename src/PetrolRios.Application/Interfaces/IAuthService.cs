@@ -14,4 +14,9 @@ public interface IAuthService
     Task Confirmar2faAsync(int usuarioId, string codigo, CancellationToken ct = default);
     Task Desactivar2faAsync(int usuarioId, string codigo, CancellationToken ct = default);
     Task<bool> Estado2faAsync(int usuarioId, CancellationToken ct = default);
+
+    // Login por QR (estilo Steam)
+    QrIniciarResponse QrIniciar();
+    Task<bool> QrAprobarAsync(string codigo, int usuarioId, CancellationToken ct = default);
+    Task<QrEstadoResponse> QrEstadoAsync(string codigo, CancellationToken ct = default);
 }

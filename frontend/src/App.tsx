@@ -14,6 +14,7 @@ import { ReportesPage } from "@/pages/ReportesPage";
 import { UsuariosPage } from "@/pages/UsuariosPage";
 import { LogsPage } from "@/pages/LogsPage";
 import { SeguridadPage } from "@/pages/SeguridadPage";
+import { AprobarQrPage } from "@/pages/AprobarQrPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 const queryClient = new QueryClient({
@@ -41,6 +42,7 @@ function App() {
                   <Route path="/alertas/:id" element={<DetalleAlertaPage />} />
                   <Route path="/conexiones" element={<ConexionesPage />} />
                   <Route path="/seguridad" element={<SeguridadPage />} />
+                  <Route path="/aprobar-qr" element={<AprobarQrPage />} />
                 </Route>
               </Route>
 
