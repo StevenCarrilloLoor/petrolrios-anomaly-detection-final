@@ -1,0 +1,13 @@
+=== git log -2 ===
+7d2ac2b Agente: autodeteccion de Firebird (boton) + pendientes nuevos anotados
+606094d correcion de bat
+ 
+=== git status --short === 
+D  scripts/_c.bat
+?? scripts/_diag.bat
+?? scripts/_diag.txt
+?? scripts/_z.bat
+ 
+=== git fsck (resumen) === 
+dangling tree c5d94ba13a92de3dc28cc540e9d9d207d9e1bebb
+dangling tree 6e8dcd9721bf71be9955e4e099badcbb39d6bbe9

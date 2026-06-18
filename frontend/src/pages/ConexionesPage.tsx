@@ -19,6 +19,7 @@ import {
   Trash2,
   Save,
   X,
+  Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -70,6 +71,13 @@ export function ConexionesPage() {
     queryKey: ["agente", "version"],
     queryFn: estacionesService.getVersionAgente,
     refetchInterval: 60_000,
+  });
+
+  const { data: usuariosConectados } = useQuery({
+    queryKey: ["monitoreo", "usuarios-conectados"],
+    queryFn: monitoreoService.getUsuariosConectados,
+    refetchInterval: REFRESCO_MS,
+    enabled: puedeGestionar,
   });
 
   const invalidar = () => {
@@ -199,6 +207,52 @@ export function ConexionesPage() {
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
           {mensaje}
         </div>
+      )}
+
+      {/* Usuarios conectados al central (en tiempo real, vía SignalR) */}
+      {puedeGestionar && (
+        <Card>
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <Users size={18} className="text-primary" />
+                Usuarios conectados al central ({usuariosConectados?.length ?? 0})
+              </span>
+            }
+            subtitle="Personas con una sesión activa en el sistema central en este momento."
+          />
+          <CardContent>
+            {!usuariosConectados || usuariosConectados.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No hay otros usuarios conectados ahora mismo.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {usuariosConectados.map((u) => (
+                  <li
+                    key={u.usuarioId}
+                    className="flex items-center justify-between gap-3 py-2"
+                  >
+                    <span className="flex items-center gap-2 text-sm text-foreground">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                        {u.nombre.slice(0, 1).toUpperCase()}
+                      </span>
+                      {u.nombre}
+                      {u.rol && (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          {u.rol}
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      desde {new Date(u.desde).toLocaleTimeString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Agentes por estación */}

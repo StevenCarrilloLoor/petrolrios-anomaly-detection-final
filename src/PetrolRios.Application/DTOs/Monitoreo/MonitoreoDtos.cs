@@ -69,3 +69,13 @@ public sealed record EstadoSistemaResponse
     public double? UltimoCicloDuracionSegundos { get; init; }
     public double? MinutosDesdeUltimoCiclo { get; init; }
 }
+
+/// <summary>Un usuario conectado al central en tiempo real (sección de monitoreo).</summary>
+public sealed record UsuarioConectadoResponse
+{
+    public string UsuarioId { get; init; } = string.Empty;
+    public string Nombre { get; init; } = string.Empty;
+    public string Rol { get; init; } = string.Empty;
+    public string? EstacionId { get; init; }
+    public DateTime Desde { get; init; }
+}

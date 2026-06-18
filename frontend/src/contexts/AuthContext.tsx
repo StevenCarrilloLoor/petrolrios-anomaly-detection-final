@@ -73,11 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return;
-    createSignalRConnection(token);
+    createSignalRConnection(token, user ?? undefined);
     return () => {
       stopSignalRConnection();
     };
-  }, [token]);
+  }, [token, user]);
 
   return (
     <AuthContext.Provider

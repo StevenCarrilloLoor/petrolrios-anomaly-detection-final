@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PetrolRios.Application.DTOs.Monitoreo;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Infrastructure.Hubs;
 
 namespace PetrolRios.Api.Controllers.V1;
 
@@ -30,6 +31,27 @@ public sealed class MonitoreoController : ControllerBase
     {
         var result = await _monitoreoService.GetConexionesEstacionesAsync(ct);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Usuarios conectados al central en tiempo real (vía SignalR). Solo Supervisor/Administrador.
+    /// </summary>
+    [HttpGet("usuarios-conectados")]
+    [Authorize(Roles = "Supervisor,Administrador")]
+    [ProducesResponseType(typeof(IReadOnlyList<UsuarioConectadoResponse>), StatusCodes.Status200OK)]
+    public IActionResult GetUsuariosConectados()
+    {
+        var conectados = AlertsHub.UsuariosConectados
+            .Select(u => new UsuarioConectadoResponse
+            {
+                UsuarioId = u.UsuarioId,
+                Nombre = u.Nombre,
+                Rol = u.Rol,
+                EstacionId = u.EstacionId,
+                Desde = u.Desde
+            })
+            .ToList();
+        return Ok(conectados);
     }
 
     /// <summary>
