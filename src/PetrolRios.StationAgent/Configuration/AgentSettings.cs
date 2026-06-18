@@ -79,11 +79,44 @@ public sealed class AgentSettings
     /// <summary>true cuando el usuario completó la configuración inicial desde la interfaz.</summary>
     public bool Configurado { get; set; }
 
+    // ─── Fuentes de extracción configurables (multi-tabla) ───
+    /// <summary>
+    /// Tablas adicionales que el agente extrae y envía al central, configuradas desde el panel
+    /// sin recompilar. Cada fuente se manda como una transacción de staging con su nombre como
+    /// tipo, y queda disponible para el creador de reglas genérico.
+    /// </summary>
+    public List<FuenteExtraccion> FuentesExtraccion { get; set; } = [];
+
     /// <summary>Construye el connection string de Firebird (siempre solo lectura).</summary>
     public string ConstruirFirebirdConnectionString() =>
         $"User={FirebirdUser};Password={FirebirdPassword};Database={FirebirdDatabase};" +
         $"DataSource={FirebirdHost};Port={FirebirdPort};Dialect={FirebirdDialect};" +
         $"Charset={FirebirdCharset};WireCrypt={FirebirdWireCrypt};ReadOnly=true";
 
-    public AgentSettings Clonar() => (AgentSettings)MemberwiseClone();
+    public AgentSettings Clonar()
+    {
+        var copia = (AgentSettings)MemberwiseClone();
+        // Copia profunda de la lista para que editar no mute la configuración activa.
+        copia.FuentesExtraccion = FuentesExtraccion
+            .Select(f => new FuenteExtraccion
+            {
+                Nombre = f.Nombre, Tabla = f.Tabla,
+                ColumnaWatermark = f.ColumnaWatermark, Activa = f.Activa
+            })
+            .ToList();
+        return copia;
+    }
+}
+
+/// <summary>
+/// Una fuente de extracción configurable: una tabla de Firebird que el agente lee y envía al
+/// central, identificada por un nombre lógico. Si <see cref="ColumnaWatermark"/> está definida
+/// (una columna de fecha), solo se extraen las filas posteriores a la marca de agua.
+/// </summary>
+public sealed class FuenteExtraccion
+{
+    public string Nombre { get; set; } = "";
+    public string Tabla { get; set; } = "";
+    public string? ColumnaWatermark { get; set; }
+    public bool Activa { get; set; } = true;
 }

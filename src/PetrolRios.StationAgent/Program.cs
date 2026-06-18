@@ -243,6 +243,7 @@ try
             UpdateFeedUrl = (req.UpdateFeedUrl ?? actual.UpdateFeedUrl).Trim(),
             UpdateFeedFallbackUrl = (req.UpdateFeedFallbackUrl ?? actual.UpdateFeedFallbackUrl).Trim(),
             NombreServicioWindows = actual.NombreServicioWindows,
+            FuentesExtraccion = actual.FuentesExtraccion,
             RequiereLoginPanel = req.RequiereLoginPanel ?? actual.RequiereLoginPanel,
             PanelLocalUsuario = string.IsNullOrWhiteSpace(req.PanelLocalUsuario)
                 ? actual.PanelLocalUsuario : req.PanelLocalUsuario.Trim(),
@@ -260,6 +261,48 @@ try
         cfg.Guardar(nueva);
         state.ModoAutomatico = nueva.InicioAutomatico;
         state.RegistrarEvento("OK", $"Configuración guardada — estación '{nueva.NombreEstacion}' ({nueva.CodigoEstacion})");
+        return Results.Json(new { ok = true });
+    });
+
+    // ─── Fuentes de extracción configurables (multi-tabla) ───
+    app.MapGet("/api/fuentes", (AgentConfigStore cfg) =>
+        Results.Json(new { ok = true, fuentes = cfg.Actual.FuentesExtraccion }));
+
+    app.MapPost("/api/fuentes", async (
+        GuardarFuentesRequest req, AgentConfigStore cfg, FirebirdExtractor extractor,
+        AgentState state, CancellationToken ct) =>
+    {
+        var fuentes = (req.Fuentes ?? new())
+            .Where(f => !string.IsNullOrWhiteSpace(f.Tabla))
+            .Select(f => new FuenteExtraccion
+            {
+                Nombre = (f.Nombre ?? "").Trim(),
+                Tabla = (f.Tabla ?? "").Trim().ToUpperInvariant(),
+                ColumnaWatermark = string.IsNullOrWhiteSpace(f.ColumnaWatermark) ? null : f.ColumnaWatermark.Trim(),
+                Activa = f.Activa ?? true
+            })
+            .ToList();
+
+        // Validar que las tablas existan contra el catálogo real (solo lectura).
+        try
+        {
+            var tablas = await extractor.ListarTablasAsync(ct);
+            var faltan = fuentes
+                .Where(f => !tablas.Any(t => t.Equals(f.Tabla, StringComparison.OrdinalIgnoreCase)))
+                .Select(f => f.Tabla)
+                .ToList();
+            if (faltan.Count > 0)
+                return Results.Json(new { ok = false, mensaje = $"Estas tablas no existen en la base: {string.Join(", ", faltan)}" });
+        }
+        catch (Exception ex)
+        {
+            return Results.Json(new { ok = false, mensaje = $"No se pudo validar contra Firebird: {ex.Message}" });
+        }
+
+        var nueva = cfg.Actual.Clonar();
+        nueva.FuentesExtraccion = fuentes;
+        cfg.Guardar(nueva);
+        state.RegistrarEvento("OK", $"Fuentes de extracción guardadas ({fuentes.Count})");
         return Results.Json(new { ok = true });
     });
 
@@ -415,6 +458,9 @@ internal sealed record ModoRequest(bool Automatico);
 internal sealed record LoginPanelRequest(string? Usuario, string? Password);
 
 internal sealed record ReiniciarWatermarkRequest(string? Fecha);
+
+internal sealed record GuardarFuentesRequest(List<FuenteItem>? Fuentes);
+internal sealed record FuenteItem(string? Nombre, string? Tabla, string? ColumnaWatermark, bool? Activa);
 
 internal sealed record GuardarConfigRequest(
     string? CodigoEstacion,

@@ -693,3 +693,24 @@ fuentes y crear reglas sin tocar código.
 
 Próximos bloques: registrar fuentes de extracción configurables (multi-tabla) y el creador de
 reglas genérico sobre cualquier tabla.
+
+---
+
+## 24. Plataforma flexible (2/3): fuentes de extracción configurables (multi-tabla)
+
+Ahora el agente puede enviar al central datos de **cualquier tabla que elijas**, no solo las 7
+fijas — configurable desde el panel, sin recompilar.
+
+- **`AgentSettings.FuentesExtraccion`**: lista de fuentes (nombre lógico, tabla, columna de
+  watermark opcional, activa), persistida en `agent-config.json`. `Clonar()` hace copia profunda.
+- **`FirebirdExtractor.ExtractFuenteAsync`**: extrae una fuente validando **tabla y columna de
+  watermark contra el catálogo real** (lista blanca anti-inyección); si hay columna de fecha,
+  filtra `> watermark`; si no, toma un tope de 500 filas (la idempotencia del central descarta
+  reenvíos). Cada fila se serializa a JSON y se envía con el nombre de la fuente como tipo.
+- **`ExtractSinceAsync`** incluye las fuentes activas tras las fijas, con tolerancia a fallos
+  (una fuente mal configurada no rompe el ciclo).
+- **Endpoints del agente** `GET/POST /api/fuentes` (el POST valida que las tablas existan).
+- **Panel del agente**: tarjeta "Fuentes de extracción adicionales" para agregar/quitar tablas,
+  apoyándose en el explorador para ver campos y elegir la columna de watermark.
+
+Falta el bloque 3/3: el creador de reglas genérico que opere sobre estas fuentes en el central.

@@ -213,6 +213,27 @@ internal static class PanelHtml
       </div>
       <div id="tabla-cols" style="margin-top:10px"></div>
     </div>
+
+    <div class="card" style="margin-top:14px">
+      <h3>Fuentes de extracción adicionales</h3>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 8px">
+        Tablas extra que el agente enviará al central en cada ciclo (además de las estándar), sin
+        recompilar. Usa el explorador de arriba para ver los campos y elegir la columna de fecha
+        (watermark) que filtra solo lo nuevo. Si la dejas vacía, envía un tope de filas por ciclo.
+      </p>
+      <div id="fuentes-lista" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="f-fuente-nombre" placeholder="Nombre lógico (ej: Tanques)"
+          style="background:#0a0f1c;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px">
+        <input id="f-fuente-tabla" placeholder="Tabla (ej: TANQ_REPO)"
+          style="background:#0a0f1c;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px">
+        <input id="f-fuente-wm" placeholder="Columna fecha (opcional)"
+          style="background:#0a0f1c;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px">
+        <button class="sec" onclick="agregarFuente()">Agregar</button>
+        <button onclick="guardarFuentes()">Guardar fuentes</button>
+      </div>
+      <div class="resultado" id="resultado-fuentes" style="margin-top:8px"></div>
+    </div>
   </div>
 
   <!-- ════════ CONFIGURACIÓN ════════ -->
@@ -590,6 +611,50 @@ async function describirTabla(){
   }catch(e){ cont.innerHTML='<span style="color:#f87171;font-size:12px">No se pudo contactar al agente.</span>'; }
 }
 
+let fuentes = [];
+function renderFuentes(){
+  const cont = document.getElementById('fuentes-lista');
+  if(!fuentes.length){ cont.innerHTML='<span style="color:var(--muted);font-size:12px">Sin fuentes adicionales.</span>'; return; }
+  cont.innerHTML = '<table style="font-size:12px;border-collapse:collapse;width:100%">'+
+    fuentes.map((f,i) =>
+      '<tr><td style="padding:3px 10px 3px 0">'+(f.nombre||f.tabla)+'</td>'+
+      '<td style="padding:3px 10px 3px 0;color:#93c5fd">'+f.tabla+'</td>'+
+      '<td style="padding:3px 10px 3px 0;color:var(--muted)">'+(f.columnaWatermark||'(tope de filas)')+'</td>'+
+      '<td style="padding:3px 10px 3px 0">'+(f.activa?'activa':'inactiva')+'</td>'+
+      '<td><button class="sec" style="padding:2px 8px" onclick="quitarFuente('+i+')">Quitar</button></td></tr>').join('')+
+    '</table>';
+}
+async function cargarFuentes(){
+  try{
+    const r = await fetch('/api/fuentes'); const j = await r.json();
+    if(j.ok){ fuentes = j.fuentes || []; renderFuentes(); }
+  }catch(e){}
+}
+function agregarFuente(){
+  const tabla = document.getElementById('f-fuente-tabla').value.trim();
+  if(!tabla){ mostrarResultado('resultado-fuentes', false, 'Indica la tabla.'); return; }
+  fuentes.push({
+    nombre: document.getElementById('f-fuente-nombre').value.trim(),
+    tabla: tabla.toUpperCase(),
+    columnaWatermark: document.getElementById('f-fuente-wm').value.trim() || null,
+    activa: true
+  });
+  document.getElementById('f-fuente-nombre').value='';
+  document.getElementById('f-fuente-tabla').value='';
+  document.getElementById('f-fuente-wm').value='';
+  renderFuentes();
+}
+function quitarFuente(i){ fuentes.splice(i,1); renderFuentes(); }
+async function guardarFuentes(){
+  try{
+    const r = await fetch('/api/fuentes', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fuentes})});
+    const j = await r.json();
+    mostrarResultado('resultado-fuentes', j.ok, j.ok ? 'Fuentes guardadas. Se enviarán en el próximo ciclo.' : (j.mensaje||'Error'));
+    if(j.ok) cargarFuentes();
+  }catch(e){ mostrarResultado('resultado-fuentes', false, 'No se pudo contactar al agente.'); }
+}
+
 async function buscarActualizacion(){
   const btn = document.getElementById('btn-buscar-upd');
   btn.disabled = true; btn.textContent = 'Buscando…';
@@ -668,7 +733,7 @@ async function hacerLogout(){
 
 async function iniciar(){
   const ok = await verificarSesion();
-  if(ok) refrescar();
+  if(ok){ refrescar(); cargarFuentes(); }
 }
 iniciar();
 setInterval(() => { if(sesionActiva && tabActual==='monitoreo') refrescar(); }, 5000);

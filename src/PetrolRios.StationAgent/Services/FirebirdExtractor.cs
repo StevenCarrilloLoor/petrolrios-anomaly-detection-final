@@ -93,6 +93,20 @@ public sealed class FirebirdExtractor
         items.AddRange(await ExtractTypeAsync<CreditoDto>(connection, "Credito", GetCreditosSql, watermark, r => r.FechaCabecera, ct));
         items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>(connection, "TarjetaTurno", GetTarjetasSql, watermark, _ => DateTime.UtcNow, ct));
 
+        // Fuentes de extracción configurables (multi-tabla) definidas desde el panel.
+        // Se toleran fallos individuales: una fuente mal configurada no rompe el ciclo.
+        foreach (var fuente in _config.Actual.FuentesExtraccion.Where(f => f.Activa))
+        {
+            try
+            {
+                items.AddRange(await ExtractFuenteAsync(fuente, watermark, ct));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extrayendo la fuente configurable '{Fuente}'", fuente.Nombre);
+            }
+        }
+
         _logger.LogInformation("Extraídas {Count} transacciones desde watermark {Watermark:O}", items.Count, watermark);
         return items;
     }
@@ -202,6 +216,59 @@ public sealed class FirebirdExtractor
             261 => subtipo == 1 ? "BLOB (texto)" : "BLOB",
             _ => $"tipo {tipo}"
         };
+    }
+
+    /// <summary>
+    /// Extrae filas de una fuente configurable (tabla elegida desde el panel). Valida la tabla y
+    /// la columna de watermark contra el catálogo real (lista blanca anti-inyección). Si hay
+    /// columna de watermark, filtra las filas posteriores a la marca; si no, toma un tope de filas.
+    /// Cada fila se serializa a JSON y se envía con el nombre de la fuente como tipo.
+    /// </summary>
+    public async Task<IReadOnlyList<TransaccionBatchItem>> ExtractFuenteAsync(
+        FuenteExtraccion fuente, DateTime watermark, CancellationToken ct)
+    {
+        var tabla = (fuente.Tabla ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(tabla))
+            return [];
+
+        var tablas = await ListarTablasAsync(ct);
+        if (!tablas.Any(t => t.Equals(tabla, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"La tabla '{fuente.Tabla}' no existe en la base.");
+
+        using var connection = CreateConnection();
+        string sql;
+        object? parametros = null;
+
+        var colWm = (fuente.ColumnaWatermark ?? "").Trim();
+        if (!string.IsNullOrWhiteSpace(colWm))
+        {
+            var desc = await DescribirTablaAsync(tabla, ct);
+            var columna = desc.Columnas.FirstOrDefault(c =>
+                c.Nombre.Equals(colWm, StringComparison.OrdinalIgnoreCase));
+            if (columna is null)
+                throw new InvalidOperationException(
+                    $"La columna de watermark '{colWm}' no existe en la tabla {tabla}.");
+
+            // Nombre de columna validado contra el catálogo: seguro para interpolar.
+            sql = $"SELECT * FROM \"{tabla}\" WHERE \"{columna.Nombre}\" > @wm ORDER BY \"{columna.Nombre}\"";
+            parametros = new { wm = watermark };
+        }
+        else
+        {
+            // Sin watermark: tope de filas para no volcar tablas enormes (la idempotencia del
+            // central descarta los reenvíos en ciclos sucesivos).
+            sql = $"SELECT FIRST 500 * FROM \"{tabla}\"";
+        }
+
+        var filas = await connection.QueryAsync(new CommandDefinition(sql, parametros, cancellationToken: ct));
+        return filas
+            .Select(fila => new TransaccionBatchItem
+            {
+                TipoTransaccion = string.IsNullOrWhiteSpace(fuente.Nombre) ? tabla : fuente.Nombre.Trim(),
+                DataJson = System.Text.Json.JsonSerializer.Serialize((IDictionary<string, object>)fila),
+                FechaOriginal = DateTime.UtcNow
+            })
+            .ToList();
     }
 
     #region SQL Queries (idénticas al servidor — tablas reales de Contaplus)
