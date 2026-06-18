@@ -341,6 +341,14 @@ try
         return Results.Json(new { ok, mensaje, totalDocumentos = total });
     });
 
+    // Autodetección de Firebird: busca host/puerto/ruta de CONTAC.FDB automáticamente.
+    app.MapPost("/api/autodetectar-firebird", async (FirebirdExtractor extractor, AgentState state, CancellationToken ct) =>
+    {
+        var (ok, host, port, database, mensaje) = await extractor.AutodetectarAsync(ct);
+        state.RegistrarEvento(ok ? "OK" : "INFO", $"Autodeteccion Firebird: {mensaje}");
+        return Results.Json(new { ok, host, port, database, mensaje });
+    });
+
     // Explorador de esquema: lista de tablas de la base Firebird (auto-documentación).
     app.MapGet("/api/firebird/tablas", async (FirebirdExtractor extractor, CancellationToken ct) =>
     {

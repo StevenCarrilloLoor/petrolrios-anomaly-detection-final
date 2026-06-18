@@ -135,6 +135,99 @@ public sealed class FirebirdExtractor
         }
     }
 
+    // ─────────── Autodetección de Firebird ───────────
+
+    /// <summary>
+    /// Busca automáticamente una base Firebird CONTAC.FDB probando combinaciones comunes de
+    /// host, puerto, ruta y WireCrypt (con las credenciales ya configuradas). Hace un pre-chequeo
+    /// TCP del puerto para descartar rápido lo que no responde. Devuelve la primera combinación
+    /// que conecta y consulta el catálogo correctamente.
+    /// </summary>
+    public async Task<(bool Ok, string? Host, int Port, string? Database, string Mensaje)> AutodetectarAsync(CancellationToken ct)
+    {
+        var cfg = _config.Actual;
+
+        var hosts = new[] { cfg.FirebirdHost, "localhost", "127.0.0.1" }
+            .Where(h => !string.IsNullOrWhiteSpace(h)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var ports = new[] { cfg.FirebirdPort, 3050, 3051 }.Where(p => p > 0).Distinct().ToArray();
+        var rutas = RutasCandidatas(cfg.FirebirdDatabase);
+        var wirecrypts = new[] { cfg.FirebirdWireCrypt, "Disabled", "Enabled" }
+            .Where(w => !string.IsNullOrWhiteSpace(w)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        foreach (var host in hosts)
+        {
+            foreach (var port in ports)
+            {
+                if (!await PuertoAbiertoAsync(host, port, 1000, ct)) continue;
+
+                foreach (var ruta in rutas)
+                {
+                    foreach (var wc in wirecrypts)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var cs = $"User={cfg.FirebirdUser};Password={cfg.FirebirdPassword};" +
+                                 $"Database={ruta};DataSource={host};Port={port};Dialect={cfg.FirebirdDialect};" +
+                                 $"Charset={cfg.FirebirdCharset};WireCrypt={wc};ReadOnly=true;ConnectionTimeout=4";
+                        try
+                        {
+                            using var conn = new FbConnection(cs);
+                            await conn.OpenAsync(ct);
+                            await conn.ExecuteScalarAsync<int>(
+                                new CommandDefinition("SELECT COUNT(*) FROM RDB$RELATIONS", cancellationToken: ct));
+                            return (true, host, port, ruta,
+                                $"Firebird encontrado en {host}:{port} — {ruta} (WireCrypt {wc}).");
+                        }
+                        catch { /* probar siguiente combinación */ }
+                    }
+                }
+            }
+        }
+
+        return (false, null, 0, null,
+            "No se encontró una base CONTAC.FDB en las ubicaciones comunes. Indique la ruta manualmente.");
+    }
+
+    /// <summary>Rutas candidatas de CONTAC.FDB según el sistema operativo (más la ya configurada).</summary>
+    private static IReadOnlyList<string> RutasCandidatas(string rutaConfigurada)
+    {
+        var candidatas = new List<string>();
+        if (!string.IsNullOrWhiteSpace(rutaConfigurada)) candidatas.Add(rutaConfigurada);
+
+        if (OperatingSystem.IsWindows())
+        {
+            candidatas.AddRange([
+                @"C:\CONTAC\CONTAC.FDB", @"C:\Contaplus\CONTAC.FDB",
+                @"C:\Contaplus\Datos\CONTAC.FDB", @"C:\PROGRA~1\CONTAC\CONTAC.FDB",
+                @"C:\Datos\CONTAC.FDB", @"C:\Firebird\CONTAC.FDB"
+            ]);
+        }
+        else
+        {
+            candidatas.AddRange([
+                "/opt/firebird/data/CONTAC.FDB", "/var/lib/firebird/3.0/data/CONTAC.FDB",
+                "/var/lib/firebird/data/CONTAC.FDB", "/firebird/data/CONTAC.FDB",
+                "/data/CONTAC.FDB"
+            ]);
+        }
+        return candidatas.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>Pre-chequeo TCP: ¿hay algo escuchando en host:port dentro del timeout?</summary>
+    private static async Task<bool> PuertoAbiertoAsync(string host, int port, int timeoutMs, CancellationToken ct)
+    {
+        try
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            var conectar = tcp.ConnectAsync(host, port, ct).AsTask();
+            var completado = await Task.WhenAny(conectar, Task.Delay(timeoutMs, ct));
+            return completado == conectar && tcp.Connected;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // ─────────── Introspección / auto-documentación del esquema ───────────
 
     /// <summary>

@@ -84,3 +84,18 @@ De auditoría/fraude (carril Auditoría → central):
 - [ ] UI para asignar estación/correo a un usuario desde el formulario (hoy por API).
 - [ ] Pruebas de seguridad sin huecos (revisión dedicada).
 - [ ] Empaquetado final del instalador (.iss) del central, si se quiere un setup único.
+
+---
+
+## Nuevos pedidos (junio 2026)
+
+- [ ] **Central — apartado de configuración de conexiones (solo Admin):** sección para gestionar y
+  configurar las conexiones/estaciones (nombre, zona, horario, correo de contacto, activa) desde la
+  interfaz; restringido a Administrador.
+- [ ] **Central — Monitoreo: usuarios conectados:** sección que muestre los usuarios actualmente
+  conectados al sistema central (vía SignalR: rastrear conexiones del hub y exponerlas).
+- [ ] **Agente — autodetección de Firebird:** botón junto a la conexión Firebird que busque
+  automáticamente la base CONTAC.FDB (host/puerto/ruta comunes) sin escribir la dirección a mano.
+  (Nombre propuesto: "Detectar Firebird automáticamente".)
+- [ ] **Pruebas rigurosas en Chrome:** recorrer todas las interfaces y procesos ya implementados,
+  verificar que reflejan y funcionan según lo previsto, y corregir cualquier bug de inmediato.

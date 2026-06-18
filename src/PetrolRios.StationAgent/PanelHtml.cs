@@ -297,6 +297,12 @@ internal static class PanelHtml
           <div class="field" style="grid-column:1/-1">
             <label>Ruta de la base (CONTAC.FDB)</label>
             <input id="f-fbdatabase" placeholder="C:\CONTAC\CONTAC.FDB">
+            <div style="margin-top:6px">
+              <button type="button" class="sec" id="btn-autodetectar" onclick="autodetectarFirebird()">
+                🔎 Detectar Firebird automáticamente
+              </button>
+              <span id="autodetectar-msg" style="margin-left:8px;color:var(--muted);font-size:12px"></span>
+            </div>
           </div>
           <div class="field">
             <label>Usuario</label>
@@ -653,6 +659,30 @@ async function guardarFuentes(){
     mostrarResultado('resultado-fuentes', j.ok, j.ok ? 'Fuentes guardadas. Se enviarán en el próximo ciclo.' : (j.mensaje||'Error'));
     if(j.ok) cargarFuentes();
   }catch(e){ mostrarResultado('resultado-fuentes', false, 'No se pudo contactar al agente.'); }
+}
+
+async function autodetectarFirebird(){
+  const btn = document.getElementById('btn-autodetectar');
+  const msg = document.getElementById('autodetectar-msg');
+  const txt = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Buscando…';
+  msg.style.color = 'var(--muted)';
+  msg.textContent = 'Probando host, puerto y ubicaciones comunes…';
+  try{
+    const r = await fetch('/api/autodetectar-firebird', {method:'POST'});
+    const j = await r.json();
+    if(j.ok){
+      document.getElementById('f-fbhost').value = j.host;
+      document.getElementById('f-fbport').value = j.port;
+      document.getElementById('f-fbdatabase').value = j.database;
+      msg.style.color = '#34d399';
+      msg.textContent = j.mensaje + ' Pulse "Guardar configuración" para conservarlo.';
+    } else {
+      msg.style.color = '#f87171';
+      msg.textContent = j.mensaje;
+    }
+  }catch(e){ msg.style.color = '#f87171'; msg.textContent = 'No se pudo contactar al agente.'; }
+  btn.disabled = false; btn.textContent = txt;
 }
 
 async function buscarActualizacion(){
