@@ -62,3 +62,25 @@ De auditoría/fraude (carril Auditoría → central):
 
 ## 🔜 Otros
 - [ ] **Pruebas de seguridad sin huecos** (revisión de seguridad pendiente de antes).
+
+---
+
+## Actualización (junio 2026) — avances
+
+**Hecho desde la lista original:**
+- ✅ Plataforma flexible completa (explorador de tablas, fuentes configurables multi-tabla,
+  motor de reglas genérico, y builder que auto-descubre fuentes/campos).
+- ✅ Detectores del ingeniero: turno sin cerrar, crédito sin garante, despacho no facturado,
+  kiting (anulaciones recurrentes). Cuadre de tanque → vía fuente configurable + regla.
+- ✅ Subsistema de ámbito (Operativa/Auditoría) + pestaña "Problemas de estación" + usuario↔estación
+  + correo de contacto.
+- ✅ Detector de fecha fuera de rango (backdating) + idempotencia de ingesta.
+- ✅ **Limpieza de scripts .bat** (purga de commit_*/scratch/verify redundantes; queda solo lo reutilizable).
+- ✅ **Guía de despliegue en la nube** (`docs/DESPLIEGUE-NUBE.md`, Azure/AWS).
+- ✅ Cobertura de pruebas para todo lo nuevo (Domain 16, Detectors 108, Api 29).
+
+**Pendiente:**
+- [ ] Watermark por ID monotónico + ventana de solapamiento (punto ciego de fecha).
+- [ ] UI para asignar estación/correo a un usuario desde el formulario (hoy por API).
+- [ ] Pruebas de seguridad sin huecos (revisión dedicada).
+- [ ] Empaquetado final del instalador (.iss) del central, si se quiere un setup único.
