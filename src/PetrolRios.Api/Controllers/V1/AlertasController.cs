@@ -44,6 +44,21 @@ public sealed class AlertasController : ControllerBase
     }
 
     /// <summary>
+    /// Problemas operativos (carril Operativa) agrupados por estación y día, para la pestaña
+    /// "Problemas de estación".
+    /// </summary>
+    [HttpGet("problemas-estacion")]
+    [ProducesResponseType(typeof(IReadOnlyList<ProblemaEstacionGrupo>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetProblemasEstacion(
+        [FromQuery] int? estacionId,
+        [FromQuery] int dias = 7,
+        CancellationToken ct = default)
+    {
+        var result = await _alertaService.GetProblemasEstacionAsync(estacionId, dias, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Obtener detalle de una alerta por su ID.
     /// </summary>
     [HttpGet("{id:int}")]

@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { AlertasPage } from "@/pages/AlertasPage";
+import { ProblemasEstacionPage } from "@/pages/ProblemasEstacionPage";
 import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
 import { ConexionesPage } from "@/pages/ConexionesPage";
 import { ReglasPage } from "@/pages/ReglasPage";
@@ -43,6 +44,7 @@ function App() {
                 <Route element={<AppLayout />}>
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/alertas" element={<AlertasPage />} />
+                  <Route path="/problemas-estacion" element={<ProblemasEstacionPage />} />
                   <Route path="/alertas/:id" element={<DetalleAlertaPage />} />
                   <Route path="/conexiones" element={<ConexionesPage />} />
                   <Route path="/seguridad" element={<SeguridadPage />} />

@@ -47,6 +47,41 @@ public sealed class AlertaService : IAlertaService
         };
     }
 
+    public async Task<IReadOnlyList<ProblemaEstacionGrupo>> GetProblemasEstacionAsync(
+        int? estacionId, int dias, CancellationToken ct = default)
+    {
+        var desde = DateTime.UtcNow.Date.AddDays(-Math.Max(0, dias));
+
+        var query = _dbContext.Alertas
+            .Include(a => a.Estacion)
+            .Where(a => a.Ambito == AmbitoAlerta.Operativa && a.FechaDeteccion >= desde);
+
+        if (estacionId is not null)
+            query = query.Where(a => a.EstacionId == estacionId);
+
+        var alertas = await query
+            .OrderByDescending(a => a.FechaDeteccion)
+            .ToListAsync(ct);
+
+        var estaciones = alertas
+            .GroupBy(a => a.EstacionId)
+            .ToDictionary(g => g.Key, g => g.First().Estacion.Nombre);
+
+        return alertas
+            .GroupBy(a => new { a.EstacionId, Fecha = a.FechaDeteccion.Date })
+            .Select(g => new ProblemaEstacionGrupo
+            {
+                EstacionId = g.Key.EstacionId,
+                EstacionNombre = estaciones.GetValueOrDefault(g.Key.EstacionId, ""),
+                Fecha = g.Key.Fecha,
+                Total = g.Count(),
+                Problemas = g.Select(a => MapToResponse(a, estaciones)).ToList()
+            })
+            .OrderByDescending(x => x.Fecha)
+            .ThenBy(x => x.EstacionNombre)
+            .ToList();
+    }
+
     public async Task<AlertaResponse?> GetByIdAsync(int id, CancellationToken ct = default)
     {
         var alerta = await _dbContext.Alertas
@@ -147,6 +182,7 @@ public sealed class AlertaService : IAlertaService
         Id = a.Id,
         TipoDetector = a.TipoDetector.ToString(),
         NivelRiesgo = a.NivelRiesgo.ToString(),
+        Ambito = a.Ambito.ToString(),
         Estado = a.Estado.ToString(),
         Descripcion = a.Descripcion,
         Score = a.Score,

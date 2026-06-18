@@ -14,10 +14,13 @@ export type EstadoAlerta =
   | "FalsoPositivo"
   | "Cerrada";
 
+export type AmbitoAlerta = "Operativa" | "Auditoria";
+
 export interface AlertaResponse {
   id: number;
   tipoDetector: TipoDetector;
   nivelRiesgo: NivelRiesgo;
+  ambito: AmbitoAlerta;
   estado: EstadoAlerta;
   descripcion: string;
   score: number;
@@ -27,6 +30,14 @@ export interface AlertaResponse {
   estacionId: number;
   estacionNombre: string;
   metadataJson: string | null;
+}
+
+export interface ProblemaEstacionGrupo {
+  estacionId: number;
+  estacionNombre: string;
+  fecha: string;
+  total: number;
+  problemas: AlertaResponse[];
 }
 
 export interface CambiarEstadoRequest {

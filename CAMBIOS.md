@@ -634,3 +634,20 @@ visión completa (incluido el carril de fraude).
 
 Pendiente del subsistema: pestaña "Problemas de estación" (agrupada por estación, expandible),
 endpoint de agregación, asociación usuario↔estación y aviso por correo al contacto de la estación.
+
+---
+
+## 21. Pestaña "Problemas de estación" (carril Operativa)
+
+Segunda parte del subsistema de ámbito: la vista para el central de los problemas operativos
+agrupados por estación.
+
+- **Endpoint** `GET /api/v1/alertas/problemas-estacion?estacionId&dias`: alertas de ámbito
+  Operativa agrupadas por estación y día con su conteo; cada grupo trae la lista de problemas
+  para documentación. `AlertaResponse` ahora expone `Ambito`.
+- **Frontend**: nueva página y entrada de menú "Problemas de estación" (Monitoreo). Tabla por
+  estación/día con el conteo; clic en el grupo despliega la lista. Selector de ventana (1/7/30
+  días) y refresco automático cada 30 s. Separada de la bandeja principal de auditoría.
+
+Pendiente del subsistema: asociación usuario↔estación y correo de contacto por estación (para
+que el administrador de la estación reciba y vea solo lo suyo).

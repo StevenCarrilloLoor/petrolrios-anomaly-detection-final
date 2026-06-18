@@ -5,6 +5,7 @@ import type {
   AsignarAlertaRequest,
   ComentarioResponse,
   AgregarComentarioRequest,
+  ProblemaEstacionGrupo,
 } from "@/types/alert";
 import type { PaginatedResponse } from "@/types/common";
 
@@ -34,6 +35,13 @@ export const alertasService = {
           fechaDesde: filters.fechaDesde,
           fechaHasta: filters.fechaHasta,
         },
+      })
+      .then((r) => r.data),
+
+  getProblemasEstacion: (estacionId?: number, dias = 7) =>
+    api
+      .get<ProblemaEstacionGrupo[]>("/alertas/problemas-estacion", {
+        params: { estacionId, dias },
       })
       .then((r) => r.data),
 

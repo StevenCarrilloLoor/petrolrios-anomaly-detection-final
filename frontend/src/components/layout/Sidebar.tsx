@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   BarChart3,
   Radio,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,11 @@ const navSections: NavSection[] = [
     items: [
       { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
       { to: "/alertas", label: "Alertas", icon: <AlertTriangle size={20} /> },
+      {
+        to: "/problemas-estacion",
+        label: "Problemas de estación",
+        icon: <Wrench size={20} />,
+      },
       { to: "/conexiones", label: "Conexiones", icon: <Radio size={20} /> },
     ],
   },
