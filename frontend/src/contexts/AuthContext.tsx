@@ -73,11 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return;
+    // La identidad del usuario para "Usuarios conectados" se resuelve en el hub desde los
+    // claims del JWT; pasamos `user` solo como respaldo. No dependemos de `user` para no
+    // recrear (y abortar) la conexión cuando el usuario carga un instante después del token.
     createSignalRConnection(token, user ?? undefined);
     return () => {
       stopSignalRConnection();
     };
-  }, [token, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   return (
     <AuthContext.Provider
