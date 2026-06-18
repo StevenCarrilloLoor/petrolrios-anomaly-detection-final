@@ -56,6 +56,13 @@ public sealed class DetectedAnomaly
     public required string Descripcion { get; init; }
     public required double Score { get; init; }
     public required NivelRiesgo NivelRiesgo { get; init; }
+
+    /// <summary>
+    /// Carril de la anomalía. Por defecto <see cref="AmbitoAlerta.Auditoria"/> (fraude grave,
+    /// solo central). Los detectores marcan <see cref="AmbitoAlerta.Operativa"/> en los
+    /// problemas operativos de estación (errores honestos) para enrutarlos al administrador.
+    /// </summary>
+    public AmbitoAlerta Ambito { get; init; } = AmbitoAlerta.Auditoria;
     public required int EstacionId { get; init; }
     public string? EmpleadoCodigo { get; init; }
     public string? TransaccionReferencia { get; init; }

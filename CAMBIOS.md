@@ -612,3 +612,25 @@ allá de una tolerancia configurable (`FechaFuturaToleranciaHoras`, por defecto 
 momento de procesamiento — convierte el experimento de la inserción fechada al futuro en una
 anomalía detectable. Sembrada en `SeedData` (editable desde la pantalla de Reglas) y cubierta
 con 3 pruebas unitarias nuevas (92 en total, todas en verde).
+
+---
+
+## 20. Subsistema de alertas por ámbito: Operativa (estación) vs Auditoría (fraude)
+
+Primer bloque del subsistema que separa las alertas en dos carriles, para que el administrador
+de cada estación reciba en tiempo real solo SUS problemas operativos y el central conserve la
+visión completa (incluido el carril de fraude).
+
+- **Enum `AmbitoAlerta`** (`Operativa` / `Auditoria`), ortogonal al `NivelRiesgo`.
+- **`Alerta.Ambito`** persistido (default `Auditoria`) + índices para filtrar por ámbito;
+  migración `AmbitoAlerta` (las alertas previas quedan como Auditoría).
+- **`DetectedAnomaly.Ambito`**: los detectores marcan el carril. Primer ejemplo: "campos
+  obligatorios vacíos" pasa a **Operativa** (error honesto del cajero); el backdating sigue en
+  **Auditoría**.
+- **SignalR**: el central (auditores/supervisores/admins) recibe todo; el grupo de la estación
+  recibe en tiempo real **solo** las operativas, por un evento aparte `ProblemaEstacion` (el
+  admin de estación no ve el carril de fraude).
+- Cubierto con 2 pruebas nuevas de ámbito (94 en Detectors, verde).
+
+Pendiente del subsistema: pestaña "Problemas de estación" (agrupada por estación, expandible),
+endpoint de agregación, asociación usuario↔estación y aviso por correo al contacto de la estación.

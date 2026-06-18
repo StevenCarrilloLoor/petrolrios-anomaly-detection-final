@@ -21,7 +21,9 @@ public class AlertaConfiguration : IEntityTypeConfiguration<Alerta>
         builder.HasIndex(a => a.NivelRiesgo);
         builder.HasIndex(a => a.TipoDetector);
         builder.HasIndex(a => a.Estado);
+        builder.HasIndex(a => a.Ambito);
         builder.HasIndex(a => new { a.EstacionId, a.FechaDeteccion });
+        builder.HasIndex(a => new { a.Ambito, a.EstacionId, a.FechaDeteccion });
 
         builder.HasOne(a => a.Estacion)
             .WithMany(e => e.Alertas)

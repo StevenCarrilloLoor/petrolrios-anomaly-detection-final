@@ -190,6 +190,40 @@ public class InvoiceAnomalyDetectorTests
     }
 
     [Fact]
+    public async Task DetectAsync_CamposObligatoriosVacios_EsAmbitoOperativa()
+    {
+        // Un campo faltante es un error operativo: debe marcarse como Operativa (carril estación)
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(placa: "", ruc: "")
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a =>
+            a.Descripcion.Contains("Campos obligatorios")
+            && a.Ambito == PetrolRios.Domain.Enums.AmbitoAlerta.Operativa);
+    }
+
+    [Fact]
+    public async Task DetectAsync_FutureDate_EsAmbitoAuditoria()
+    {
+        // El backdating es posible fraude: carril de auditoría (no se manda a la estación)
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(fecha: DateTime.UtcNow.AddHours(48))
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a =>
+            a.Descripcion.Contains("fechado en el futuro")
+            && a.Ambito == PetrolRios.Domain.Enums.AmbitoAlerta.Auditoria);
+    }
+
+    [Fact]
     public async Task DetectAsync_FutureDateRuleDisabled_NoAlert()
     {
         var reglas = TestHelpers.DefaultReglas()

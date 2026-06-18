@@ -224,6 +224,8 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
+                // Error operativo (el cajero olvidó capturar placa/cédula): va al carril de la estación.
+                Ambito = Domain.Enums.AmbitoAlerta.Operativa,
                 Descripcion = $"Campos obligatorios vacíos en documento {factura.NumeroDocumento}: " +
                               string.Join(", ", camposFaltantes),
                 Score = score,

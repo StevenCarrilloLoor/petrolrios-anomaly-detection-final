@@ -95,7 +95,8 @@ public sealed class AnomalyDetectionJob
                             anomaly.EmpleadoCodigo,
                             anomaly.TransaccionReferencia,
                             JsonSerializer.Serialize(anomaly.Metadata),
-                            ejecucion.Id);
+                            ejecucion.Id,
+                            anomaly.Ambito);
 
                         await _dbContext.Alertas.AddAsync(alerta, ct);
                         totalAlertas++;
@@ -264,17 +265,27 @@ public sealed class AnomalyDetectionJob
             alerta.Id,
             TipoDetector = alerta.TipoDetector.ToString(),
             NivelRiesgo = alerta.NivelRiesgo.ToString(),
+            Ambito = alerta.Ambito.ToString(),
             alerta.Descripcion,
             alerta.Score,
             alerta.FechaDeteccion,
             EstacionId = estacionId
         };
 
-        // Notificar a todos los grupos relevantes
-        await Task.WhenAll(
+        // El central (auditores/supervisores/admins) ve TODO.
+        var tareas = new List<Task>
+        {
             _hubContext.Clients.Group("auditores").SendAsync("NuevaAlerta", payload),
             _hubContext.Clients.Group("supervisores").SendAsync("NuevaAlerta", payload),
-            _hubContext.Clients.Group("administradores").SendAsync("NuevaAlerta", payload),
-            _hubContext.Clients.Group($"estacion-{estacionId}").SendAsync("NuevaAlerta", payload));
+            _hubContext.Clients.Group("administradores").SendAsync("NuevaAlerta", payload)
+        };
+
+        // El grupo de la estación recibe en tiempo real SOLO sus problemas operativos
+        // (el administrador de la estación no debe ver el carril de auditoría/fraude).
+        if (alerta.Ambito == AmbitoAlerta.Operativa)
+            tareas.Add(_hubContext.Clients.Group($"estacion-{estacionId}")
+                .SendAsync("ProblemaEstacion", payload));
+
+        await Task.WhenAll(tareas);
     }
 }

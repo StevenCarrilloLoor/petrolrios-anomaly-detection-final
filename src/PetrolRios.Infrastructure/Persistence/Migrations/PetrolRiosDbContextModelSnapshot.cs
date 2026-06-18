@@ -30,6 +30,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("Ambito")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -78,6 +81,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Ambito");
+
                     b.HasIndex("EjecucionJobId");
 
                     b.HasIndex("EstacionId");
@@ -91,6 +96,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.HasIndex("TipoDetector");
 
                     b.HasIndex("EstacionId", "FechaDeteccion");
+
+                    b.HasIndex("Ambito", "EstacionId", "FechaDeteccion");
 
                     b.ToTable("alertas", (string)null);
                 });

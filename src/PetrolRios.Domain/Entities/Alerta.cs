@@ -6,6 +6,10 @@ public class Alerta : BaseEntity
 {
     public TipoDetector TipoDetector { get; private set; }
     public NivelRiesgo NivelRiesgo { get; private set; }
+
+    /// <summary>Carril de la alerta: operativa (estación) o de auditoría (fraude grave).</summary>
+    public AmbitoAlerta Ambito { get; private set; } = AmbitoAlerta.Auditoria;
+
     public EstadoAlerta Estado { get; set; } = EstadoAlerta.Nueva;
     public string Descripcion { get; private set; } = string.Empty;
     public double Score { get; private set; }
@@ -35,11 +39,13 @@ public class Alerta : BaseEntity
         string? empleadoCodigo = null,
         string? transaccionReferencia = null,
         string? metadataJson = null,
-        int? ejecucionJobId = null) =>
+        int? ejecucionJobId = null,
+        AmbitoAlerta ambito = AmbitoAlerta.Auditoria) =>
         new()
         {
             TipoDetector = tipoDetector,
             NivelRiesgo = nivelRiesgo,
+            Ambito = ambito,
             Descripcion = descripcion,
             Score = score,
             EstacionId = estacionId,
