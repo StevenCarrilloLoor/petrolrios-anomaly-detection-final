@@ -38,7 +38,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
     /// </summary>
     [HttpGet("catalogo")]
     [ProducesResponseType(typeof(CatalogoReglasResponse), StatusCodes.Status200OK)]
-    public IActionResult GetCatalogo()
+    public async Task<IActionResult> GetCatalogo(CancellationToken ct)
     {
         var etiquetasFuente = new Dictionary<string, string>
         {
@@ -49,19 +49,66 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             ["TarjetaTurno"] = "Transacciones con tarjeta (TURN_TARJ)"
         };
 
+        var fuentes = CatalogoReglasPersonalizadas.Fuentes
+            .Select(kv => new FuenteCatalogo(
+                kv.Key,
+                etiquetasFuente.GetValueOrDefault(kv.Key, kv.Key),
+                kv.Value.Select(c => new CampoCatalogo(c.Nombre, c.Etiqueta, c.Tipo)).ToList()))
+            .ToList();
+
+        // Fuentes configurables (tablas arbitrarias del agente): se descubren del staging y se
+        // auto-documentan sus campos a partir de una fila de muestra. Así el builder de reglas
+        // las ofrece automáticamente, sin escribir campos a mano.
+        var conocidas = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Factura", "DetalleFactura", "CierreTurno", "DepositoTurno",
+            "Anulacion", "Credito", "TarjetaTurno"
+        };
+        var tiposCustom = await _dbContext.TransaccionesStaging
+            .Select(s => s.TipoTransaccion)
+            .Distinct()
+            .ToListAsync(ct);
+
+        foreach (var tipo in tiposCustom.Where(t => !conocidas.Contains(t)).OrderBy(t => t))
+        {
+            var muestra = await _dbContext.TransaccionesStaging
+                .Where(s => s.TipoTransaccion == tipo)
+                .OrderByDescending(s => s.Id)
+                .Select(s => s.DataJson)
+                .FirstOrDefaultAsync(ct);
+
+            fuentes.Add(new FuenteCatalogo(tipo, $"{tipo} (tabla configurable)", InferirCampos(muestra)));
+        }
+
         var catalogo = new CatalogoReglasResponse
         {
-            Fuentes = CatalogoReglasPersonalizadas.Fuentes
-                .Select(kv => new FuenteCatalogo(
-                    kv.Key,
-                    etiquetasFuente.GetValueOrDefault(kv.Key, kv.Key),
-                    kv.Value.Select(c => new CampoCatalogo(c.Nombre, c.Etiqueta, c.Tipo)).ToList()))
-                .ToList(),
+            Fuentes = fuentes,
             OperadoresNumero = CatalogoReglasPersonalizadas.OperadoresNumero,
             OperadoresTexto = CatalogoReglasPersonalizadas.OperadoresTexto,
             Funciones = CatalogoReglasPersonalizadas.Funciones
         };
         return Ok(catalogo);
+    }
+
+    /// <summary>Infiere los campos (nombre + tipo) de una fuente configurable desde una fila JSON.</summary>
+    private static List<CampoCatalogo> InferirCampos(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try
+        {
+            var raw = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+            if (raw is null) return [];
+            return raw.Select(kv => new CampoCatalogo(
+                kv.Key,
+                kv.Key,
+                kv.Value.ValueKind == JsonValueKind.Number
+                    ? CatalogoReglasPersonalizadas.TipoNumero
+                    : CatalogoReglasPersonalizadas.TipoTexto)).ToList();
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     /// <summary>
@@ -187,8 +234,10 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         if (request.RiesgoBase is < 1 or > 100)
             errores.Add("El riesgo base debe estar entre 1 y 100.");
 
-        if (!CatalogoReglasPersonalizadas.Fuentes.ContainsKey(request.FuenteDatos))
-            errores.Add($"Fuente de datos desconocida: '{request.FuenteDatos}'.");
+        // Se aceptan las 5 fuentes del catálogo y también las fuentes configurables (tablas
+        // arbitrarias enviadas por el agente). Solo se exige que se indique una.
+        if (string.IsNullOrWhiteSpace(request.FuenteDatos))
+            errores.Add("Debe indicar una fuente de datos.");
 
         if (!string.IsNullOrWhiteSpace(request.ExpresionAvanzada))
         {

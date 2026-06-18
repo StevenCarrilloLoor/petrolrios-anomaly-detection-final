@@ -736,3 +736,23 @@ anclado a un catálogo cableado de 5 fuentes; ahora es genérico.
 
 Falta solo la UI: que el formulario de reglas liste las fuentes configurables y sus campos
 (auto-documentación) para elegirlos sin escribir a mano. El motor ya los soporta.
+
+---
+
+## 26. Plataforma flexible (3/3, UI): el builder de reglas auto-descubre las fuentes configurables
+
+Remate de la plataforma: el formulario de Reglas ya ofrece automáticamente las tablas
+configurables y sus campos, sin escribir nada a mano.
+
+- **`GET /reglas-personalizadas/catalogo`** ahora es asíncrono y, además de las 5 fuentes del
+  catálogo, **descubre las fuentes configurables** desde el staging (tipos no conocidos) y
+  **auto-documenta sus campos** infiriendo el tipo (número/texto) de una fila de muestra. El
+  frontend, que ya consume este catálogo, las muestra en el selector sin cambios.
+- **`EvaluadorExpresion.Validar`**: en fuentes configurables valida solo la sintaxis (los campos
+  se resuelven en runtime); en las del catálogo sigue validando que los campos existan.
+- **Controlador de reglas**: la validación al guardar acepta fuentes configurables (antes
+  rechazaba toda fuente fuera del catálogo).
+
+Con esto el ciclo completo de la plataforma queda cerrado: explorar una tabla → registrarla como
+fuente (multi-tabla) → el agente la envía → y crear reglas básicas o avanzadas sobre sus campos
+desde la interfaz, **sin tocar código**. Build verde (96 pruebas en Detectors).

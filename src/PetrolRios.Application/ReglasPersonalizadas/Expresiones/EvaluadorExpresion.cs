@@ -43,11 +43,16 @@ public sealed class EvaluadorExpresion
             return errores;
         }
 
-        // Verificar que los campos referenciados existen en la fuente
-        foreach (var campo in CamposReferenciados(arbol))
+        // En fuentes del catálogo se comprueba que los campos existan. En fuentes configurables
+        // (tablas arbitrarias) no hay catálogo estático: se valida solo la sintaxis y los campos
+        // se resuelven en tiempo de ejecución.
+        if (CatalogoReglasPersonalizadas.Fuentes.ContainsKey(fuente))
         {
-            if (CatalogoReglasPersonalizadas.BuscarCampo(fuente, campo) is null)
-                errores.Add($"El campo '{campo}' no existe en la fuente '{fuente}'.");
+            foreach (var campo in CamposReferenciados(arbol))
+            {
+                if (CatalogoReglasPersonalizadas.BuscarCampo(fuente, campo) is null)
+                    errores.Add($"El campo '{campo}' no existe en la fuente '{fuente}'.");
+            }
         }
         return errores;
     }
