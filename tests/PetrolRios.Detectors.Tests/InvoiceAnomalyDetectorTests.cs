@@ -224,6 +224,37 @@ public class InvoiceAnomalyDetectorTests
     }
 
     [Fact]
+    public async Task DetectAsync_DespachoNoFacturado_GeneraAlertaOperativa()
+    {
+        // Despacho con galones servidos pero no facturado (FAC_DESP != '1')
+        var detalles = new List<DetalleFacturaDto>
+        {
+            TestHelpers.CreateDetalle(numero: 9, cantidad: 12, facturado: "0")
+        };
+        var context = TestHelpers.CreateContext(detalles: detalles);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a =>
+            a.Descripcion.Contains("NO facturado")
+            && a.Ambito == PetrolRios.Domain.Enums.AmbitoAlerta.Operativa);
+    }
+
+    [Fact]
+    public async Task DetectAsync_DespachoFacturado_NoGeneraAlerta()
+    {
+        var detalles = new List<DetalleFacturaDto>
+        {
+            TestHelpers.CreateDetalle(numero: 10, cantidad: 12, facturado: "1")
+        };
+        var context = TestHelpers.CreateContext(detalles: detalles);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("NO facturado")).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task DetectAsync_FutureDatedCredito_GeneraAlerta()
     {
         // El backdating también se detecta sobre créditos (CRED_CABE)

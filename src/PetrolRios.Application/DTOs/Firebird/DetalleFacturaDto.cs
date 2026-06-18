@@ -31,4 +31,7 @@ public sealed record DetalleFacturaDto
 
     // COD_CLIE — código de cliente
     public string CodigoCliente { get; init; } = string.Empty;
+
+    // FAC_DESP — indicador de facturado ('1' facturado; distinto = no facturado)
+    public string Facturado { get; init; } = string.Empty;
 }

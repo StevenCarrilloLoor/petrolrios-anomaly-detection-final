@@ -76,6 +76,10 @@ public static class SeedData
             "Fecha fuera de rango plausible (backdating)",
             "Genera alerta si una factura o credito esta fechado en el futuro mas alla de la tolerancia (en horas) respecto al procesamiento; senial de manipulacion de fecha. Umbral = horas de tolerancia.",
             "FechaFuturaToleranciaHoras", 24.0);
+        AddIfMissing(TipoDetector.InvoiceAnomaly,
+            "Despacho no facturado",
+            "Genera una alerta operativa si un despacho (DESP) con galones servidos no esta marcado como facturado (FAC_DESP); combustible que salio sin cobrarse.",
+            "DespachoNoFacturadoHabilitado", 1.0);
         AddIfMissing(TipoDetector.PaymentFraud,
             "Despachos rapidos sucesivos",
             "Genera alerta si el mismo cliente registra 3 o mas despachos consecutivos con menos de N minutos entre ellos (patron del caso documentado de enero 2026)",

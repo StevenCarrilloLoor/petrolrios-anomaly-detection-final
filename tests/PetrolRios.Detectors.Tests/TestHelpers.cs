@@ -145,7 +145,8 @@ internal static class TestHelpers
 
     public static DetalleFacturaDto CreateDetalle(
         double numero = 1, double cantidad = 10, double valorUnitario = 2.50,
-        string producto = "01", string manguera = "01", DateTime? fecha = null) => new()
+        string producto = "01", string manguera = "01", DateTime? fecha = null,
+        string facturado = "1") => new()
         {
             NumeroDespacho = numero,
             CodigoManguera = manguera,
@@ -155,7 +156,8 @@ internal static class TestHelpers
             ValorUnitario = valorUnitario,
             CodigoProducto = producto,
             NombreProducto = $"Producto {producto}",
-            CodigoCliente = "C001"
+            CodigoCliente = "C001",
+            Facturado = facturado
         };
 
     public static AnulacionDto CreateAnulacion(DateTime? fecha = null) => new()

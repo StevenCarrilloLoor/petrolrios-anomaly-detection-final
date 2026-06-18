@@ -793,3 +793,18 @@ reglas editables.
   ("autorizan créditos a quien no debe").
 - 4 pruebas nuevas (turno sin cerrar dispara/no dispara según horas; crédito con/sin garante).
   Totales: Domain 16, Detectors 104, Api 29 — todo verde. Agente compila (EXITCODE 0).
+
+---
+
+## 29. Detector nuevo del ingeniero: despacho no facturado
+
+- **Despacho no facturado** (InvoiceAnomalyDetector, carril **Operativa**): se añadió `FAC_DESP`
+  al DTO de despacho y a la extracción. La regla `DespachoNoFacturadoHabilitado` alerta cuando un
+  despacho con galones servidos (`CAN_DESP > 0`) no está marcado como facturado (`FAC_DESP` ≠ '1')
+  — combustible que salió sin cobrarse ("no lo colgó bien / no cerró el despacho"). Si el indicador
+  viene vacío no se asume nada (evita falsos positivos). Sembrada como regla editable.
+- 2 pruebas nuevas (despacho no facturado dispara alerta operativa; despacho facturado no).
+  Totales: Domain 16, Detectors 106, Api 29 — verdes. Agente compila (EXITCODE 0).
+
+> Nota: el **cuadre de tanque** (TANQ_REPO.DIFERENCIA) ya es alcanzable sin detector nuevo:
+> se registra TANQ_REPO como fuente configurable y se crea una regla `DIFERENCIA > X` desde la UI.

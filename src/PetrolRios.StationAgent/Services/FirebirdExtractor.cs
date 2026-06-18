@@ -293,7 +293,7 @@ public sealed class FirebirdExtractor
             FIN_DESP  AS FechaDespacho,   VTO_DESP  AS VolumenTotal,
             CAN_DESP  AS Cantidad,        VUN_DESP  AS ValorUnitario,
             COD_PROD  AS CodigoProducto,  NOM_PROD  AS NombreProducto,
-            COD_CLIE  AS CodigoCliente
+            COD_CLIE  AS CodigoCliente,   FAC_DESP  AS Facturado
         FROM DESP WHERE FIN_DESP > @Watermark ORDER BY FIN_DESP
         """;
 
