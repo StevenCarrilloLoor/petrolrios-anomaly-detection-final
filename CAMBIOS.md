@@ -672,3 +672,24 @@ operativos de SU estación.
 Con esto el subsistema de ámbito queda funcional de punta a punta (clasificación → pestaña →
 notificación in-app/SignalR + correo al admin de estación). Falta solo el detalle de UI para
 elegir estación/correo desde el formulario (hoy se setea por API).
+
+---
+
+## 23. Plataforma flexible (1/3): explorador de tablas Firebird con documentación automática
+
+Primer bloque de la plataforma de detección configurable. El agente ahora puede **introspeccionar
+el esquema real de Firebird** y auto-documentar cualquier tabla — la base para registrar nuevas
+fuentes y crear reglas sin tocar código.
+
+- **`FirebirdExtractor.ListarTablasAsync`**: lista las tablas de usuario (consulta `RDB$RELATIONS`,
+  excluye vistas y tablas del sistema).
+- **`FirebirdExtractor.DescribirTablaAsync`**: **verifica que la tabla exista** (validación contra
+  la lista real = lista blanca anti-inyección) y devuelve sus columnas con **tipo legible, longitud
+  y nulabilidad** (mapea `RDB$FIELD_TYPE` a SMALLINT/INTEGER/VARCHAR/TIMESTAMP/…), más el conteo de
+  filas. Todo en **solo lectura**.
+- **Endpoints del agente**: `GET /api/firebird/tablas` y `GET /api/firebird/tabla/{nombre}`.
+- **Panel del agente**: nueva tarjeta "Explorador de tablas (documentación automática)" en
+  Monitoreo: botón "Cargar tablas", selector de tabla y tabla de campos/tipos/nulabilidad.
+
+Próximos bloques: registrar fuentes de extracción configurables (multi-tabla) y el creador de
+reglas genérico sobre cualquier tabla.

@@ -196,6 +196,23 @@ internal static class PanelHtml
       <h3>Actividad reciente</h3>
       <div id="log">cargando…</div>
     </div>
+
+    <div class="card" style="margin-top:14px">
+      <h3>Explorador de tablas (documentación automática)</h3>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 8px">
+        Elige cualquier tabla de la base Firebird para ver sus campos y tipos. Sirve para decidir
+        sobre qué tabla crear nuevas reglas, sin tocar código ni llamar a un ingeniero.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="sec" onclick="cargarTablas()">Cargar tablas</button>
+        <select id="f-tabla" onchange="describirTabla()"
+          style="background:#0a0f1c;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;min-width:220px">
+          <option value="">— elige una tabla —</option>
+        </select>
+        <span id="tabla-info" style="color:var(--muted);font-size:12px"></span>
+      </div>
+      <div id="tabla-cols" style="margin-top:10px"></div>
+    </div>
   </div>
 
   <!-- ════════ CONFIGURACIÓN ════════ -->
@@ -534,6 +551,43 @@ async function reiniciarWatermark(){
     mostrarResultado('resultado', j.ok, j.mensaje);
   }catch(e){ mostrarResultado('resultado', false, 'No se pudo contactar al agente.'); }
   refrescar();
+}
+
+async function cargarTablas(){
+  const sel = document.getElementById('f-tabla');
+  const info = document.getElementById('tabla-info');
+  info.textContent = 'Cargando…';
+  try{
+    const r = await fetch('/api/firebird/tablas');
+    const j = await r.json();
+    if(!j.ok){ info.textContent = j.mensaje || 'No se pudo leer el esquema.'; return; }
+    sel.innerHTML = '<option value="">— elige una tabla —</option>' +
+      j.tablas.map(t => '<option value="'+t+'">'+t+'</option>').join('');
+    info.textContent = j.tablas.length + ' tablas en la base.';
+  }catch(e){ info.textContent = 'No se pudo contactar al agente.'; }
+}
+
+async function describirTabla(){
+  const tabla = document.getElementById('f-tabla').value;
+  const cont = document.getElementById('tabla-cols');
+  const info = document.getElementById('tabla-info');
+  if(!tabla){ cont.innerHTML=''; info.textContent=''; return; }
+  cont.innerHTML = '<span style="color:var(--muted);font-size:12px">Leyendo estructura…</span>';
+  try{
+    const r = await fetch('/api/firebird/tabla/' + encodeURIComponent(tabla));
+    const j = await r.json();
+    if(!j.ok){ cont.innerHTML='<span style="color:#f87171;font-size:12px">'+(j.mensaje||'Error')+'</span>'; return; }
+    const d = j.desc;
+    info.textContent = d.totalFilas.toLocaleString() + ' filas · ' + d.columnas.length + ' campos';
+    const filas = d.columnas.map(c =>
+      '<tr><td style="padding:4px 10px 4px 0">'+c.nombre+'</td>'+
+      '<td style="padding:4px 10px 4px 0;color:#93c5fd">'+c.tipo+'</td>'+
+      '<td style="padding:4px 0;color:var(--muted)">'+(c.nullable?'acepta nulos':'obligatorio')+'</td></tr>').join('');
+    cont.innerHTML =
+      '<table style="font-size:12px;border-collapse:collapse;width:100%">'+
+      '<tr style="text-align:left;color:var(--muted)"><th style="padding:4px 10px 4px 0">Campo</th>'+
+      '<th style="padding:4px 10px 4px 0">Tipo</th><th>Nulabilidad</th></tr>'+filas+'</table>';
+  }catch(e){ cont.innerHTML='<span style="color:#f87171;font-size:12px">No se pudo contactar al agente.</span>'; }
 }
 
 async function buscarActualizacion(){

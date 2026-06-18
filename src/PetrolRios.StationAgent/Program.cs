@@ -298,6 +298,26 @@ try
         return Results.Json(new { ok, mensaje, totalDocumentos = total });
     });
 
+    // Explorador de esquema: lista de tablas de la base Firebird (auto-documentación).
+    app.MapGet("/api/firebird/tablas", async (FirebirdExtractor extractor, CancellationToken ct) =>
+    {
+        try { return Results.Json(new { ok = true, tablas = await extractor.ListarTablasAsync(ct) }); }
+        catch (Exception ex) { return Results.Json(new { ok = false, mensaje = ex.Message }); }
+    });
+
+    // Descripción (campos y tipos) de una tabla; verifica que exista.
+    app.MapGet("/api/firebird/tabla/{nombre}", async (string nombre, FirebirdExtractor extractor, CancellationToken ct) =>
+    {
+        try
+        {
+            var desc = await extractor.DescribirTablaAsync(nombre, ct);
+            return desc.Existe
+                ? Results.Json(new { ok = true, desc })
+                : Results.Json(new { ok = false, mensaje = $"La tabla '{nombre}' no existe en esta base." });
+        }
+        catch (Exception ex) { return Results.Json(new { ok = false, mensaje = ex.Message }); }
+    });
+
     app.MapPost("/api/probar-servidor", async (ServerClient client, AgentState state, CancellationToken ct) =>
     {
         var (ok, mensaje, latencia) = await client.ProbarConexionAsync(ct);

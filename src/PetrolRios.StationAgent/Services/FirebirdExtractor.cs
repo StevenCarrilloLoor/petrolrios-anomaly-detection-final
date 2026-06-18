@@ -121,6 +121,89 @@ public sealed class FirebirdExtractor
         }
     }
 
+    // ─────────── Introspección / auto-documentación del esquema ───────────
+
+    /// <summary>
+    /// Lista las tablas de usuario de la base Firebird (excluye vistas y tablas del sistema).
+    /// Base de la "documentación automática": permite elegir cualquier tabla para analizar.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ListarTablasAsync(CancellationToken ct)
+    {
+        using var connection = CreateConnection();
+        const string sql = """
+            SELECT TRIM(RDB$RELATION_NAME) AS NOMBRE
+            FROM RDB$RELATIONS
+            WHERE RDB$VIEW_BLR IS NULL
+              AND (RDB$SYSTEM_FLAG IS NULL OR RDB$SYSTEM_FLAG = 0)
+            ORDER BY RDB$RELATION_NAME
+            """;
+        var rows = await connection.QueryAsync<string>(new CommandDefinition(sql, cancellationToken: ct));
+        return rows.Select(r => r.Trim()).ToList();
+    }
+
+    /// <summary>
+    /// Describe una tabla: verifica que exista y devuelve sus columnas con tipo, longitud y
+    /// nulabilidad (auto-documentación). El nombre se valida contra la lista real de tablas
+    /// (verificación de existencia + lista blanca anti-inyección antes de tocar el catálogo).
+    /// </summary>
+    public async Task<DescripcionTabla> DescribirTablaAsync(string tabla, CancellationToken ct)
+    {
+        var nombre = (tabla ?? string.Empty).Trim().ToUpperInvariant();
+        var tablas = await ListarTablasAsync(ct);
+        if (!tablas.Any(t => t.Equals(nombre, StringComparison.OrdinalIgnoreCase)))
+            return new DescripcionTabla(nombre, false, [], 0);
+
+        using var connection = CreateConnection();
+        const string sql = """
+            SELECT TRIM(RF.RDB$FIELD_NAME) AS NOMBRE, F.RDB$FIELD_TYPE AS TIPO,
+                   F.RDB$FIELD_LENGTH AS LONGITUD, F.RDB$FIELD_SUB_TYPE AS SUBTIPO,
+                   F.RDB$FIELD_SCALE AS ESCALA, RF.RDB$NULL_FLAG AS NOTNULL
+            FROM RDB$RELATION_FIELDS RF
+            JOIN RDB$FIELDS F ON RF.RDB$FIELD_SOURCE = F.RDB$FIELD_NAME
+            WHERE RF.RDB$RELATION_NAME = @t
+            ORDER BY RF.RDB$FIELD_POSITION
+            """;
+        var raw = await connection.QueryAsync<ColumnaRaw>(
+            new CommandDefinition(sql, new { t = nombre }, cancellationToken: ct));
+
+        var columnas = raw.Select(c => new ColumnaFirebird(
+            (c.NOMBRE ?? "").Trim(),
+            MapearTipoFirebird(c.TIPO, c.SUBTIPO, c.ESCALA, c.LONGITUD),
+            c.LONGITUD ?? 0,
+            c.NOTNULL is null)).ToList();
+
+        long totalFilas = 0;
+        try
+        {
+            totalFilas = await connection.ExecuteScalarAsync<long>(
+                new CommandDefinition($"SELECT COUNT(*) FROM \"{nombre}\"", cancellationToken: ct));
+        }
+        catch { /* el conteo es informativo; si falla, queda en 0 */ }
+
+        return new DescripcionTabla(nombre, true, columnas, totalFilas);
+    }
+
+    /// <summary>Traduce el código de tipo de Firebird (RDB$FIELD_TYPE) a un nombre legible.</summary>
+    private static string MapearTipoFirebird(short? tipo, short? subtipo, short? escala, short? longitud)
+    {
+        var esDecimal = escala is < 0;
+        return tipo switch
+        {
+            7 => esDecimal ? "NUMERIC" : "SMALLINT",
+            8 => esDecimal ? "NUMERIC" : "INTEGER",
+            16 => esDecimal ? "DECIMAL/NUMERIC" : "BIGINT",
+            10 => "FLOAT",
+            27 => "DOUBLE PRECISION",
+            12 => "DATE",
+            13 => "TIME",
+            35 => "TIMESTAMP",
+            14 => $"CHAR({longitud})",
+            37 => $"VARCHAR({longitud})",
+            261 => subtipo == 1 ? "BLOB (texto)" : "BLOB",
+            _ => $"tipo {tipo}"
+        };
+    }
+
     #region SQL Queries (idénticas al servidor — tablas reales de Contaplus)
 
     private const string GetFacturasSql = """
@@ -212,3 +295,21 @@ public sealed class TransaccionBatchItem
     public required string DataJson { get; set; }
     public required DateTime FechaOriginal { get; set; }
 }
+
+/// <summary>Fila cruda del catálogo de Firebird (RDB$RELATION_FIELDS).</summary>
+internal sealed class ColumnaRaw
+{
+    public string? NOMBRE { get; set; }
+    public short? TIPO { get; set; }
+    public short? LONGITUD { get; set; }
+    public short? SUBTIPO { get; set; }
+    public short? ESCALA { get; set; }
+    public short? NOTNULL { get; set; }
+}
+
+/// <summary>Una columna documentada automáticamente: nombre, tipo legible, longitud y nulabilidad.</summary>
+public sealed record ColumnaFirebird(string Nombre, string Tipo, int Longitud, bool Nullable);
+
+/// <summary>Documentación automática de una tabla: si existe, sus columnas y su conteo de filas.</summary>
+public sealed record DescripcionTabla(
+    string Tabla, bool Existe, IReadOnlyList<ColumnaFirebird> Columnas, long TotalFilas);
