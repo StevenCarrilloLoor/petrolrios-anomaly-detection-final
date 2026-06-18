@@ -808,3 +808,19 @@ reglas editables.
 
 > Nota: el **cuadre de tanque** (TANQ_REPO.DIFERENCIA) ya es alcanzable sin detector nuevo:
 > se registra TANQ_REPO como fuente configurable y se crea una regla `DIFERENCIA > X` desde la UI.
+
+---
+
+## 30. Detector del ingeniero: anulaciones recurrentes (kiting)
+
+- **Anulaciones recurrentes / kiting** (InvoiceAnomalyDetector, carril Auditoría): la regla
+  `AnulacionRecurrenteDiasMinimo` (default 3) alerta cuando un mismo punto de emisión
+  (establecimiento + punto) acumula anulaciones en varios días distintos — el patrón de
+  "cancelar y reingresar al día siguiente, y así sucesivamente" que mencionó el ingeniero, usado
+  para rodar la deuda o mover el período. Sembrada como regla editable.
+- 2 pruebas nuevas (anulaciones en 3 días distintos disparan; mismo día no). Domain 16,
+  Detectors 108, Api 29 — verdes.
+
+**Con esto quedan implementados los cuatro patrones del ingeniero:** turno sin cerrar (operativa),
+crédito sin garante, despacho no facturado (operativa) y kiting. El cuadre de tanque se cubre con
+la plataforma de fuentes configurables + reglas, sin detector dedicado.

@@ -80,6 +80,10 @@ public static class SeedData
             "Despacho no facturado",
             "Genera una alerta operativa si un despacho (DESP) con galones servidos no esta marcado como facturado (FAC_DESP); combustible que salio sin cobrarse.",
             "DespachoNoFacturadoHabilitado", 1.0);
+        AddIfMissing(TipoDetector.InvoiceAnomaly,
+            "Anulaciones recurrentes (kiting)",
+            "Genera alerta si un mismo punto de emision tiene anulaciones en varios dias distintos (umbral = dias minimos); posible patron de cancelar y reingresar para rodar la deuda o mover el periodo.",
+            "AnulacionRecurrenteDiasMinimo", 3.0);
         AddIfMissing(TipoDetector.PaymentFraud,
             "Despachos rapidos sucesivos",
             "Genera alerta si el mismo cliente registra 3 o mas despachos consecutivos con menos de N minutos entre ellos (patron del caso documentado de enero 2026)",

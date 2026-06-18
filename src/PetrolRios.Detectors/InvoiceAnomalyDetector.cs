@@ -40,6 +40,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         var totalInconsistenteHabilitado = GetUmbral(reglas, "TotalInconsistenteHabilitado", 1.0) >= 1.0;
         var toleranciaFuturaHoras = GetUmbral(reglas, "FechaFuturaToleranciaHoras", 24.0);
         var despachoNoFacturadoHabilitado = GetUmbral(reglas, "DespachoNoFacturadoHabilitado", 1.0) >= 1.0;
+        var anulacionRecurrenteDias = GetUmbral(reglas, "AnulacionRecurrenteDiasMinimo", 3.0);
 
         // Regla 1: Tasa de anulaciones excesivas
         if (umbralAnulaciones is not null)
@@ -68,6 +69,10 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         // Regla 7: Despacho no facturado (combustible servido sin cobrar)
         if (despachoNoFacturadoHabilitado)
             DetectDespachoNoFacturado(context, anomalies);
+
+        // Regla 8: Anulaciones recurrentes en varios días (posible kiting / cancelar-reingresar)
+        if (anulacionRecurrenteDias is not null)
+            DetectAnulacionRecurrente(context, (int)anulacionRecurrenteDias.Value, anomalies);
 
         _logger.LogDebug("InvoiceAnomalyDetector: {Count} anomalías en estación {Est}",
             anomalies.Count, context.EstacionNombre);
@@ -413,6 +418,54 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
                     ["FechaProcesamiento"] = context.ToWatermark,
                     ["HorasAdelante"] = horasAdelante,
                     ["ToleranciaHoras"] = toleranciaHoras
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Anulaciones recurrentes (posible kiting / "cancelar y reingresar"): un mismo punto de
+    /// emisión con anulaciones en varios días distintos sugiere el patrón que mencionó el
+    /// ingeniero —cancelan una operación y la vuelven a poner al día siguiente, repetidamente—
+    /// para rodar la deuda o mover el período. Carril de auditoría (fraude).
+    /// </summary>
+    private void DetectAnulacionRecurrente(
+        DetectionContext context, int diasMinimo, List<DetectedAnomaly> anomalies)
+    {
+        if (context.Anulaciones.Count == 0) return;
+
+        var grupos = context.Anulaciones
+            .GroupBy(a => new { Est = a.Establecimiento.Trim(), Pto = a.PuntoEmision.Trim() });
+
+        foreach (var grupo in grupos)
+        {
+            var diasDistintos = grupo
+                .Select(a => a.FechaAnulacion.Date)
+                .Distinct()
+                .Count();
+
+            if (diasDistintos < diasMinimo) continue;
+
+            var totalAnulaciones = grupo.Count();
+            var (score, nivel) = _scoring.Calculate(riesgoBase: 60);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.InvoiceAnomaly,
+                Descripcion = $"Anulaciones recurrentes en {grupo.Key.Est}-{grupo.Key.Pto}: " +
+                              $"{totalAnulaciones} anulaciones en {diasDistintos} días distintos " +
+                              $"(umbral: {diasMinimo}). Posible patrón de cancelar y reingresar (kiting).",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                TransaccionReferencia = $"ANUL-RECURR-{grupo.Key.Est}-{grupo.Key.Pto}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["Establecimiento"] = grupo.Key.Est,
+                    ["PuntoEmision"] = grupo.Key.Pto,
+                    ["DiasDistintos"] = diasDistintos,
+                    ["TotalAnulaciones"] = totalAnulaciones,
+                    ["DiasMinimo"] = diasMinimo
                 }
             });
         }

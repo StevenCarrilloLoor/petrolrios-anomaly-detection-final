@@ -255,6 +255,38 @@ public class InvoiceAnomalyDetectorTests
     }
 
     [Fact]
+    public async Task DetectAsync_AnulacionesRecurrentes_GeneraAlertaKiting()
+    {
+        // Mismo punto de emisión con anulaciones en 3 días distintos → posible kiting
+        var anulaciones = new List<AnulacionDto>
+        {
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow),
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow.AddDays(-1)),
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow.AddDays(-2))
+        };
+        var context = TestHelpers.CreateContext(anulaciones: anulaciones);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("Anulaciones recurrentes"));
+    }
+
+    [Fact]
+    public async Task DetectAsync_AnulacionesMismoDia_NoGeneraKiting()
+    {
+        var anulaciones = new List<AnulacionDto>
+        {
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow),
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow.AddHours(-1))
+        };
+        var context = TestHelpers.CreateContext(anulaciones: anulaciones);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("Anulaciones recurrentes")).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task DetectAsync_FutureDatedCredito_GeneraAlerta()
     {
         // El backdating también se detecta sobre créditos (CRED_CABE)
