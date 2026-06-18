@@ -224,6 +224,21 @@ public class InvoiceAnomalyDetectorTests
     }
 
     [Fact]
+    public async Task DetectAsync_FutureDatedCredito_GeneraAlerta()
+    {
+        // El backdating también se detecta sobre créditos (CRED_CABE)
+        var creditos = new List<CreditoDto>
+        {
+            TestHelpers.CreateCredito(fecha: DateTime.UtcNow.AddHours(72))
+        };
+        var context = TestHelpers.CreateContext(creditos: creditos);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("Crédito") && a.Descripcion.Contains("futuro"));
+    }
+
+    [Fact]
     public async Task DetectAsync_FutureDateRuleDisabled_NoAlert()
     {
         var reglas = TestHelpers.DefaultReglas()

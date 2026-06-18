@@ -169,10 +169,11 @@ internal static class TestHelpers
     };
 
     public static CreditoDto CreateCredito(
-        double total = 500, double comprobante = 0, string socio = "S001") => new()
+        double total = 500, double comprobante = 0, string socio = "S001",
+        DateTime? fecha = null) => new()
         {
             NumeroCabecera = 1,
-            FechaCabecera = DateTime.UtcNow.AddMinutes(-30),
+            FechaCabecera = fecha ?? DateTime.UtcNow.AddMinutes(-30),
             CodigoCredito = "01",
             CodigoSocio = socio,
             PlazoCabecera = 30,

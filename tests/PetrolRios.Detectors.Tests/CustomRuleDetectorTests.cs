@@ -213,4 +213,49 @@ public class CustomRuleDetectorTests
 
         result.Should().HaveCount(1);
     }
+
+    [Fact]
+    public async Task DetectAsync_FuenteGenerica_Agregacion_GeneraAlertaPorGrupo()
+    {
+        // Suma de MONTO por VENDEDOR > 500 sobre una tabla configurable
+        var fuentes = FuenteGenerica("Ventas",
+            Fila(("VENDEDOR", "V1"), ("MONTO", 300.0)),
+            Fila(("VENDEDOR", "V1"), ("MONTO", 300.0)),
+            Fila(("VENDEDOR", "V2"), ("MONTO", 100.0)));
+        var agregacion = new AgregacionRegla("VENDEDOR", "Suma", "MONTO", ">", 500);
+        var regla = CrearRegla("Ventas", [], agregacion);
+
+        var context = TestHelpers.CreateContext(reglasPersonalizadas: [regla], fuentesGenericas: fuentes);
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        // V1 suma 600 (> 500) → alerta; V2 suma 100 → no
+        result.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task DetectAsync_FuenteGenerica_CondicionTexto_GeneraAlerta()
+    {
+        var fuentes = FuenteGenerica("Docs",
+            Fila(("ESTADO", "ANULADO"), ("ID", "1")),
+            Fila(("ESTADO", "ACTIVO"), ("ID", "2")));
+        var regla = CrearRegla("Docs", [new CondicionRegla("ESTADO", "=", "ANULADO")]);
+
+        var context = TestHelpers.CreateContext(reglasPersonalizadas: [regla], fuentesGenericas: fuentes);
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task DetectAsync_FuenteGenerica_ExpresionNoCumple_SinAlerta()
+    {
+        var fuentes = FuenteGenerica("Tanques", Fila(("DIFERENCIA", 10.0)));
+        var regla = CrearRegla("Tanques", []);
+        regla.ExpresionAvanzada = "DIFERENCIA > 500";
+
+        var context = TestHelpers.CreateContext(reglasPersonalizadas: [regla], fuentesGenericas: fuentes);
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().BeEmpty();
+    }
 }

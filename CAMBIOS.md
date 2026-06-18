@@ -756,3 +756,22 @@ configurables y sus campos, sin escribir nada a mano.
 Con esto el ciclo completo de la plataforma queda cerrado: explorar una tabla → registrarla como
 fuente (multi-tabla) → el agente la envía → y crear reglas básicas o avanzadas sobre sus campos
 desde la interfaz, **sin tocar código**. Build verde (96 pruebas en Detectors).
+
+---
+
+## 27. Cobertura de pruebas para lo nuevo
+
+Pruebas unitarias para las funcionalidades agregadas en esta ronda:
+
+- **Idempotencia** (`TransaccionStagingTests`): la huella `CalcularHash` es determinista, tiene
+  longitud SHA-256 (64 hex) y cambia si cambia cualquier componente (estación/tipo/datos);
+  `Create` asigna el hash del contenido.
+- **Ámbito de alerta** (`AlertaAmbitoTests`): `Create` por defecto es Auditoría y conserva
+  Operativa cuando se indica.
+- **Motor de reglas genérico** (`CustomRuleDetectorTests`, casos nuevos): agregación (Suma por
+  grupo) sobre fuente configurable, condición de texto sobre fuente genérica, y expresión que no
+  cumple → sin alerta.
+- **Backdating sobre créditos** (`InvoiceAnomalyDetectorTests`): un crédito (CRED_CABE) fechado al
+  futuro también dispara la alerta.
+
+Totales: Domain 16, Detectors 100, Api 29 — todo en verde.
