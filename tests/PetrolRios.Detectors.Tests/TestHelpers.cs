@@ -23,9 +23,11 @@ internal static class TestHelpers
         IReadOnlyList<ReglaDeteccion>? reglas = null,
         IReadOnlyList<ReglaPersonalizada>? reglasPersonalizadas = null,
         IReadOnlyDictionary<string, int>? alertasPrevias = null,
+        IReadOnlyDictionary<string, IReadOnlyList<IDictionary<string, object>>>? fuentesGenericas = null,
         TimeOnly? horaApertura = null,
         TimeOnly? horaCierre = null) => new()
         {
+            FuentesGenericas = fuentesGenericas ?? new Dictionary<string, IReadOnlyList<IDictionary<string, object>>>(),
             EstacionId = estacionId,
             EstacionNombre = estacionNombre,
             FromWatermark = DateTime.UtcNow.AddHours(-1),

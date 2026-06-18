@@ -187,12 +187,31 @@ public sealed class AnomalyDetectionJob
             .GroupBy(codigo => codigo)
             .ToDictionary(g => g.Key, g => g.Count());
 
+        // Fuentes genéricas: staging de tipos NO conocidos = tablas configurables del agente.
+        // Se exponen como diccionarios para que las reglas personalizadas operen sobre ellas.
+        var tiposConocidos = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Factura", "DetalleFactura", "CierreTurno", "DepositoTurno",
+            "Anulacion", "Credito", "TarjetaTurno"
+        };
+        var fuentesGenericas = staging
+            .Where(s => !tiposConocidos.Contains(s.TipoTransaccion))
+            .GroupBy(s => s.TipoTransaccion)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<IDictionary<string, object>>)g
+                    .Select(s => DeserializarDiccionario(s.DataJson))
+                    .Where(d => d is not null)
+                    .Cast<IDictionary<string, object>>()
+                    .ToList());
+
         // Marcar TODO el staging (incluidos duplicados) como procesado
         foreach (var s in stagingTodos)
             s.Procesada = true;
 
         return new DetectionContext
         {
+            FuentesGenericas = fuentesGenericas,
             EstacionId = estacion.Id,
             EstacionNombre = estacion.Nombre,
             FromWatermark = desde,
@@ -211,6 +230,34 @@ public sealed class AnomalyDetectionJob
             HoraCierre = estacion.HoraCierre
         };
     }
+
+    /// <summary>Convierte el JSON de una fila de fuente configurable en un diccionario campo→valor.</summary>
+    private static IDictionary<string, object>? DeserializarDiccionario(string json)
+    {
+        try
+        {
+            var crudo = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+            if (crudo is null) return null;
+            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (clave, valor) in crudo)
+                dict[clave] = ConvertirJsonElement(valor);
+            return dict;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static object ConvertirJsonElement(JsonElement e) => e.ValueKind switch
+    {
+        JsonValueKind.Number => e.GetDouble(),
+        JsonValueKind.String => e.GetString() ?? "",
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Null => "",
+        _ => e.ToString()
+    };
 
     private static IReadOnlyList<T> DeserializeStagingByType<T>(
         IEnumerable<TransaccionStaging> staging, string tipoTransaccion)

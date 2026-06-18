@@ -714,3 +714,25 @@ fijas — configurable desde el panel, sin recompilar.
   apoyándose en el explorador para ver campos y elegir la columna de watermark.
 
 Falta el bloque 3/3: el creador de reglas genérico que opere sobre estas fuentes en el central.
+
+---
+
+## 25. Plataforma flexible (3/3, motor): reglas sobre cualquier fuente (genéricas)
+
+Mejora directa del creador de reglas (forma básica y avanzada) para que opere sobre **cualquier
+tabla**, incluidas las fuentes configurables, sin tocar el código base. Antes el motor estaba
+anclado a un catálogo cableado de 5 fuentes; ahora es genérico.
+
+- **`DetectionContext.FuentesGenericas`**: las tablas configurables (tipos de staging no conocidos)
+  se exponen como registros diccionario campo→valor.
+- **`AnomalyDetectionJob`**: deserializa esas filas a diccionarios y las pasa al contexto.
+- **`CustomRuleDetector`**: `ObtenerFuente` cae a las fuentes genéricas; condiciones simples y
+  **expresiones avanzadas** funcionan igual, **infiriendo el tipo (número/texto) del valor**
+  cuando no hay catálogo. Una expresión rebuscada como `DIFERENCIA > 500 && VENTAS_TANQ >= 100`
+  ya corre sobre una tabla arbitraria.
+- **`CatalogoReglasPersonalizadas`**: `GetValor` resuelve diccionarios genéricos; `ValidarDefinicion`
+  acepta fuentes configurables (valida sus campos en runtime, no contra el catálogo estático).
+- 2 pruebas nuevas (condición básica y expresión avanzada sobre fuente genérica); 96 en Detectors.
+
+Falta solo la UI: que el formulario de reglas liste las fuentes configurables y sus campos
+(auto-documentación) para elegirlos sin escribir a mano. El motor ya los soporta.

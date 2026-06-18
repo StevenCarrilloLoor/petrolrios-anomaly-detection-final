@@ -170,4 +170,47 @@ public class CustomRuleDetectorTests
 
         result.Should().HaveCount(1);
     }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<IDictionary<string, object>>> FuenteGenerica(
+        string nombre, params IDictionary<string, object>[] filas) =>
+        new Dictionary<string, IReadOnlyList<IDictionary<string, object>>> { [nombre] = filas.ToList() };
+
+    private static IDictionary<string, object> Fila(params (string, object)[] campos)
+    {
+        var d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (k, v) in campos) d[k] = v;
+        return d;
+    }
+
+    [Fact]
+    public async Task DetectAsync_FuenteGenerica_CondicionBasica_GeneraAlerta()
+    {
+        // Regla sobre una tabla configurable arbitraria ("Tanques"), sin catálogo cableado
+        var fuentes = FuenteGenerica("Tanques",
+            Fila(("DIFERENCIA", 600.0), ("COD_TANQ", "01")),
+            Fila(("DIFERENCIA", 10.0), ("COD_TANQ", "02")));
+        var regla = CrearRegla("Tanques", [new CondicionRegla("DIFERENCIA", ">", "500")]);
+
+        var context = TestHelpers.CreateContext(reglasPersonalizadas: [regla], fuentesGenericas: fuentes);
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().ContainSingle()
+            .Which.TipoDetector.Should().Be(TipoDetector.Personalizada);
+    }
+
+    [Fact]
+    public async Task DetectAsync_FuenteGenerica_ExpresionAvanzada_GeneraAlerta()
+    {
+        // Lógica rebuscada sobre una tabla configurable, sin tocar código
+        var fuentes = FuenteGenerica("Tanques",
+            Fila(("DIFERENCIA", 600.0), ("VENTAS_TANQ", 100.0)),
+            Fila(("DIFERENCIA", 5.0), ("VENTAS_TANQ", 100.0)));
+        var regla = CrearRegla("Tanques", []);
+        regla.ExpresionAvanzada = "DIFERENCIA > 500 && VENTAS_TANQ >= 100";
+
+        var context = TestHelpers.CreateContext(reglasPersonalizadas: [regla], fuentesGenericas: fuentes);
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().HaveCount(1);
+    }
 }

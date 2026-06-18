@@ -32,6 +32,14 @@ public sealed class DetectionContext
     public IReadOnlyList<CreditoDto> Creditos { get; init; } = [];
     public IReadOnlyList<TarjetaTurnoDto> TarjetasTurno { get; init; } = [];
 
+    /// <summary>
+    /// Datos de las fuentes de extracción configurables (tablas arbitrarias enviadas por el
+    /// agente), por nombre de fuente. Cada registro es un diccionario campo→valor. Permite que
+    /// las reglas personalizadas operen sobre cualquier tabla sin tocar el código.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<IDictionary<string, object>>> FuentesGenericas { get; init; }
+        = new Dictionary<string, IReadOnlyList<IDictionary<string, object>>>();
+
     // Reglas de detección configuradas
     public IReadOnlyList<ReglaDeteccion> Reglas { get; init; } = [];
 

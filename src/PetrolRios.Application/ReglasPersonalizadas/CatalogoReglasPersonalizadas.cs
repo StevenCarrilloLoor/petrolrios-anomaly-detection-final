@@ -84,7 +84,16 @@ public static class CatalogoReglasPersonalizadas
         };
 
     /// <summary>Obtiene el valor de un campo de un registro de la fuente indicada.</summary>
-    public static object? GetValor(string fuente, string campo, object registro) => (fuente, registro) switch
+    public static object? GetValor(string fuente, string campo, object registro)
+    {
+        // Fuente genérica (tabla configurable): el registro es un diccionario campo→valor.
+        if (registro is IDictionary<string, object> dict)
+            return dict.TryGetValue(campo, out var valor) ? valor : null;
+
+        return GetValorTipado(fuente, campo, registro);
+    }
+
+    private static object? GetValorTipado(string fuente, string campo, object registro) => (fuente, registro) switch
     {
         ("Factura", FacturaDto f) => campo switch
         {
@@ -173,8 +182,12 @@ public static class CatalogoReglasPersonalizadas
     {
         var errores = new List<string>();
 
-        if (!Fuentes.ContainsKey(fuente))
-            errores.Add($"Fuente de datos desconocida: '{fuente}'.");
+        // Las fuentes configurables (tablas arbitrarias del agente) no están en el catálogo
+        // estático: se validan sus campos en tiempo de ejecución, no aquí.
+        var conocida = Fuentes.ContainsKey(fuente);
+
+        if (string.IsNullOrWhiteSpace(fuente))
+            errores.Add("Debe indicar una fuente de datos.");
 
         if (riesgoBase is < 1 or > 100)
             errores.Add("El riesgo base debe estar entre 1 y 100.");
@@ -182,33 +195,36 @@ public static class CatalogoReglasPersonalizadas
         if (condiciones.Count == 0 && agregacion is null)
             errores.Add("La regla necesita al menos una condición o una agregación.");
 
-        foreach (var condicion in condiciones)
+        if (conocida)
         {
-            var campo = BuscarCampo(fuente, condicion.Campo);
-            if (campo is null)
+            foreach (var condicion in condiciones)
             {
-                errores.Add($"El campo '{condicion.Campo}' no existe en la fuente '{fuente}'.");
-                continue;
-            }
+                var campo = BuscarCampo(fuente, condicion.Campo);
+                if (campo is null)
+                {
+                    errores.Add($"El campo '{condicion.Campo}' no existe en la fuente '{fuente}'.");
+                    continue;
+                }
 
-            var operadoresValidos = campo.Tipo == TipoNumero ? OperadoresNumero : OperadoresTexto;
-            if (!operadoresValidos.Contains(condicion.Operador))
-            {
-                errores.Add($"Operador '{condicion.Operador}' no válido para el campo {campo.Tipo} '{condicion.Campo}'.");
-                continue;
-            }
+                var operadoresValidos = campo.Tipo == TipoNumero ? OperadoresNumero : OperadoresTexto;
+                if (!operadoresValidos.Contains(condicion.Operador))
+                {
+                    errores.Add($"Operador '{condicion.Operador}' no válido para el campo {campo.Tipo} '{condicion.Campo}'.");
+                    continue;
+                }
 
-            if (campo.Tipo == TipoNumero && !double.TryParse(
-                    condicion.Valor, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _))
-            {
-                errores.Add($"El valor '{condicion.Valor}' de la condición sobre '{condicion.Campo}' debe ser numérico.");
+                if (campo.Tipo == TipoNumero && !double.TryParse(
+                        condicion.Valor, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out _))
+                {
+                    errores.Add($"El valor '{condicion.Valor}' de la condición sobre '{condicion.Campo}' debe ser numérico.");
+                }
             }
         }
 
         if (agregacion is not null)
         {
-            if (BuscarCampo(fuente, agregacion.AgruparPor) is null)
+            if (conocida && BuscarCampo(fuente, agregacion.AgruparPor) is null)
                 errores.Add($"El campo de agrupación '{agregacion.AgruparPor}' no existe en la fuente '{fuente}'.");
 
             if (!Funciones.Contains(agregacion.Funcion))
@@ -218,7 +234,7 @@ public static class CatalogoReglasPersonalizadas
             {
                 if (string.IsNullOrWhiteSpace(agregacion.Campo))
                     errores.Add($"La función {agregacion.Funcion} requiere un campo numérico.");
-                else
+                else if (conocida)
                 {
                     var campoAgregado = BuscarCampo(fuente, agregacion.Campo);
                     if (campoAgregado is null || campoAgregado.Tipo != TipoNumero)

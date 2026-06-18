@@ -114,19 +114,34 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         "DetalleFactura" => context.Detalles.Cast<object>().ToList(),
         "Credito" => context.Creditos.Cast<object>().ToList(),
         "TarjetaTurno" => context.TarjetasTurno.Cast<object>().ToList(),
-        _ => []
+        // Fuente configurable (tabla arbitraria enviada por el agente): registros genéricos.
+        _ => context.FuentesGenericas.TryGetValue(fuente, out var filas)
+            ? filas.Cast<object>().ToList()
+            : []
     };
+
+    /// <summary>true si el valor es numérico (para inferir el tipo en fuentes genéricas sin catálogo).</summary>
+    private static bool EsNumerico(object? valor) =>
+        valor is double or float or decimal or int or long or short or byte;
 
     private static bool EvaluarCondicion(string fuente, object registro, CondicionRegla condicion)
     {
         var valor = CatalogoReglasPersonalizadas.GetValor(fuente, condicion.Campo, registro);
         var campo = CatalogoReglasPersonalizadas.BuscarCampo(fuente, condicion.Campo);
-        if (campo is null) return false;
 
-        if (campo.Tipo == CatalogoReglasPersonalizadas.TipoNumero)
+        // En fuentes conocidas, un campo inexistente invalida la condición. En fuentes
+        // genéricas (tablas configurables) no hay catálogo: se infiere el tipo del valor.
+        var fuenteConocida = CatalogoReglasPersonalizadas.Fuentes.ContainsKey(fuente);
+        if (campo is null && fuenteConocida) return false;
+
+        var esNumero = campo?.Tipo == CatalogoReglasPersonalizadas.TipoNumero
+                       || (campo is null && EsNumerico(valor));
+
+        if (esNumero)
         {
             var numero = Convert.ToDouble(valor ?? 0, CultureInfo.InvariantCulture);
-            var referencia = double.Parse(condicion.Valor, NumberStyles.Any, CultureInfo.InvariantCulture);
+            if (!double.TryParse(condicion.Valor, NumberStyles.Any, CultureInfo.InvariantCulture, out var referencia))
+                return false;
             return CompararNumeros(numero, condicion.Operador, referencia);
         }
 
@@ -281,10 +296,17 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         {
             var valor = CatalogoReglasPersonalizadas.GetValor(fuente, nombre, registro);
             var campo = CatalogoReglasPersonalizadas.BuscarCampo(fuente, nombre);
-            if (campo is null)
+
+            // En fuentes conocidas el campo debe existir en el catálogo; en fuentes genéricas
+            // (tablas configurables) se infiere el tipo del valor.
+            var fuenteConocida = CatalogoReglasPersonalizadas.Fuentes.ContainsKey(fuente);
+            if (campo is null && fuenteConocida)
                 throw new ExpresionException($"El campo '{nombre}' no existe en la fuente '{fuente}'.");
 
-            return campo.Tipo == CatalogoReglasPersonalizadas.TipoNumero
+            var esNumero = campo?.Tipo == CatalogoReglasPersonalizadas.TipoNumero
+                           || (campo is null && EsNumerico(valor));
+
+            return esNumero
                 ? Valor.DeNumero(Convert.ToDouble(valor ?? 0, CultureInfo.InvariantCulture))
                 : Valor.DeTexto(Convert.ToString(valor, CultureInfo.InvariantCulture)?.Trim() ?? "");
         }
