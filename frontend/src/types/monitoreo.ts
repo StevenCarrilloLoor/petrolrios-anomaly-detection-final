@@ -14,6 +14,9 @@ export interface ConexionEstacionResponse {
   transaccionesUltimas24Horas: number;
   transaccionesTotales: number;
   pendientesAnalisis: number;
+  horaApertura: string;
+  horaCierre: string;
+  correoContacto: string | null;
 }
 
 export interface EstadoSistemaResponse {

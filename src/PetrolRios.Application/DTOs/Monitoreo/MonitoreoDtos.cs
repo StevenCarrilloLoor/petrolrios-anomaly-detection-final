@@ -40,6 +40,11 @@ public sealed record ConexionEstacionResponse
 
     /// <summary>Transacciones en staging pendientes de análisis.</summary>
     public int PendientesAnalisis { get; init; }
+
+    // Configuración de la estación (para el apartado de gestión del Admin).
+    public string HoraApertura { get; init; } = string.Empty;
+    public string HoraCierre { get; init; } = string.Empty;
+    public string? CorreoContacto { get; init; }
 }
 
 /// <summary>Estado general del sistema para el panel de monitoreo.</summary>

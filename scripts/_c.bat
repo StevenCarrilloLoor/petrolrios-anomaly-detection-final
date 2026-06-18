@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0.."
 if exist ".git\index.lock" del /F /Q ".git\index.lock"
 git add -A
-git commit -m "Central: usuarios conectados en Monitoreo (SignalR)" -m "- AlertsHub registra usuario/rol por conexion (claims JWT + respaldo por query); expone UsuariosConectados" -m "- Endpoint GET /monitoreo/usuarios-conectados (Supervisor/Admin) + DTO" -m "- signalr.ts pasa usuarioId/nombre/rol; AuthContext lo envia; seccion 'Usuarios conectados' en ConexionesPage; CardHeader.title acepta ReactNode"
+git commit -m "Central: configuracion de estaciones por Admin (horario, correo, activa)" -m "- EstacionesController.Update aplica horario/correo/activa solo si el rol es Administrador; EstacionResponse y ConexionEstacionResponse exponen esos campos" -m "- Frontend: formulario de edicion en Conexiones con horario, correo de contacto y activar/desactivar (solo Admin)"
 echo.
 git log --oneline -1
 echo Listo. Cierre esta ventana.

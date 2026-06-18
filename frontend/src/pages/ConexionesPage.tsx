@@ -49,6 +49,10 @@ export function ConexionesPage() {
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [editNombre, setEditNombre] = useState("");
   const [editZona, setEditZona] = useState("");
+  const [editApertura, setEditApertura] = useState("");
+  const [editCierre, setEditCierre] = useState("");
+  const [editCorreo, setEditCorreo] = useState("");
+  const [editActiva, setEditActiva] = useState(true);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
   const {
@@ -87,7 +91,20 @@ export function ConexionesPage() {
 
   const actualizarMutation = useMutation({
     mutationFn: ({ id }: { id: number }) =>
-      estacionesService.update(id, { nombre: editNombre, zona: editZona || null }),
+      estacionesService.update(id, {
+        nombre: editNombre,
+        zona: editZona || null,
+        // Campos de configuración: solo se envían cuando el editor es Administrador
+        // (el backend además los ignora si el rol no es Admin).
+        ...(puedeEliminar
+          ? {
+              horaApertura: editApertura || null,
+              horaCierre: editCierre || null,
+              correoContacto: editCorreo.trim() || null,
+              activa: editActiva,
+            }
+          : {}),
+      }),
     onSuccess: () => {
       setEditandoId(null);
       invalidar();
@@ -110,6 +127,10 @@ export function ConexionesPage() {
     setEditandoId(conexion.estacionId);
     setEditNombre(conexion.nombre);
     setEditZona(conexion.zona ?? "");
+    setEditApertura(conexion.horaApertura ?? "");
+    setEditCierre(conexion.horaCierre ?? "");
+    setEditCorreo(conexion.correoContacto ?? "");
+    setEditActiva(conexion.activa);
   }
 
   return (
@@ -310,6 +331,41 @@ export function ConexionesPage() {
                             className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:outline-none"
                             placeholder="Zona"
                           />
+                          {puedeEliminar && (
+                            <>
+                              <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                Horario
+                                <input
+                                  type="time"
+                                  value={editApertura}
+                                  onChange={(e) => setEditApertura(e.target.value)}
+                                  className="rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:outline-none"
+                                />
+                                <span>a</span>
+                                <input
+                                  type="time"
+                                  value={editCierre}
+                                  onChange={(e) => setEditCierre(e.target.value)}
+                                  className="rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:outline-none"
+                                />
+                              </label>
+                              <input
+                                type="email"
+                                value={editCorreo}
+                                onChange={(e) => setEditCorreo(e.target.value)}
+                                className="w-48 rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:outline-none"
+                                placeholder="Correo de contacto"
+                              />
+                              <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <input
+                                  type="checkbox"
+                                  checked={editActiva}
+                                  onChange={(e) => setEditActiva(e.target.checked)}
+                                />
+                                Activa
+                              </label>
+                            </>
+                          )}
                           <button
                             onClick={() =>
                               actualizarMutation.mutate({ id: c.estacionId })

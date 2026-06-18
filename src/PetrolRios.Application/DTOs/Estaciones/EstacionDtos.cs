@@ -10,12 +10,21 @@ public sealed record EstacionResponse
     public bool Activa { get; init; }
     public DateTime? UltimoHeartbeat { get; init; }
     public string? VersionAgente { get; init; }
+
+    // Configuración (Admin): horario de operación y correo de contacto de la estación.
+    public string HoraApertura { get; init; } = string.Empty;
+    public string HoraCierre { get; init; } = string.Empty;
+    public string? CorreoContacto { get; init; }
 }
 
 public sealed record ActualizarEstacionRequest(
     string Nombre,
     string? Direccion,
-    string? Zona);
+    string? Zona,
+    string? HoraApertura = null,
+    string? HoraCierre = null,
+    string? CorreoContacto = null,
+    bool? Activa = null);
 
 public sealed record EliminarEstacionResponse(
     bool Eliminada,

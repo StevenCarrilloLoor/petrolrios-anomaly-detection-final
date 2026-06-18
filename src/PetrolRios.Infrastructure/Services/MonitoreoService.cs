@@ -37,7 +37,7 @@ public sealed class MonitoreoService : IMonitoreoService
 
         var estaciones = await _dbContext.Estaciones
             .OrderBy(e => e.Codigo)
-            .Select(e => new { e.Id, e.Codigo, e.Nombre, e.Zona, e.Activa, e.UltimoHeartbeat, e.VersionAgente })
+            .Select(e => new { e.Id, e.Codigo, e.Nombre, e.Zona, e.Activa, e.UltimoHeartbeat, e.VersionAgente, e.HoraApertura, e.HoraCierre, e.CorreoContacto })
             .ToListAsync(ct);
 
         // Estadísticas de ingesta por estación (la última ingesta REAL, no el seed)
@@ -77,6 +77,9 @@ public sealed class MonitoreoService : IMonitoreoService
                 Nombre = e.Nombre,
                 Zona = e.Zona ?? string.Empty,
                 Activa = e.Activa,
+                HoraApertura = e.HoraApertura.ToString("HH:mm"),
+                HoraCierre = e.HoraCierre.ToString("HH:mm"),
+                CorreoContacto = e.CorreoContacto,
                 Conectada = conectada,
                 Estado = conectada
                     ? "En línea"

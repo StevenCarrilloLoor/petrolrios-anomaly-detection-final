@@ -43,7 +43,10 @@ public sealed class EstacionesController : ControllerBase
                 Zona = e.Zona,
                 Activa = e.Activa,
                 UltimoHeartbeat = e.UltimoHeartbeat,
-                VersionAgente = e.VersionAgente
+                VersionAgente = e.VersionAgente,
+                HoraApertura = e.HoraApertura.ToString("HH:mm"),
+                HoraCierre = e.HoraCierre.ToString("HH:mm"),
+                CorreoContacto = e.CorreoContacto
             })
             .ToListAsync(ct);
         return Ok(estaciones);
@@ -64,11 +67,28 @@ public sealed class EstacionesController : ControllerBase
             return BadRequest(new { mensaje = "El nombre no puede estar vacío." });
 
         estacion.Actualizar(request.Nombre.Trim(), request.Direccion?.Trim(), request.Zona?.Trim());
+
+        // Configuración avanzada (horario, correo de contacto, activa): solo Administrador.
+        if (User.IsInRole("Administrador"))
+        {
+            if (!string.IsNullOrWhiteSpace(request.HoraApertura)
+                && TimeOnly.TryParse(request.HoraApertura, out var apertura))
+                estacion.HoraApertura = apertura;
+            if (!string.IsNullOrWhiteSpace(request.HoraCierre)
+                && TimeOnly.TryParse(request.HoraCierre, out var cierre))
+                estacion.HoraCierre = cierre;
+            if (request.CorreoContacto is not null)
+                estacion.CorreoContacto = string.IsNullOrWhiteSpace(request.CorreoContacto)
+                    ? null : request.CorreoContacto.Trim();
+            if (request.Activa.HasValue)
+                estacion.Activa = request.Activa.Value;
+        }
+
         await _dbContext.SaveChangesAsync(ct);
 
         await this.RegistrarAuditoriaAsync(_logService,
             "Actualización de estación", "Estacion", id,
-            new { estacion.Codigo, estacion.Nombre, estacion.Zona }, ct: ct);
+            new { estacion.Codigo, estacion.Nombre, estacion.Zona, estacion.Activa }, ct: ct);
 
         return Ok(new EstacionResponse
         {
@@ -79,7 +99,10 @@ public sealed class EstacionesController : ControllerBase
             Zona = estacion.Zona,
             Activa = estacion.Activa,
             UltimoHeartbeat = estacion.UltimoHeartbeat,
-            VersionAgente = estacion.VersionAgente
+            VersionAgente = estacion.VersionAgente,
+            HoraApertura = estacion.HoraApertura.ToString("HH:mm"),
+            HoraCierre = estacion.HoraCierre.ToString("HH:mm"),
+            CorreoContacto = estacion.CorreoContacto
         });
     }
 

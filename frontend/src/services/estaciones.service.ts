@@ -15,6 +15,11 @@ export interface ActualizarEstacionRequest {
   nombre: string;
   direccion?: string | null;
   zona?: string | null;
+  // Configuración avanzada (solo aplica si quien edita es Administrador).
+  horaApertura?: string | null;
+  horaCierre?: string | null;
+  correoContacto?: string | null;
+  activa?: boolean | null;
 }
 
 export interface EliminarEstacionResponse {
