@@ -553,3 +553,42 @@ limpio. Verificado en vivo: dashboard, conexiones (API v2.2.0, SignalR activo), 
 end-to-end con Firebird real, panel del agente con login RBAC, 2FA con QR, **verificación de
 correo real contra Gmail**, y recuperación/login por autenticador. Migraciones EF nuevas:
 `SeguridadUsuario` y `VerificacionEmail`.
+
+---
+
+## 18. Idempotencia de ingesta (anti reenvío duplicado) + login QR opcional
+
+**Problema observado en pruebas:** al insertar en Firebird un registro fechado al futuro,
+el agente lo re-extraía en cada ciclo (su fecha siempre quedaba por encima del watermark) y
+el central lo volvía a guardar y a alertar **una y otra vez**. Además, el central insertaba
+en `transacciones_staging` sin deduplicar.
+
+**Solución — idempotencia por huella de contenido:**
+
+- `TransaccionStaging` ahora calcula un `HashContenido` = SHA-256 de
+  `estación | tipo | datos`. Índice **único** `(EstacionId, HashContenido)` como red de
+  seguridad a nivel de base de datos.
+- `IngestaService.RecibirLoteAsync` descarta los reenvíos: consulta los hashes ya existentes
+  de la estación y los duplicados dentro del mismo lote, e inserta solo lo nuevo. La respuesta
+  reporta cuántas se insertaron vs. cuántas se descartaron por duplicado. Así un registro
+  fechado al futuro se guarda y alerta **una sola vez**, aunque el agente lo reenvíe en cada
+  ciclo. Si el registro de origen cambia, su hash cambia y se trata como nuevo (deseable:
+  permite detectar modificaciones/backdating).
+- Migración `IdempotenciaStaging` (rellena las filas previas con su Id para no chocar con el
+  índice único; las nuevas usan el SHA-256 real).
+
+**Nota sobre puntos ciegos del watermark (pendiente para fase de detectores):** el watermark
+por fecha tiene puntos ciegos conocidos (registros con fecha anterior a la marca, o reloj
+desfasado, pueden saltarse). Quedan como mejora: watermark por ID monotónico (las tablas de
+Contaplus tienen generadores como `GEN_FACT_ID`, `GEN_DCTO_ID`) + ventana de solapamiento, y
+un detector nuevo de "fecha fuera de rango plausible" (futuro/backdating) que convierte ese
+mismo escenario en una anomalía detectable.
+
+**Correo de verificación:** el enlace ya era configurable (`App:FrontendUrl`, cae a
+`localhost:5173`). Para que funcione fuera de la máquina del central, basta apuntar esa clave a
+la IP de red/dominio (variable de entorno `App__FrontendUrl`) y servir el frontend en la red.
+
+**Login por QR oculto por defecto:** como requiere que el teléfono alcance al central por la
+red (sin dominio público aparece "caído"), se oculta tras `VITE_QR_HABILITADO`. El login móvil
+queda cubierto por el autenticador (TOTP), que funciona offline. El QR se reactiva cuando haya
+una URL pública.

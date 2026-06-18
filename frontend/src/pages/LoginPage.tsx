@@ -7,6 +7,12 @@ import { authService } from "@/services/auth.service";
 import { Shield, Activity, Bell, Search, QrCode, ArrowLeft, KeyRound } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 
+// El login por QR requiere que el teléfono alcance al central por la red; sin un
+// dominio/IP pública accesible aparece "caído". Se oculta por defecto y se reactiva
+// con VITE_QR_HABILITADO=true cuando exista una URL pública. Mientras tanto, el login
+// móvil se cubre con el autenticador (TOTP), que funciona offline.
+const QR_HABILITADO = import.meta.env.VITE_QR_HABILITADO === "true";
+
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -411,13 +417,15 @@ export function LoginPage() {
                   <span className="text-xs text-muted-foreground">o</span>
                   <span className="h-px flex-1 bg-border" />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setModoQr(true)}
-                  className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
-                >
-                  <QrCode size={16} /> Entrar con código QR
-                </button>
+                {QR_HABILITADO && (
+                  <button
+                    type="button"
+                    onClick={() => setModoQr(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-muted"
+                  >
+                    <QrCode size={16} /> Entrar con código QR
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => { setModoTotp(true); setError(null); setCodigoTotp(""); }}

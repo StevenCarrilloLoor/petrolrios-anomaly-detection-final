@@ -82,8 +82,8 @@ public sealed class IngestaService : IIngestaService
             request.CodigoEstacion, request.NombreEstacion, request.ZonaEstacion, ct);
         estacion.UltimoHeartbeat = DateTime.UtcNow;
 
-        // Insertar cada transacción en staging
-        foreach (var item in request.Transacciones)
+        // Construir las entidades (calcula el hash de contenido de cada una)
+        var entrantes = request.Transacciones.Select(item =>
         {
             // Las fechas de Firebird llegan con Kind=Unspecified; Npgsql exige UTC
             // para columnas 'timestamp with time zone'.
@@ -91,13 +91,29 @@ public sealed class IngestaService : IIngestaService
                 ? DateTime.SpecifyKind(item.FechaOriginal, DateTimeKind.Utc)
                 : item.FechaOriginal.ToUniversalTime();
 
-            var staging = TransaccionStaging.Create(
-                estacion.Id,
-                item.TipoTransaccion,
-                item.DataJson,
-                fechaOriginal);
-            await _dbContext.TransaccionesStaging.AddAsync(staging, ct);
+            return TransaccionStaging.Create(
+                estacion.Id, item.TipoTransaccion, item.DataJson, fechaOriginal);
+        }).ToList();
+
+        // Idempotencia: descartar lo que ya existe en BD (reenvío del agente) y los
+        // duplicados dentro del mismo lote. Así un registro fechado al futuro —que el
+        // agente vuelve a extraer en cada ciclo— no genera la misma alerta una y otra vez.
+        var hashesEntrantes = entrantes.Select(e => e.HashContenido).ToList();
+        var yaExisten = await _dbContext.TransaccionesStaging
+            .Where(t => t.EstacionId == estacion.Id && hashesEntrantes.Contains(t.HashContenido))
+            .Select(t => t.HashContenido)
+            .ToListAsync(ct);
+
+        var vistos = new HashSet<string>(yaExisten);
+        var nuevos = new List<TransaccionStaging>();
+        foreach (var staging in entrantes)
+        {
+            if (vistos.Add(staging.HashContenido))
+                nuevos.Add(staging);
         }
+
+        if (nuevos.Count > 0)
+            await _dbContext.TransaccionesStaging.AddRangeAsync(nuevos, ct);
 
         await _dbContext.SaveChangesAsync(ct);
 
@@ -105,13 +121,14 @@ public sealed class IngestaService : IIngestaService
         await _unitOfWork.Estaciones.UpsertWatermarkAsync(estacion.Id, DateTime.UtcNow, ct);
         await _unitOfWork.SaveChangesAsync(ct);
 
+        var duplicadas = entrantes.Count - nuevos.Count;
         _logger.LogInformation(
-            "Ingesta: {Count} transacciones recibidas de estación {Codigo}",
-            request.Transacciones.Count, request.CodigoEstacion);
+            "Ingesta: {Recibidas} recibidas de estación {Codigo} — {Nuevas} nuevas, {Duplicadas} duplicadas descartadas",
+            request.Transacciones.Count, request.CodigoEstacion, nuevos.Count, duplicadas);
 
         return new IngestaResponse
         {
-            TransaccionesRecibidas = request.Transacciones.Count,
+            TransaccionesRecibidas = nuevos.Count,
             FechaRecepcion = DateTime.UtcNow
         };
     }

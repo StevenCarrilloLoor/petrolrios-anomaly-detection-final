@@ -538,6 +538,11 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("FechaOriginal")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("HashContenido")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<bool>("Procesada")
                         .HasColumnType("boolean");
 
@@ -554,6 +559,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.HasIndex("EstacionId");
 
                     b.HasIndex("Procesada");
+
+                    b.HasIndex("EstacionId", "HashContenido")
+                        .IsUnique();
 
                     b.HasIndex("EstacionId", "Procesada");
 
