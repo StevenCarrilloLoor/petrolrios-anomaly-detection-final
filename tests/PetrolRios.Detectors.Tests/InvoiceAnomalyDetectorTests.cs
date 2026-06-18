@@ -158,4 +158,52 @@ public class InvoiceAnomalyDetectorTests
 
         result.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task DetectAsync_WithFutureDatedInvoice_GeneratesAlert()
+    {
+        // Factura fechada 48h en el futuro (tolerancia por defecto 24h)
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(fecha: DateTime.UtcNow.AddHours(48))
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("fechado en el futuro"));
+    }
+
+    [Fact]
+    public async Task DetectAsync_WithNormalDate_NoFutureDateAlert()
+    {
+        // Factura con fecha normal (reciente) no debe disparar la regla de fecha futura
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(fecha: DateTime.UtcNow.AddMinutes(-30))
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("fechado en el futuro")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DetectAsync_FutureDateRuleDisabled_NoAlert()
+    {
+        var reglas = TestHelpers.DefaultReglas()
+            .Append(TestHelpers.CreateReglaInactiva(
+                TipoDetector.InvoiceAnomaly, "FechaFuturaToleranciaHoras", 24.0))
+            .ToList();
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(fecha: DateTime.UtcNow.AddHours(48))
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas, reglas: reglas);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("fechado en el futuro")).Should().BeEmpty();
+    }
 }

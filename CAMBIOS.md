@@ -592,3 +592,23 @@ la IP de red/dominio (variable de entorno `App__FrontendUrl`) y servir el fronte
 red (sin dominio público aparece "caído"), se oculta tras `VITE_QR_HABILITADO`. El login móvil
 queda cubierto por el autenticador (TOTP), que funciona offline. El QR se reactiva cuando haya
 una URL pública.
+
+---
+
+## 19. Investigación profunda del esquema Firebird + detector de fecha fuera de rango
+
+Se documentó el análisis tabla por tabla de `CONTAC.FDB` (~200 tablas) y el diseño de la
+plataforma de detección configurable en `docs/investigacion-deteccion-anomalias.md`: tablas
+útiles no aprovechadas (TURN.EST_TURN para turnos sin cerrar, DESP.FAC_DESP para despachos no
+facturados, TANQ_REPO.DIFERENCIA para cuadre de tanque, CRED_CABE para créditos no autorizados,
+ANUL para kiting/cancelar-reingresar, PLACA_BLOQ/PLACA_CUPO para regulación), el hallazgo de la
+dualidad `FEC_*` (fecha negocio) vs `FUL_*` (inserción real) para detectar backdating, y el plan
+de 6 fases hacia extracción multi-tabla + registro dinámico con auto-documentación + reglas sin
+código. Validado con literatura de prevención de pérdidas en estaciones (fuentes en el doc).
+
+**Primer detector nuevo entregado — "fecha fuera de rango plausible" (backdating):** regla 6 del
+`InvoiceAnomalyDetector`. Marca facturas (DCTO) y créditos (CRED_CABE) fechados en el futuro más
+allá de una tolerancia configurable (`FechaFuturaToleranciaHoras`, por defecto 24 h) respecto al
+momento de procesamiento — convierte el experimento de la inserción fechada al futuro en una
+anomalía detectable. Sembrada en `SeedData` (editable desde la pantalla de Reglas) y cubierta
+con 3 pruebas unitarias nuevas (92 en total, todas en verde).
