@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 title PetrolRios - Reiniciar central accesible por RED (ZeroTier)
 cd /d "%~dp0..\.."
 
@@ -33,11 +34,36 @@ echo        En el agente de la estacion remota, pon:
 echo            URL del servidor = http://TU-IP-DE-ZEROTIER:5170
 echo.
 
-echo [4/4] Arrancando el servidor central en 0.0.0.0:5170 ...
-echo        (PostgreSQL debe estar corriendo; la BD se crea sola la 1a vez)
-rem  --no-launch-profile: ignora launchSettings.json (que forzaba localhost)
-rem  y respeta ASPNETCORE_URLS para escuchar en toda la red.
-set ASPNETCORE_ENVIRONMENT=Development
-set ASPNETCORE_URLS=http://0.0.0.0:5170
-dotnet run --project src\PetrolRios.Api --no-launch-profile
+echo [4/5] Asegurando PostgreSQL (Docker) en :5432 ...
+docker info >nul 2>&1
+if errorlevel 1 (
+  echo        Docker no responde. Iniciando Docker Desktop...
+  start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+  set /a intentos=0
+  :esperar_docker
+  timeout /t 5 /nobreak >nul
+  docker info >nul 2>&1
+  if errorlevel 1 (
+    set /a intentos+=1
+    if !intentos! lss 24 (
+      echo        Esperando a Docker... [!intentos!/24]
+      goto esperar_docker
+    )
+    echo        ERROR: Docker no arranco. Abrelo manualmente y reintenta.
+    pause
+    exit /b 1
+  )
+)
+docker start petrolrios-postgres >nul 2>&1
+if errorlevel 1 docker compose up -d >nul 2>&1
+docker start petrolrios-firebird >nul 2>&1
+echo        PostgreSQL listo.
+echo.
+
+echo [5/5] Arrancando el servidor central en 0.0.0.0:5170 ...
+echo        (la BD se crea/migra sola la 1a vez)
+rem  Perfil "red": escucha en 0.0.0.0:5170 (toda la red) conservando el entorno
+rem  Development y toda la configuracion (Hangfire, etc.). Evita el truco de
+rem  --no-launch-profile que rompia Hangfire al descartar el entorno.
+dotnet run --project src\PetrolRios.Api --launch-profile red
 pause
