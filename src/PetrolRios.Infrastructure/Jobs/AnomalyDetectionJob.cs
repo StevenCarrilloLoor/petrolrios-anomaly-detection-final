@@ -82,6 +82,7 @@ public sealed class AnomalyDetectionJob
                 var results = await Task.WhenAll(detectionTasks);
 
                 // Persistir alertas y notificar
+                var operativasDeEstacion = new List<Alerta>();
                 foreach (var anomalies in results)
                 {
                     foreach (var anomaly in anomalies)
@@ -100,6 +101,8 @@ public sealed class AnomalyDetectionJob
 
                         await _dbContext.Alertas.AddAsync(alerta, ct);
                         totalAlertas++;
+                        if (alerta.Ambito == AmbitoAlerta.Operativa)
+                            operativasDeEstacion.Add(alerta);
 
                         // Notificar por SignalR
                         await NotifyAlertAsync(alerta, estacion.Id);
@@ -109,6 +112,9 @@ public sealed class AnomalyDetectionJob
                             await NotificarCriticaPorCorreoAsync(alerta, estacion, ct);
                     }
                 }
+
+                // Digest de problemas operativos al contacto de la estación (carril Operativa)
+                await NotificarOperativasEstacionAsync(estacion, operativasDeEstacion, ct);
 
                 estacionesProcesadas++;
             }
@@ -256,6 +262,50 @@ public sealed class AnomalyDetectionJob
             $"Este es un aviso automático; no responda a este correo.</p>";
 
         await _emailService.EnviarAsync(asunto, cuerpo, _destinatariosCorreo, ct);
+    }
+
+    /// <summary>
+    /// Envía un resumen de los problemas operativos de la estación a su contacto
+    /// (Estacion.CorreoContacto) y a los usuarios adscritos a esa estación. Un solo correo
+    /// por ciclo para no saturar; solo si hay problemas operativos y destinatarios.
+    /// </summary>
+    private async Task NotificarOperativasEstacionAsync(
+        Estacion estacion, IReadOnlyList<Alerta> operativas, CancellationToken ct)
+    {
+        if (!_emailService.Habilitado || operativas.Count == 0) return;
+
+        var destinatarios = new List<string>();
+        if (!string.IsNullOrWhiteSpace(estacion.CorreoContacto))
+            destinatarios.Add(estacion.CorreoContacto.Trim());
+
+        var usuariosEstacion = await _dbContext.Usuarios
+            .AsNoTracking()
+            .Where(u => u.Activo && u.EstacionId == estacion.Id && u.Email != "")
+            .Select(u => u.Email)
+            .ToListAsync(ct);
+        destinatarios.AddRange(usuariosEstacion);
+
+        destinatarios = destinatarios
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (destinatarios.Count == 0) return;
+
+        var filas = string.Join("", operativas.Select(a =>
+            $"<li style='margin-bottom:6px'>{a.Descripcion}" +
+            (string.IsNullOrWhiteSpace(a.EmpleadoCodigo) ? "" : $" <span style='color:#64748b'>(empleado {a.EmpleadoCodigo})</span>") +
+            "</li>"));
+
+        var asunto = $"[PetrolRíos] {operativas.Count} problema(s) operativo(s) en {estacion.Nombre}";
+        var cuerpo =
+            $"<h2 style='color:#b45309'>Problemas operativos detectados</h2>" +
+            $"<p><b>Estación:</b> {estacion.Nombre} ({estacion.Codigo})</p>" +
+            $"<p>Se detectaron los siguientes problemas operativos que conviene revisar y corregir:</p>" +
+            $"<ul>{filas}</ul>" +
+            $"<hr><p style='color:#64748b;font-size:12px'>Aviso automático del sistema de detección de PetrolRíos. " +
+            $"Revise el detalle en la pestaña \"Problemas de estación\". No responda a este correo.</p>";
+
+        await _emailService.EnviarAsync(asunto, cuerpo, destinatarios, ct);
     }
 
     private async Task NotifyAlertAsync(Alerta alerta, int estacionId)

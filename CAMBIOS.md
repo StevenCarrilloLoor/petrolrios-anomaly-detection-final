@@ -651,3 +651,24 @@ agrupados por estación.
 
 Pendiente del subsistema: asociación usuario↔estación y correo de contacto por estación (para
 que el administrador de la estación reciba y vea solo lo suyo).
+
+---
+
+## 22. Asociación usuario↔estación + correo de contacto + aviso de problemas operativos
+
+Cierre del subsistema de ámbito: ahora el administrador de una estación recibe los problemas
+operativos de SU estación.
+
+- **`Usuario.EstacionId`** (nullable): adscribe un usuario a una estación. Expuesto en crear/editar
+  usuario (`CrearUsuarioRequest`/`ActualizarUsuarioRequest`) y en `UsuarioResponse`. Índice en BD.
+- **`Estacion.CorreoContacto`** (nullable): correo del contacto/administrador de la estación.
+- **Aviso por correo (digest):** al final de cada ciclo de detección, si una estación tuvo
+  problemas operativos (carril Operativa), se envía **un solo correo** con el resumen a su
+  `CorreoContacto` y a los usuarios adscritos a esa estación (`EstacionId`). No satura: un correo
+  por ciclo, solo si hay problemas y destinatarios.
+- Migración `UsuarioEstacionYContacto` (columnas nullable, sin backfill). Build verde, 94 pruebas
+  en Detectors.
+
+Con esto el subsistema de ámbito queda funcional de punta a punta (clasificación → pestaña →
+notificación in-app/SignalR + correo al admin de estación). Falta solo el detalle de UI para
+elegir estación/correo desde el formulario (hoy se setea por API).

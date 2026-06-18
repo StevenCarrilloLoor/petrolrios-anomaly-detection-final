@@ -51,6 +51,7 @@ public sealed class UsuarioService : IUsuarioService
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         var usuario = Usuario.Create(request.Email, request.NombreCompleto, passwordHash, request.RolId);
+        usuario.AsignarEstacion(request.EstacionId);
         var token = usuario.GenerarTokenVerificacion();
 
         await _dbContext.Usuarios.AddAsync(usuario, ct);
@@ -121,6 +122,9 @@ public sealed class UsuarioService : IUsuarioService
         // Actualizar nombre y rol si vienen en la solicitud.
         usuario.ActualizarPerfil(request.NombreCompleto, request.RolId);
 
+        if (request.EstacionId.HasValue)
+            usuario.AsignarEstacion(request.EstacionId);
+
         await _dbContext.SaveChangesAsync(ct);
         // Recargar el rol por si cambió
         await _dbContext.Entry(usuario).Reference(u => u.Rol).LoadAsync(ct);
@@ -143,6 +147,7 @@ public sealed class UsuarioService : IUsuarioService
         NombreCompleto = u.NombreCompleto,
         Rol = u.Rol.Nombre,
         RolId = u.RolId,
+        EstacionId = u.EstacionId,
         Activo = u.Activo,
         EmailVerificado = u.EmailVerificado,
         CreatedAt = u.CreatedAt

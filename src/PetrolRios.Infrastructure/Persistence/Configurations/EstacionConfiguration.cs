@@ -14,6 +14,7 @@ public class EstacionConfiguration : IEntityTypeConfiguration<Estacion>
         builder.Property(e => e.Codigo).HasMaxLength(20).IsRequired();
         builder.Property(e => e.Direccion).HasMaxLength(300).IsRequired();
         builder.Property(e => e.Zona).HasMaxLength(50);
+        builder.Property(e => e.CorreoContacto).HasMaxLength(200);
         builder.HasIndex(e => e.Codigo).IsUnique();
     }
 }

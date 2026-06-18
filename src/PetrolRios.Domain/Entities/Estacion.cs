@@ -10,6 +10,12 @@ public class Estacion : BaseEntity
     public TimeOnly HoraApertura { get; set; } = new(6, 0);
     public TimeOnly HoraCierre { get; set; } = new(22, 0);
 
+    /// <summary>
+    /// Correo del administrador/contacto de la estación. Si está definido, recibe el aviso de
+    /// los problemas operativos (carril Operativa) de su estación. Null = sin aviso por correo.
+    /// </summary>
+    public string? CorreoContacto { get; set; }
+
     /// <summary>Último heartbeat recibido del Station Agent (aunque no haya datos nuevos).</summary>
     public DateTime? UltimoHeartbeat { get; set; }
 

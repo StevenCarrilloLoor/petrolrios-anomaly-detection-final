@@ -14,6 +14,7 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
         builder.Property(u => u.NombreCompleto).HasMaxLength(200).IsRequired();
         builder.Property(u => u.PasswordHash).HasMaxLength(200).IsRequired();
         builder.HasIndex(u => u.Email).IsUnique();
+        builder.HasIndex(u => u.EstacionId);
 
         builder.HasOne(u => u.Rol)
             .WithMany(r => r.Usuarios)

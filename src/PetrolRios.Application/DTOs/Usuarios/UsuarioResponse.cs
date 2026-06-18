@@ -7,6 +7,8 @@ public sealed record UsuarioResponse
     public string NombreCompleto { get; init; } = string.Empty;
     public string Rol { get; init; } = string.Empty;
     public int RolId { get; init; }
+    /// <summary>Estación a la que está adscrito el usuario (admin de estación). Null = central.</summary>
+    public int? EstacionId { get; init; }
     public bool Activo { get; init; }
     public bool EmailVerificado { get; init; }
     public DateTime CreatedAt { get; init; }
@@ -16,9 +18,11 @@ public sealed record CrearUsuarioRequest(
     string Email,
     string NombreCompleto,
     string Password,
-    int RolId);
+    int RolId,
+    int? EstacionId = null);
 
 public sealed record ActualizarUsuarioRequest(
     string? NombreCompleto,
     int? RolId,
-    bool? Activo);
+    bool? Activo,
+    int? EstacionId = null);

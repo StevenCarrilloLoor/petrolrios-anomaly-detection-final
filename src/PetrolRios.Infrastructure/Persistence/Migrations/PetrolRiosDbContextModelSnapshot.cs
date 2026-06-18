@@ -236,6 +236,10 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("CorreoContacto")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -603,6 +607,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailVerificado")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("EstacionId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
 
@@ -638,6 +645,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("EstacionId");
 
                     b.HasIndex("RolId");
 

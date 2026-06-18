@@ -10,6 +10,16 @@ public class Usuario : BaseEntity
     public int RolId { get; private set; }
     public Rol Rol { get; private set; } = null!;
 
+    /// <summary>
+    /// Estación a la que está adscrito el usuario (administrador de estación). Si está definida,
+    /// el usuario solo recibe/ve los problemas operativos de esa estación. Null = usuario del
+    /// central sin estación fija (ve todo según su rol).
+    /// </summary>
+    public int? EstacionId { get; private set; }
+
+    /// <summary>Adscribe (o desadscribe, con null) el usuario a una estación.</summary>
+    public void AsignarEstacion(int? estacionId) => EstacionId = estacionId;
+
     // ─── Seguridad ───
     /// <summary>Obliga a cambiar la contraseña en el próximo inicio de sesión (p. ej. credenciales por defecto).</summary>
     public bool DebeCambiarPassword { get; set; }
