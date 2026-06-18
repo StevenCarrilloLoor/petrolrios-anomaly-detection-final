@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0.."
 if exist ".git\index.lock" del /F /Q ".git\index.lock"
 git add -A
-git commit -m "Pruebas para lo nuevo: idempotencia, ambito, motor generico y backdating de creditos" -m "- TransaccionStagingTests: hash determinista, longitud, sensibilidad por componente, Create asigna hash" -m "- AlertaAmbitoTests: default Auditoria, conserva Operativa" -m "- CustomRuleDetectorTests: agregacion, condicion de texto y expresion-no-cumple sobre fuente generica" -m "- InvoiceAnomalyDetectorTests: credito fechado al futuro" -m "Totales: Domain 16, Detectors 100, Api 29 (verde)"
+git commit -m "Detectores del inge: turno sin cerrar (operativa) y credito sin garante" -m "- CierreTurnoDto.EstadoTurno + extraccion trae turnos abiertos; CashFraudDetector regla TurnoSinCerrarHorasUmbral (18h, carril Operativa)" -m "- PaymentFraudDetector regla CreditoSinGaranteHabilitado (COD_GARA vacio = autorizacion indebida)" -m "- Sembradas en SeedData; 4 pruebas nuevas. Domain 16, Detectors 104, Api 29 verdes; agente compila"
 echo.
 git log --oneline -1
 echo Listo. Cierre esta ventana.

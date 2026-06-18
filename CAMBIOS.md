@@ -775,3 +775,21 @@ Pruebas unitarias para las funcionalidades agregadas en esta ronda:
   futuro también dispara la alerta.
 
 Totales: Domain 16, Detectors 100, Api 29 — todo en verde.
+
+---
+
+## 28. Detectores nuevos del ingeniero: turno sin cerrar y crédito sin garante
+
+Dos patrones que mencionó el ingeniero, integrados a los detectores existentes y sembrados como
+reglas editables.
+
+- **Turno sin cerrar** (CashFraudDetector, carril **Operativa**): se añadió `EST_TURN` al DTO y a
+  la extracción (`WHERE FFI_TURN > watermark OR EST_TURN = '0'`, trae también turnos abiertos).
+  La regla `TurnoSinCerrarHorasUmbral` (default 18 h) alerta cuando un turno sigue abierto desde
+  hace más horas que el umbral. Es el descuido operativo ("se olvidan de cerrar turno") y va al
+  carril de la estación, no al de auditoría.
+- **Crédito sin garante** (PaymentFraudDetector): la regla `CreditoSinGaranteHabilitado` alerta
+  cuando un crédito (CRED_CABE) se otorga con `COD_GARA` vacío — señal de autorización indebida
+  ("autorizan créditos a quien no debe").
+- 4 pruebas nuevas (turno sin cerrar dispara/no dispara según horas; crédito con/sin garante).
+  Totales: Domain 16, Detectors 104, Api 29 — todo verde. Agente compila (EXITCODE 0).

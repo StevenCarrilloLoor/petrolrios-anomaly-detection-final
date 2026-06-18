@@ -304,8 +304,10 @@ public sealed class FirebirdExtractor
             SIN_TURN  AS SaldoInicial,  ING_TURN  AS Ingresos,
             EGR_TURN  AS Egresos,       SFI_TURN  AS SaldoFinal,
             FAL_TURN  AS Faltante,      SOB_TURN  AS Sobrante,
-            CRE_TURN  AS Creditos
-        FROM TURN WHERE FFI_TURN > @Watermark ORDER BY FFI_TURN
+            CRE_TURN  AS Creditos,      EST_TURN  AS EstadoTurno
+        FROM TURN
+        WHERE FFI_TURN > @Watermark OR EST_TURN = '0'
+        ORDER BY FIN_TURN
         """;
 
     private const string GetDepositosSql = """

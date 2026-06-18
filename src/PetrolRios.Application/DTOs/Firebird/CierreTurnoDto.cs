@@ -17,6 +17,9 @@ public sealed record CierreTurnoDto
     // FFI_TURN — fecha/hora de fin del turno
     public DateTime FechaFin { get; init; }
 
+    // EST_TURN — estado del turno ('0' abierto, '1' cerrado)
+    public string EstadoTurno { get; init; } = string.Empty;
+
     // SIN_TURN — saldo inicial
     public double SaldoInicial { get; init; }
 

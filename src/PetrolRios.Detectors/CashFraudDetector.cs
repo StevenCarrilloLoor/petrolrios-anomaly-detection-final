@@ -41,6 +41,7 @@ public sealed class CashFraudDetector : IAnomalyDetector
         var diasFaltantes = GetUmbral(reglas, "FaltantesRecurrentesDias", 30.0) ?? 30.0;
         var creditoSinClienteHabilitado = GetUmbral(reglas, "CreditoSinClienteHabilitado", 1.0) >= 1.0;
         var umbralEfectivoCorporativo = GetUmbral(reglas, "EfectivoCorporativoPorcentajeUmbral", 30.0);
+        var umbralTurnoSinCerrar = GetUmbral(reglas, "TurnoSinCerrarHorasUmbral", 18.0);
 
         // Regla 1: Diferencia efectivo vs sistema por turno
         if (umbralDiferencia is not null)
@@ -57,6 +58,10 @@ public sealed class CashFraudDetector : IAnomalyDetector
         // Regla 4: Proporción atípica de efectivo en clientes corporativos
         if (umbralEfectivoCorporativo is not null)
             DetectEfectivoCorporativoAtipico(context, umbralEfectivoCorporativo.Value, anomalies);
+
+        // Regla 5: Turno sin cerrar (problema operativo de estación)
+        if (umbralTurnoSinCerrar is not null)
+            DetectTurnoSinCerrar(context, umbralTurnoSinCerrar.Value, anomalies);
 
         _logger.LogDebug("CashFraudDetector: {Count} anomalías en estación {Est}",
             anomalies.Count, context.EstacionNombre);
@@ -266,6 +271,48 @@ public sealed class CashFraudDetector : IAnomalyDetector
                     ["TransaccionesEfectivo"] = enEfectivo.Count,
                     ["TransaccionesTotales"] = transacciones.Count,
                     ["MontoEfectivo"] = montoEfectivo
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Turno sin cerrar: un turno que sigue abierto (EST_TURN = '0') desde hace más horas que el
+    /// umbral. Es el descuido operativo que mencionó el ingeniero ("se olvidan de cerrar turno").
+    /// Va al carril Operativa (estación), no al de auditoría/fraude.
+    /// </summary>
+    private void DetectTurnoSinCerrar(
+        DetectionContext context, double umbralHoras, List<DetectedAnomaly> anomalies)
+    {
+        foreach (var turno in context.CierresTurno)
+        {
+            // Solo turnos abiertos con fecha de inicio válida
+            if (turno.EstadoTurno.Trim() != "0") continue;
+            if (turno.FechaInicio.Year < 2000) continue;
+
+            var horasAbierto = (context.ToWatermark - turno.FechaInicio).TotalHours;
+            if (horasAbierto < umbralHoras) continue;
+
+            var (score, nivel) = _scoring.Calculate(riesgoBase: 30);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.CashFraud,
+                Ambito = AmbitoAlerta.Operativa,
+                Descripcion = $"Turno {turno.NumeroTurno} sin cerrar: abierto hace {horasAbierto:F0} h " +
+                              $"(umbral: {umbralHoras:F0} h). Vendedor: {turno.CodigoVendedor.Trim()}. " +
+                              $"Revisar y cerrar el turno.",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                EmpleadoCodigo = turno.CodigoVendedor.Trim(),
+                TransaccionReferencia = $"TURN-ABIERTO-{turno.NumeroTurno}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["NumeroTurno"] = turno.NumeroTurno,
+                    ["FechaInicio"] = turno.FechaInicio,
+                    ["HorasAbierto"] = Math.Round(horasAbierto, 1),
+                    ["UmbralHoras"] = umbralHoras
                 }
             });
         }

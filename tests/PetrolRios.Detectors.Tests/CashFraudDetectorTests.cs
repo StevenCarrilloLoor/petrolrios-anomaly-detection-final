@@ -142,4 +142,37 @@ public class CashFraudDetectorTests
         alert.Metadata.Should().ContainKey("Umbral");
         alert.TransaccionReferencia.Should().StartWith("TURN-");
     }
+
+    [Fact]
+    public async Task DetectAsync_TurnoSinCerrar_GeneraAlertaOperativa()
+    {
+        // Turno abierto (EST_TURN='0') desde hace 30 h (umbral 18 h) → problema operativo
+        var turnos = new List<CierreTurnoDto>
+        {
+            TestHelpers.CreateCierreTurno(
+                turno: 5, estadoTurno: "0", fechaInicio: DateTime.UtcNow.AddHours(-30))
+        };
+        var context = TestHelpers.CreateContext(cierresTurno: turnos);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a =>
+            a.Descripcion.Contains("sin cerrar") && a.Ambito == AmbitoAlerta.Operativa);
+    }
+
+    [Fact]
+    public async Task DetectAsync_TurnoAbiertoReciente_NoGeneraAlerta()
+    {
+        // Turno abierto hace solo 2 h: aún es normal, no debe alertar
+        var turnos = new List<CierreTurnoDto>
+        {
+            TestHelpers.CreateCierreTurno(
+                turno: 6, estadoTurno: "0", fechaInicio: DateTime.UtcNow.AddHours(-2))
+        };
+        var context = TestHelpers.CreateContext(cierresTurno: turnos);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("sin cerrar")).Should().BeEmpty();
+    }
 }

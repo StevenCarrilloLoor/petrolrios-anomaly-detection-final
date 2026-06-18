@@ -60,6 +60,10 @@ public static class SeedData
             "Proporcion atipica de efectivo corporativo",
             "Genera alerta si un vendedor supera el porcentaje umbral de ventas en efectivo sobre clientes corporativos (patron del caso documentado de enero 2026)",
             "EfectivoCorporativoPorcentajeUmbral", 30.0);
+        AddIfMissing(TipoDetector.CashFraud,
+            "Turno sin cerrar",
+            "Genera una alerta operativa (para el administrador de la estacion) si un turno sigue abierto desde hace mas horas que el umbral. Umbral = horas.",
+            "TurnoSinCerrarHorasUmbral", 18.0);
         AddIfMissing(TipoDetector.InvoiceAnomaly,
             "Descuento excesivo fuera de politica",
             "Genera alerta si el descuento aplicado excede el porcentaje maximo permitido por la politica comercial",
@@ -76,6 +80,10 @@ public static class SeedData
             "Despachos rapidos sucesivos",
             "Genera alerta si el mismo cliente registra 3 o mas despachos consecutivos con menos de N minutos entre ellos (patron del caso documentado de enero 2026)",
             "DespachosRapidosMinutosUmbral", 10.0);
+        AddIfMissing(TipoDetector.PaymentFraud,
+            "Credito sin garante",
+            "Genera alerta si un credito (CRED_CABE) se otorga sin garante (COD_GARA vacio); senial de autorizacion indebida de credito.",
+            "CreditoSinGaranteHabilitado", 1.0);
         AddIfMissing(TipoDetector.ComplianceViolation,
             "Venta sin placa en monto mayor",
             "Genera alerta si una venta supera el monto umbral sin placa registrada (trazabilidad exigida por normativa de comercializacion)",

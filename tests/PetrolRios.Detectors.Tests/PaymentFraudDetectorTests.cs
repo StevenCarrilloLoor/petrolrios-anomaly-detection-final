@@ -202,4 +202,33 @@ public class PaymentFraudDetectorTests
         alert.Metadata.Should().ContainKey("MontoReversion");
         alert.TransaccionReferencia.Should().StartWith("TURN_TARJ-");
     }
+
+    [Fact]
+    public async Task DetectAsync_CreditoSinGarante_GeneraAlerta()
+    {
+        // Crédito otorgado sin garante (COD_GARA vacío) = autorización indebida
+        var creditos = new List<CreditoDto>
+        {
+            TestHelpers.CreateCredito(total: 1000, garante: "")
+        };
+        var context = TestHelpers.CreateContext(creditos: creditos);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("SIN garante"));
+    }
+
+    [Fact]
+    public async Task DetectAsync_CreditoConGarante_NoGeneraAlertaSinGarante()
+    {
+        var creditos = new List<CreditoDto>
+        {
+            TestHelpers.CreateCredito(total: 1000, garante: "G123")
+        };
+        var context = TestHelpers.CreateContext(creditos: creditos);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("SIN garante")).Should().BeEmpty();
+    }
 }

@@ -36,6 +36,7 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
 
         var umbralReversionMinutos = GetUmbral(reglas, "ReversionTarjetaMinutosUmbral", 30.0);
         var creditoSinAutHabilitado = GetUmbral(reglas, "CreditoSinAutorizacionHabilitado", 1.0) >= 1.0;
+        var creditoSinGaranteHabilitado = GetUmbral(reglas, "CreditoSinGaranteHabilitado", 1.0) >= 1.0;
         var umbralDuplicadaMinutos = GetUmbral(reglas, "DuplicadaMinutosUmbral", 5.0);
         var umbralDespachosRapidosMinutos = GetUmbral(reglas, "DespachosRapidosMinutosUmbral", 10.0);
 
@@ -46,6 +47,10 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
         // Regla 2: Crédito sin autorización
         if (creditoSinAutHabilitado)
             DetectCreditoSinAutorizacion(context, anomalies);
+
+        // Regla 2b: Crédito sin garante (autorización indebida — patrón del ingeniero)
+        if (creditoSinGaranteHabilitado)
+            DetectCreditoSinGarante(context, anomalies);
 
         // Regla 3: Transacciones duplicadas
         if (umbralDuplicadaMinutos is not null)
@@ -148,6 +153,43 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
                     ["CodigoSocio"] = credito.CodigoSocio.Trim(),
                     ["TotalCredito"] = credito.TotalCredito,
                     ["CodigoCredito"] = credito.CodigoCredito.Trim()
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Crédito otorgado sin garante (COD_GARA vacío). Un crédito sin respaldo de garante sugiere
+    /// una autorización indebida — el patrón que mencionó el ingeniero ("autorizan créditos a
+    /// personas que no están autorizadas"). Es incobrable y de alto riesgo.
+    /// </summary>
+    private void DetectCreditoSinGarante(
+        DetectionContext context, List<DetectedAnomaly> anomalies)
+    {
+        foreach (var credito in context.Creditos)
+        {
+            if (credito.TotalCredito <= 0) continue;
+            if (!string.IsNullOrWhiteSpace(credito.CodigoGarante)) continue;
+
+            var (score, nivel) = _scoring.Calculate(
+                riesgoBase: 55,
+                montoInvolucrado: credito.TotalCredito);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.PaymentFraud,
+                Descripcion = $"Crédito de ${credito.TotalCredito:F2} otorgado SIN garante al socio " +
+                              $"{credito.CodigoSocio.Trim()} (riesgo de autorización indebida). " +
+                              $"Crédito {credito.NumeroCabecera}",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                TransaccionReferencia = $"CRED-SINGAR-{credito.NumeroCabecera}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["NumeroCabecera"] = credito.NumeroCabecera,
+                    ["CodigoSocio"] = credito.CodigoSocio.Trim(),
+                    ["TotalCredito"] = credito.TotalCredito
                 }
             });
         }

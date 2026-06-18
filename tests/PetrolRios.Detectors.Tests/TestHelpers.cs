@@ -111,12 +111,14 @@ internal static class TestHelpers
     public static CierreTurnoDto CreateCierreTurno(
         int turno = 100, string vendedor = "V001", double faltante = 0,
         double sobrante = 0, double ingresos = 1000,
-        DateTime? fechaInicio = null, DateTime? fechaFin = null) => new()
+        DateTime? fechaInicio = null, DateTime? fechaFin = null,
+        string estadoTurno = "1") => new()
         {
             NumeroTurno = turno,
             CodigoVendedor = vendedor,
             FechaInicio = fechaInicio ?? DateTime.UtcNow.AddHours(-8),
             FechaFin = fechaFin ?? DateTime.UtcNow,
+            EstadoTurno = estadoTurno,
             SaldoInicial = 100,
             Ingresos = ingresos,
             Egresos = 0,
@@ -170,7 +172,7 @@ internal static class TestHelpers
 
     public static CreditoDto CreateCredito(
         double total = 500, double comprobante = 0, string socio = "S001",
-        DateTime? fecha = null) => new()
+        DateTime? fecha = null, string garante = "G001") => new()
         {
             NumeroCabecera = 1,
             FechaCabecera = fecha ?? DateTime.UtcNow.AddMinutes(-30),
@@ -178,7 +180,7 @@ internal static class TestHelpers
             CodigoSocio = socio,
             PlazoCabecera = 30,
             TasaCredito = 0.15,
-            CodigoGarante = "",
+            CodigoGarante = garante,
             TotalCredito = total,
             TotalInteres = total * 0.15,
             CodigoBanco = "01",
