@@ -5,9 +5,10 @@ import {
   type FuenteDatosResponse,
 } from "@/services/fuentesDatos.service";
 import { useAuth } from "@/contexts/AuthContext";
+import { esquemaService } from "@/services/esquema.service";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Database, Plus, Trash2, Pencil, X, Save, Info } from "lucide-react";
+import { Database, Plus, Trash2, Pencil, X, Save, Info, Search } from "lucide-react";
 
 const inputClass =
   "rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -252,6 +253,25 @@ function FormularioFila({
   guardando: boolean;
   error: string | null;
 }) {
+  // Buscador de tablas del esquema reportado por los agentes (para quien no conoce la base).
+  const tabla = form.tabla.trim();
+  const { data: sugerencias } = useQuery({
+    queryKey: ["esquema-tablas", tabla],
+    queryFn: () => esquemaService.buscarTablas(tabla),
+    enabled: tabla.length >= 1,
+    staleTime: 30_000,
+  });
+  const coincideExacta = (sugerencias ?? []).some(
+    (s) => s.tabla.toUpperCase() === tabla.toUpperCase(),
+  );
+  const { data: detalle } = useQuery({
+    queryKey: ["esquema-tabla", tabla],
+    queryFn: () => esquemaService.getTabla(tabla),
+    enabled: coincideExacta,
+    retry: false,
+    staleTime: 30_000,
+  });
+
   return (
     <div className="space-y-3 bg-muted/30 px-4 py-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -264,17 +284,46 @@ function FormularioFila({
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Tabla de Firebird
-          <input
-            className={`${inputClass} font-mono`}
-            placeholder="Ej: TANQ_REPO"
-            value={form.tabla}
-            onChange={(e) =>
-              setForm({ ...form, tabla: e.target.value.toUpperCase() })
-            }
-          />
-        </label>
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Tabla de Firebird (busca por nombre)
+          <div className="relative">
+            <Search
+              size={13}
+              className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              className={`${inputClass} w-full pl-7 font-mono`}
+              placeholder="Escribe para buscar: TANQ, TURN…"
+              value={form.tabla}
+              onChange={(e) =>
+                setForm({ ...form, tabla: e.target.value.toUpperCase() })
+              }
+            />
+            {tabla.length >= 1 && !coincideExacta && (sugerencias ?? []).length > 0 && (
+              <div className="absolute z-10 mt-1 max-h-44 w-full overflow-auto rounded-md border border-border bg-background shadow-lg">
+                {(sugerencias ?? []).slice(0, 20).map((s) => (
+                  <button
+                    key={s.tabla}
+                    type="button"
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        tabla: s.tabla,
+                        nombre: form.nombre || capitalizar(s.tabla),
+                      })
+                    }
+                    className="flex w-full items-center justify-between px-3 py-1.5 text-left font-mono text-xs hover:bg-muted"
+                  >
+                    <span>{s.tabla}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {s.columnas} col.
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Columna de fecha (marca de agua, opcional)
           <input
@@ -295,6 +344,30 @@ function FormularioFila({
           Activa (los agentes la extraen)
         </label>
       </div>
+
+      {/* Documentación automática de la tabla seleccionada (columnas reportadas por el agente) */}
+      {detalle && detalle.columnas.length > 0 && (
+        <div className="rounded-lg border border-border bg-background p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Columnas de {detalle.tabla} ({detalle.columnas.length})
+          </p>
+          <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+            {detalle.columnas.map((c) => (
+              <button
+                key={c.nombre}
+                type="button"
+                onClick={() => setForm({ ...form, columnaWatermark: c.nombre })}
+                className="flex items-center justify-between rounded px-1.5 py-0.5 text-left text-xs hover:bg-muted"
+                title="Usar como columna de fecha (marca de agua)"
+              >
+                <span className="font-mono text-foreground">{c.nombre}</span>
+                <span className="font-mono text-[10px] text-primary">{c.tipo}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <label className="flex flex-col gap-1 text-xs text-muted-foreground">
         Descripción
         <input
@@ -322,6 +395,12 @@ function FormularioFila({
       </div>
     </div>
   );
+}
+
+/** "TANQ_REPO" → "Tanq repo" (sugerencia de nombre lógico legible). */
+function capitalizar(tabla: string): string {
+  const t = tabla.toLowerCase().replace(/_/g, " ").trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 function mensajeError(e: unknown): string {

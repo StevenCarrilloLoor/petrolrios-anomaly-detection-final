@@ -4,8 +4,8 @@ title PetrolRios - Paso: build + migracion + tests + commit
 cd /d "%~dp0.."
 
 rem ====== EDITAR ESTAS 2 LINEAS POR CADA PASO ======
-set "MIGRACION=ReglaPersonalizadaAmbito"
-set "MENSAJE=Reglas personalizadas con ambito Operativa/Auditoria seleccionable"
+set "MIGRACION=EsquemaTabla"
+set "MENSAJE=El agente reporta su esquema al central + navegador de tablas con busqueda y auto-documentacion en Reglas"
 rem  (Si el paso NO necesita migracion, deja MIGRACION vacio: set "MIGRACION=")
 rem =================================================
 
@@ -46,6 +46,8 @@ echo.
 
 echo [6/6] Todo verde -> commit...
 if exist ".git\index.lock" del /F /Q ".git\index.lock"
+rem  Sacar del control de versiones los datos de runtime del agente (ya en .gitignore)
+git rm -r --cached --ignore-unmatch src/PetrolRios.StationAgent/pending >nul 2>&1
 git add -A
 git commit -m "%MENSAJE%"
 echo.

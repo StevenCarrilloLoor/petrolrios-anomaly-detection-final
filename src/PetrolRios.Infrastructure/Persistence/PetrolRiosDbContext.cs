@@ -13,6 +13,7 @@ public class PetrolRiosDbContext : DbContext
     public DbSet<EjecucionJob> EjecucionesJob => Set<EjecucionJob>();
     public DbSet<Estacion> Estaciones => Set<Estacion>();
     public DbSet<EstacionWatermark> EstacionWatermarks => Set<EstacionWatermark>();
+    public DbSet<EsquemaTabla> EsquemasTabla => Set<EsquemaTabla>();
     public DbSet<FuenteDatos> FuentesDatos => Set<FuenteDatos>();
     public DbSet<LogAuditoria> LogsAuditoria => Set<LogAuditoria>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();

@@ -193,6 +193,31 @@ public sealed class ServerClient
 
     private sealed record FuenteCentralDto(string Nombre, string Tabla, string? ColumnaWatermark);
 
+    /// <summary>
+    /// Reporta al central el esquema completo de la base Firebird (tablas + columnas), para que el
+    /// servidor lo documente y ofrezca un navegador de tablas. Devuelve true si el central confirmó.
+    /// </summary>
+    public async Task<bool> EnviarEsquemaAsync(IReadOnlyList<TablaEsquemaAgente> tablas, CancellationToken ct)
+    {
+        var settings = _config.Actual;
+        try
+        {
+            await EnsureAuthenticatedAsync(settings, ct);
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _token);
+
+            var payload = new { CodigoEstacion = settings.CodigoEstacion, Tablas = tablas };
+            var resp = await _httpClient.PostAsJsonAsync(
+                Url(settings.ServerUrl, "/api/v1/esquema"), payload, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No se pudo reportar el esquema al central");
+            return false;
+        }
+    }
+
     private async Task EnsureAuthenticatedAsync(AgentSettings settings, CancellationToken ct)
     {
         if (_token is not null && DateTime.UtcNow < _tokenExpiration.AddMinutes(-5))

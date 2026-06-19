@@ -112,13 +112,43 @@ public sealed class ReglasPersonalizadasController : ControllerBase
     }
 
     /// <summary>
-    /// Campos de una tabla a partir del esquema que reporta el agente. (Pendiente Increment 3:
-    /// cuando el agente empuje su esquema al central, aquí se leerá la tabla de esquemas. Por
-    /// ahora devuelve vacío: la fuente igual aparece en el builder y, en cuanto llegue la primera
-    /// fila al staging, sus campos se documentan automáticamente.)
+    /// Campos de una tabla a partir del esquema que reportó el agente (tabla esquemas_tabla).
+    /// Así una fuente registrada en el central ya ofrece sus campos en el builder, sin esperar a
+    /// que llegue la primera fila al staging.
     /// </summary>
-    private Task<List<CampoCatalogo>> CamposDesdeEsquemaAsync(string tabla, CancellationToken ct) =>
-        Task.FromResult(new List<CampoCatalogo>());
+    private async Task<List<CampoCatalogo>> CamposDesdeEsquemaAsync(string tabla, CancellationToken ct)
+    {
+        var t = tabla.Trim().ToUpperInvariant();
+        var fila = await _dbContext.EsquemasTabla.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Tabla == t, ct);
+        if (fila is null) return [];
+
+        try
+        {
+            var columnas = JsonSerializer.Deserialize<List<ColumnaEsquemaRaw>>(fila.ColumnasJson, JsonOpts) ?? [];
+            return columnas.Select(c => new CampoCatalogo(
+                c.Nombre,
+                c.Nombre,
+                EsTipoNumerico(c.Tipo)
+                    ? CatalogoReglasPersonalizadas.TipoNumero
+                    : CatalogoReglasPersonalizadas.TipoTexto)).ToList();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    /// <summary>true si el tipo de Firebird es numérico (para clasificar el campo en el builder).</summary>
+    private static bool EsTipoNumerico(string? tipo)
+    {
+        var t = (tipo ?? "").ToUpperInvariant();
+        return t.Contains("INT") || t.Contains("DOUBLE") || t.Contains("FLOAT")
+               || t.Contains("NUMERIC") || t.Contains("DECIMAL");
+    }
+
+    /// <summary>Forma de una columna en el JSON del esquema reportado.</summary>
+    private sealed record ColumnaEsquemaRaw(string Nombre, string Tipo, int Longitud, bool Nullable);
 
     /// <summary>Infiere los campos (nombre + tipo) de una fuente configurable desde una fila JSON.</summary>
     private static List<CampoCatalogo> InferirCampos(string? json)

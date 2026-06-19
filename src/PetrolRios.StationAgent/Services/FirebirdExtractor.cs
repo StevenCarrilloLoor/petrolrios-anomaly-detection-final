@@ -304,6 +304,40 @@ public sealed class FirebirdExtractor
         return new DescripcionTabla(nombre, true, columnas, totalFilas);
     }
 
+    /// <summary>
+    /// Obtiene el esquema COMPLETO de la base (todas las tablas de usuario con sus columnas) en una
+    /// sola consulta al catálogo, para reportarlo al central. Una fila por columna, agrupada por tabla.
+    /// </summary>
+    public async Task<IReadOnlyList<TablaEsquemaAgente>> ObtenerEsquemaCompletoAsync(CancellationToken ct)
+    {
+        using var connection = CreateConnection();
+        const string sql = """
+            SELECT TRIM(RF.RDB$RELATION_NAME) AS TABLA, TRIM(RF.RDB$FIELD_NAME) AS NOMBRE,
+                   F.RDB$FIELD_TYPE AS TIPO, F.RDB$FIELD_LENGTH AS LONGITUD,
+                   F.RDB$FIELD_SUB_TYPE AS SUBTIPO, F.RDB$FIELD_SCALE AS ESCALA, RF.RDB$NULL_FLAG AS NOTNULL
+            FROM RDB$RELATION_FIELDS RF
+            JOIN RDB$RELATIONS R ON R.RDB$RELATION_NAME = RF.RDB$RELATION_NAME
+            JOIN RDB$FIELDS F ON RF.RDB$FIELD_SOURCE = F.RDB$FIELD_NAME
+            WHERE R.RDB$VIEW_BLR IS NULL AND (R.RDB$SYSTEM_FLAG IS NULL OR R.RDB$SYSTEM_FLAG = 0)
+            ORDER BY RF.RDB$RELATION_NAME, RF.RDB$FIELD_POSITION
+            """;
+
+        var raw = await connection.QueryAsync<ColumnaEsquemaRaw>(
+            new CommandDefinition(sql, cancellationToken: ct));
+
+        return raw
+            .GroupBy(c => (c.TABLA ?? "").Trim())
+            .Where(g => g.Key.Length > 0)
+            .Select(g => new TablaEsquemaAgente(
+                g.Key,
+                g.Select(c => new ColumnaEsquemaAgente(
+                    (c.NOMBRE ?? "").Trim(),
+                    MapearTipoFirebird(c.TIPO, c.SUBTIPO, c.ESCALA, c.LONGITUD),
+                    c.LONGITUD ?? 0,
+                    c.NOTNULL is null)).ToList()))
+            .ToList();
+    }
+
     /// <summary>Traduce el código de tipo de Firebird (RDB$FIELD_TYPE) a un nombre legible.</summary>
     private static string MapearTipoFirebird(short? tipo, short? subtipo, short? escala, short? longitud)
     {
@@ -489,3 +523,21 @@ public sealed record ColumnaFirebird(string Nombre, string Tipo, int Longitud, b
 /// <summary>Documentación automática de una tabla: si existe, sus columnas y su conteo de filas.</summary>
 public sealed record DescripcionTabla(
     string Tabla, bool Existe, IReadOnlyList<ColumnaFirebird> Columnas, long TotalFilas);
+
+/// <summary>Fila cruda del catálogo al leer el esquema completo (incluye el nombre de tabla).</summary>
+internal sealed class ColumnaEsquemaRaw
+{
+    public string? TABLA { get; set; }
+    public string? NOMBRE { get; set; }
+    public short? TIPO { get; set; }
+    public short? LONGITUD { get; set; }
+    public short? SUBTIPO { get; set; }
+    public short? ESCALA { get; set; }
+    public short? NOTNULL { get; set; }
+}
+
+/// <summary>Una columna del esquema que el agente reporta al central.</summary>
+public sealed record ColumnaEsquemaAgente(string Nombre, string Tipo, int Longitud, bool Nullable);
+
+/// <summary>Una tabla con sus columnas, para reportar el esquema al central.</summary>
+public sealed record TablaEsquemaAgente(string Tabla, IReadOnlyList<ColumnaEsquemaAgente> Columnas);

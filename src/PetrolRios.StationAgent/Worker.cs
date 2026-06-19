@@ -15,15 +15,18 @@ public sealed class Worker : BackgroundService
     private readonly CycleRunner _cycleRunner;
     private readonly ServerClient _serverClient;
     private readonly UpdateService _updateService;
+    private readonly FirebirdExtractor _extractor;
     private readonly AgentState _state;
     private readonly AgentConfigStore _config;
     private readonly ILogger<Worker> _logger;
     private DateTime _ultimaRevisionUpdate = DateTime.MinValue;
+    private DateTime _ultimoReporteEsquema = DateTime.MinValue;
 
     public Worker(
         CycleRunner cycleRunner,
         ServerClient serverClient,
         UpdateService updateService,
+        FirebirdExtractor extractor,
         AgentState state,
         AgentConfigStore config,
         ILogger<Worker> logger)
@@ -31,6 +34,7 @@ public sealed class Worker : BackgroundService
         _cycleRunner = cycleRunner;
         _serverClient = serverClient;
         _updateService = updateService;
+        _extractor = extractor;
         _state = state;
         _config = config;
         _logger = logger;
@@ -65,6 +69,11 @@ public sealed class Worker : BackgroundService
                     if (_state.ModoAutomatico)
                         await _cycleRunner.RunCycleAsync(stoppingToken);
 
+                    // Reportar el esquema de Firebird al central poco después de arrancar y
+                    // luego cada ~6 horas (para el navegador de tablas y la auto-documentación).
+                    if (DateTime.UtcNow - _ultimoReporteEsquema > TimeSpan.FromHours(6))
+                        await ReportarEsquemaAsync(stoppingToken);
+
                     // Revisar el feed de actualización cada ~5 minutos (no en cada vuelta)
                     if (DateTime.UtcNow - _ultimaRevisionUpdate > TimeSpan.FromMinutes(5))
                     {
@@ -88,6 +97,29 @@ public sealed class Worker : BackgroundService
         }
 
         _logger.LogInformation("Agente de estación {Codigo} detenido", _config.Actual.CodigoEstacion);
+    }
+
+    /// <summary>
+    /// Lee el esquema completo de Firebird (tablas + columnas) y lo reporta al central. Tolerante a
+    /// fallos: si Firebird o el central no responden, se reintenta en la próxima vuelta.
+    /// </summary>
+    private async Task ReportarEsquemaAsync(CancellationToken ct)
+    {
+        try
+        {
+            var tablas = await _extractor.ObtenerEsquemaCompletoAsync(ct);
+            if (tablas.Count == 0) return;
+
+            if (await _serverClient.EnviarEsquemaAsync(tablas, ct))
+            {
+                _ultimoReporteEsquema = DateTime.UtcNow;
+                _state.RegistrarEvento("INFO", $"Esquema reportado al central ({tablas.Count} tablas)");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No se pudo reportar el esquema (se reintenta luego)");
+        }
     }
 
     /// <summary>
