@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.Esquema;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Infrastructure.Persistence;
@@ -36,7 +37,7 @@ public sealed class EsquemaController : ControllerBase
     /// (segundos) el agente recibirá la señal y enviará sus tablas y columnas al central.
     /// </summary>
     [HttpPost("solicitar/{codigoEstacion}")]
-    [Authorize(Roles = "Supervisor,Administrador")]
+    [Authorize(Roles = "Supervisor,Administrador", Policy = "Central")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     public IActionResult Solicitar(string codigoEstacion)
     {
@@ -49,6 +50,9 @@ public sealed class EsquemaController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Reportar([FromBody] ReportarEsquemaRequest request, CancellationToken ct)
     {
+        if (!await User.PuedeUsarEstacionAsync(_dbContext, request.CodigoEstacion, ct))
+            return Forbid();
+
         if (request.Tablas is null || request.Tablas.Count == 0)
             return Ok(new { recibidas = 0 });
 
@@ -85,7 +89,7 @@ public sealed class EsquemaController : ControllerBase
 
     /// <summary>Buscar tablas por nombre (navegador del central). Devuelve nombre + nº de columnas.</summary>
     [HttpGet("tablas")]
-    [Authorize(Roles = "Supervisor,Administrador")]
+    [Authorize(Roles = "Supervisor,Administrador", Policy = "Central")]
     [ProducesResponseType(typeof(IReadOnlyList<TablaResumen>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Buscar([FromQuery] string? buscar, CancellationToken ct)
     {
@@ -103,7 +107,7 @@ public sealed class EsquemaController : ControllerBase
 
     /// <summary>Columnas de una tabla (documentación automática para el central).</summary>
     [HttpGet("tabla/{nombre}")]
-    [Authorize(Roles = "Supervisor,Administrador")]
+    [Authorize(Roles = "Supervisor,Administrador", Policy = "Central")]
     [ProducesResponseType(typeof(TablaDetalle), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Detalle(string nombre, CancellationToken ct)

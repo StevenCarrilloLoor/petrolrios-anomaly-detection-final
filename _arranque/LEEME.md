@@ -14,6 +14,7 @@ Scripts pensados para levantar el sistema completo en tu máquina (Windows) y mo
 | 4 | `04_seed_staging_demo.bat` *(opcional, recomendado para demo sin Firebird)* | Inyecta facturas, cierres y anulaciones sintéticas en `transacciones_staging` que disparan los 4 detectores. | una, se cierra al pulsar Enter |
 | 5 | `05_firebird_demo.bat` *(opcional)* | Restaura `CONTACONSTANZA-20250609.FBK` (en `Programas\ContaGober1\DatosC`) a `_arranque\firebird_data\CONTAC.FDB` usando `gbak.exe` de la instalación local de Firebird 2.5. **Requiere el servicio Firebird corriendo en `localhost:3050`** (services.msc → "Firebird Server – DefaultInstance"). | una |
 | 6 | `06_levantar_station_agent.bat` *(opcional, depende de #5)* | Worker .NET que conecta a `localhost:3050/CONTAC.FDB` en modo solo lectura, extrae transacciones nuevas (DCTO, DESP, TURN, TURN_DEPO, ANUL, CRED_CABE, TURN_TARJ) y postea lotes a `/api/v1/ingesta` con JWT del usuario `agent-est-001`. | una, persistente |
+| 7 | `07_levantar_station_monitor.bat` | Cliente local de solo lectura que consulta al central únicamente los problemas operativos activos de EST-001. Panel en `http://localhost:5190`. | una, persistente |
 
 **Atajo:** `ARRANQUE_DEMO.bat` lanza 1, 2 y 3 secuencialmente en ventanas separadas.
 
@@ -26,6 +27,7 @@ Scripts pensados para levantar el sistema completo en tu máquina (Windows) y mo
 | Swagger UI | http://localhost:5170/swagger |
 | Hangfire Dashboard | http://localhost:5170/hangfire |
 | SignalR Hub | ws://localhost:5170/hubs/alerts |
+| Monitor de estación | http://localhost:5190 |
 
 ## Credenciales sembradas
 

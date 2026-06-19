@@ -1,0 +1,10 @@
+{
+  "codigoEstacion": "EST-001",
+  "serverUrl": "http://servidor-central:5170",
+  "email": "agent-est-001@petrolrios.com",
+  "password": "CAMBIAR_EN_CADA_ESTACION",
+  "intervaloSegundos": 15,
+  "diasConsulta": 30,
+  "panelPuerto": 5190,
+  "configurado": true
+}

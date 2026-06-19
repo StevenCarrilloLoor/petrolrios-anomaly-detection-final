@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.Ingesta;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Infrastructure.Persistence;
 
 namespace PetrolRios.Api.Controllers.V1;
 
@@ -12,11 +14,16 @@ public sealed class IngestaController : ControllerBase
 {
     private readonly IIngestaService _ingestaService;
     private readonly ISolicitudesEsquema _solicitudesEsquema;
+    private readonly PetrolRiosDbContext _dbContext;
 
-    public IngestaController(IIngestaService ingestaService, ISolicitudesEsquema solicitudesEsquema)
+    public IngestaController(
+        IIngestaService ingestaService,
+        ISolicitudesEsquema solicitudesEsquema,
+        PetrolRiosDbContext dbContext)
     {
         _ingestaService = ingestaService;
         _solicitudesEsquema = solicitudesEsquema;
+        _dbContext = dbContext;
     }
 
     /// <summary>
@@ -30,6 +37,9 @@ public sealed class IngestaController : ControllerBase
         [FromBody] IngestaRequest request,
         CancellationToken ct)
     {
+        if (!await User.PuedeUsarEstacionAsync(_dbContext, request.CodigoEstacion, ct))
+            return Forbid();
+
         var result = await _ingestaService.RecibirLoteAsync(request, ct);
         return Ok(result);
     }
@@ -45,6 +55,9 @@ public sealed class IngestaController : ControllerBase
         [FromBody] HeartbeatRequest request,
         CancellationToken ct)
     {
+        if (!await User.PuedeUsarEstacionAsync(_dbContext, request.CodigoEstacion, ct))
+            return Forbid();
+
         await _ingestaService.HeartbeatAsync(request, ct);
         var reportarEsquema = _solicitudesEsquema.TomarPendiente(request.CodigoEstacion);
         return Ok(new { reportarEsquema });

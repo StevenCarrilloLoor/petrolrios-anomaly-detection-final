@@ -11,7 +11,7 @@ namespace PetrolRios.Api.Controllers.V1;
 /// </summary>
 [ApiController]
 [Route("api/v1/reportes")]
-[Authorize(Roles = "Supervisor,Administrador")]
+[Authorize(Roles = "Supervisor,Administrador", Policy = "Central")]
 public sealed class ReportesController : ControllerBase
 {
     private readonly IReporteService _reporteService;

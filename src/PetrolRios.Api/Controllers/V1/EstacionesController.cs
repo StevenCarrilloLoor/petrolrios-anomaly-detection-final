@@ -15,7 +15,7 @@ namespace PetrolRios.Api.Controllers.V1;
 /// </summary>
 [ApiController]
 [Route("api/v1/estaciones")]
-[Authorize]
+[Authorize(Policy = "Central")]
 public sealed class EstacionesController : ControllerBase
 {
     private readonly PetrolRiosDbContext _dbContext;

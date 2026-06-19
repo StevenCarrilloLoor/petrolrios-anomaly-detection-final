@@ -14,7 +14,7 @@ namespace PetrolRios.Api.Controllers.V1;
 /// </summary>
 [ApiController]
 [Route("api/v1/reglas")]
-[Authorize(Roles = "Supervisor,Administrador")]
+[Authorize(Roles = "Supervisor,Administrador", Policy = "Central")]
 public sealed class ReglasController : ControllerBase
 {
     private readonly IReglaService _reglaService;

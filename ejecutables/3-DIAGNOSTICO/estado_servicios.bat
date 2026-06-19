@@ -6,7 +6,8 @@ echo.
 echo === PROCESOS DE LA APLICACION ===
 tasklist /FI "IMAGENAME eq PetrolRios.Api.exe" 2>nul | find /i "PetrolRios" && echo  (API corriendo) || echo  API: detenida
 tasklist /FI "IMAGENAME eq PetrolRios.StationAgent.exe" 2>nul | find /i "PetrolRios" && echo  (Agente corriendo) || echo  Agente: detenido
+tasklist /FI "IMAGENAME eq PetrolRios.StationMonitor.exe" 2>nul | find /i "PetrolRios" && echo  (Monitor corriendo) || echo  Monitor: detenido
 echo.
 echo === PUERTOS ===
-netstat -ano | findstr ":5170 :5173 :5180 :5432 :3051" | findstr LISTENING
+netstat -ano | findstr ":5170 :5173 :5180 :5190 :5432 :3051" | findstr LISTENING
 pause

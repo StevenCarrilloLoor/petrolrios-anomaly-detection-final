@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.Security;
 using PetrolRios.Domain.Entities;
 
 namespace PetrolRios.Infrastructure.Services;
@@ -26,13 +27,20 @@ public sealed class JwtService : IJwtService
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expirationMinutes = _config.GetValue("Jwt:ExpirationMinutes", 60);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
             new Claim(ClaimTypes.Email, usuario.Email),
             new Claim(ClaimTypes.Name, usuario.NombreCompleto),
             new Claim(ClaimTypes.Role, rolNombre)
         };
+
+        if (usuario.EstacionId.HasValue)
+        {
+            claims.Add(new Claim(
+                PetrolRiosClaimTypes.EstacionId,
+                usuario.EstacionId.Value.ToString()));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],

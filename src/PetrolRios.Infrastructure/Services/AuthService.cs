@@ -302,6 +302,13 @@ public sealed class AuthService : IAuthService
     private async Task<LoginResponse> GenerateAuthResponseAsync(Usuario usuario, CancellationToken ct)
     {
         var rolNombre = usuario.Rol.Nombre;
+        var estacion = usuario.EstacionId.HasValue
+            ? await _dbContext.Estaciones
+                .AsNoTracking()
+                .Where(e => e.Id == usuario.EstacionId.Value)
+                .Select(e => new { e.Codigo, e.Nombre })
+                .FirstOrDefaultAsync(ct)
+            : null;
         var jwt = _jwtService.GenerateToken(usuario, rolNombre);
         var refreshTokenStr = _jwtService.GenerateRefreshToken();
         var refreshDays = _config.GetValue("Jwt:RefreshExpirationDays", 7);
@@ -325,7 +332,9 @@ public sealed class AuthService : IAuthService
                 usuario.Email,
                 usuario.NombreCompleto,
                 rolNombre,
-                usuario.EstacionId),
+                usuario.EstacionId,
+                estacion?.Codigo,
+                estacion?.Nombre),
             usuario.DebeCambiarPassword);
     }
 }

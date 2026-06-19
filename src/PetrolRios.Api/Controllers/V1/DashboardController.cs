@@ -7,7 +7,7 @@ namespace PetrolRios.Api.Controllers.V1;
 
 [ApiController]
 [Route("api/v1/dashboard")]
-[Authorize]
+[Authorize(Policy = "Central")]
 public sealed class DashboardController : ControllerBase
 {
     private readonly IDashboardService _dashboardService;

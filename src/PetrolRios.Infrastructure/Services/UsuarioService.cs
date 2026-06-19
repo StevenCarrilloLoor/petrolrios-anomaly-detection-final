@@ -48,6 +48,7 @@ public sealed class UsuarioService : IUsuarioService
         var existente = await _unitOfWork.Usuarios.GetByEmailAsync(request.Email, ct);
         if (existente is not null)
             throw new InvalidOperationException($"Ya existe un usuario con email '{request.Email}'.");
+        await ValidarEstacionAsync(request.EstacionId, ct);
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         var usuario = Usuario.Create(request.Email, request.NombreCompleto, passwordHash, request.RolId);
@@ -122,8 +123,11 @@ public sealed class UsuarioService : IUsuarioService
         // Actualizar nombre y rol si vienen en la solicitud.
         usuario.ActualizarPerfil(request.NombreCompleto, request.RolId);
 
-        if (request.EstacionId.HasValue)
+        if (request.ActualizarEstacion)
+        {
+            await ValidarEstacionAsync(request.EstacionId, ct);
             usuario.AsignarEstacion(request.EstacionId);
+        }
 
         await _dbContext.SaveChangesAsync(ct);
         // Recargar el rol por si cambió
@@ -138,6 +142,18 @@ public sealed class UsuarioService : IUsuarioService
 
         usuario.Activo = false; // Soft delete
         await _dbContext.SaveChangesAsync(ct);
+    }
+
+    private async Task ValidarEstacionAsync(int? estacionId, CancellationToken ct)
+    {
+        if (!estacionId.HasValue)
+            return;
+
+        var existe = await _dbContext.Estaciones
+            .AsNoTracking()
+            .AnyAsync(e => e.Id == estacionId.Value && e.Activa, ct);
+        if (!existe)
+            throw new ArgumentException($"La estación {estacionId.Value} no existe o está inactiva.");
     }
 
     private static UsuarioResponse MapToResponse(Usuario u) => new()

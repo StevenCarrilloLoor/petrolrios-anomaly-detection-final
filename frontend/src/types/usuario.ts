@@ -4,6 +4,7 @@ export interface UsuarioResponse {
   nombreCompleto: string;
   rol: string;
   rolId: number;
+  estacionId: number | null;
   activo: boolean;
   createdAt: string;
 }
@@ -13,10 +14,13 @@ export interface CrearUsuarioRequest {
   nombreCompleto: string;
   password: string;
   rolId: number;
+  estacionId?: number | null;
 }
 
 export interface ActualizarUsuarioRequest {
   nombreCompleto?: string | null;
   rolId?: number | null;
   activo?: boolean | null;
+  estacionId?: number | null;
+  actualizarEstacion?: boolean;
 }

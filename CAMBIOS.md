@@ -885,3 +885,68 @@ no como parte de la autodocumentación.
   de producción correcto.
 - Se restauró `scripts/verificar-mejoras.bat` para ejecutar restore, build Release, pruebas,
   comprobación de migraciones, lint y build frontend con log en `verificacion.log`.
+
+---
+
+## 32. Tercer subsistema: Monitor local de problemas operativos por estación
+
+Se completó la interfaz que faltaba para las estaciones. No es otra vista dentro del central:
+es un ejecutable independiente, desplegable como el Station Agent, pero con flujo inverso y
+estrictamente de solo lectura.
+
+### Nuevo `PetrolRios.StationMonitor`
+
+- Proyecto ASP.NET Core local en `src/PetrolRios.StationMonitor`, panel en
+  `http://localhost:5190`.
+- Se autentica contra el servidor central con una cuenta vinculada a estación y rechaza cuentas
+  sin `EstacionId` o que pertenezcan a otro código.
+- Consulta periódicamente únicamente problemas con ámbito `Operativa`, estado activo y estación
+  propia. No accede a Firebird, no envía transacciones y no expone acciones de escritura.
+- Panel con estado de conexión, conteos, prioridad, referencias, actividad local, botón de
+  consulta manual, configuración editable y avisos del navegador/sonido para problemas nuevos.
+- Se añadió publicación self-contained, instalador Inno Setup, instalación como servicio Windows
+  y scripts de inicio/diagnóstico. `INICIAR_TODO.bat` ya levanta también el monitor.
+
+### Aislamiento de seguridad
+
+- El JWT incorpora el claim firmado `estacion_id`; el login devuelve además código y nombre de
+  estación.
+- `GET /alertas/problemas-estacion` fuerza la estación del JWT aunque el cliente intente enviar
+  otro `estacionId`; `soloActivos=true` excluye alertas cerradas/resueltas.
+- Las cuentas de estación reciben `403` al intentar abrir dashboard, listado general de alertas
+  u otros módulos centrales.
+- El detalle solo permite una alerta operativa propia y devuelve `404` para otra estación o para
+  el carril Auditoría.
+- Ingesta, heartbeat, estado de fuentes y reporte de esquema validan que el código enviado
+  coincida con la estación firmada.
+- SignalR dejó de confiar en `rol`/`estacionId` de la query string. Una cuenta de estación entra
+  exclusivamente a `estacion-{id}`; una cuenta central entra al grupo de su rol.
+- El hub ahora exige autenticación explícita; conexiones anónimas tampoco pueden aparecer como
+  usuarios conectados ficticios.
+- El cliente SignalR ignora limpiamente la negociación obsoleta del primer montaje de React
+  Strict Mode y reintenta fallos reales sin dejar errores rojos falsos en la consola.
+- Las cuentas técnicas `agent-est-001`…`agent-est-010` se vinculan idempotentemente a sus
+  estaciones durante el seed.
+
+### Gestión central
+
+- La tabla de Usuarios muestra `Sistema central` o el código de estación.
+- Crear y editar usuario permite asignar o retirar la estación desde la UI.
+- Se valida que la estación exista y esté activa.
+
+### Pruebas y evidencia conservada
+
+- Build completo sin advertencias; frontend de producción correcto.
+- Pruebas: **Domain 34, Detectors 110, API 47, Monitor 2**, todas verdes; la API usa PostgreSQL Testcontainers.
+- Nuevas pruebas comprueban JWT, aislamiento de alertas, bloqueo de heartbeat cruzado y resolución
+  de grupos SignalR desde claims.
+- Chrome: central, agente y monitor recorridos. Firebird se recuperó y TANQ_REPO quedó
+  `Sincronizada`; el agente reportó 239 tablas.
+- Evidencias permanentes en PostgreSQL:
+  - `145` turno sin cerrar EST-001 (Operativa),
+  - `146` despacho no facturado EST-001 (Operativa),
+  - `147` problema EST-002 usado para demostrar aislamiento,
+  - `148` alerta Auditoría EST-001 que el monitor no muestra,
+  - `149` operativa cerrada que `soloActivos` excluye,
+  - `150` operativa creada con el monitor abierto; apareció automáticamente y generó el evento
+    local `ALERTA`.

@@ -30,8 +30,35 @@ public static class SeedData
         // Pasos idempotentes: aplican también sobre bases ya sembradas
         await EnsureReglasNuevasAsync(context);
         await EnsureUsuariosDemoAsync(context);
+        await EnsureAgentUsersStationAssignmentAsync(context);
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Mantiene las cuentas técnicas del agente vinculadas a su estación. Además de permitir
+    /// que el Monitor de estación reutilice esas credenciales, evita que una cuenta técnica
+    /// pueda consultar problemas operativos de otra estación.
+    /// </summary>
+    private static async Task EnsureAgentUsersStationAssignmentAsync(PetrolRiosDbContext context)
+    {
+        var estaciones = await context.Estaciones
+            .AsNoTracking()
+            .Select(e => new { e.Id, e.Codigo })
+            .ToListAsync();
+
+        var agentes = await context.Usuarios
+            .Where(u => u.Email.StartsWith("agent-"))
+            .ToListAsync();
+
+        foreach (var estacion in estaciones)
+        {
+            var email = $"agent-{estacion.Codigo.ToLowerInvariant()}@petrolrios.com";
+            var agente = agentes.FirstOrDefault(u =>
+                u.Email.Equals(email, StringComparison.OrdinalIgnoreCase));
+            if (agente is not null && agente.EstacionId != estacion.Id)
+                agente.AsignarEstacion(estacion.Id);
+        }
     }
 
     /// <summary>
@@ -345,6 +372,7 @@ public static class SeedData
                 $"Agente Estacion {est.Codigo}",
                 BCrypt.Net.BCrypt.HashPassword("Agent123!"),
                 auditorRol.Id);
+            agent.AsignarEstacion(est.Id);
             agent.MarcarEmailVerificado(); // cuenta de servicio del agente
             await context.Usuarios.AddAsync(agent);
         }

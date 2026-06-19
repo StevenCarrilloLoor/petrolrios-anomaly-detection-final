@@ -38,6 +38,9 @@ public sealed class AlertasController : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
     {
+        if (User.GetEstacionId().HasValue)
+            return Forbid();
+
         var result = await _alertaService.GetFilteredAsync(
             tipo, nivelRiesgo, estado, estacionId, fechaDesde, fechaHasta, page, pageSize, ct);
         return Ok(result);
@@ -52,9 +55,15 @@ public sealed class AlertasController : ControllerBase
     public async Task<IActionResult> GetProblemasEstacion(
         [FromQuery] int? estacionId,
         [FromQuery] int dias = 7,
+        [FromQuery] bool soloActivos = false,
         CancellationToken ct = default)
     {
-        var result = await _alertaService.GetProblemasEstacionAsync(estacionId, dias, ct);
+        var estacionEfectiva = User.GetEstacionId() ?? estacionId;
+        var result = await _alertaService.GetProblemasEstacionAsync(
+            estacionEfectiva,
+            dias,
+            soloActivos,
+            ct);
         return Ok(result);
     }
 
@@ -67,6 +76,15 @@ public sealed class AlertasController : ControllerBase
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _alertaService.GetByIdAsync(id, ct);
+        var estacionAsignada = User.GetEstacionId();
+        if (estacionAsignada.HasValue
+            && (result is null
+                || result.EstacionId != estacionAsignada.Value
+                || !result.Ambito.Equals(nameof(AmbitoAlerta.Operativa), StringComparison.OrdinalIgnoreCase)))
+        {
+            return NotFound();
+        }
+
         return result is null ? NotFound() : Ok(result);
     }
 
@@ -78,6 +96,9 @@ public sealed class AlertasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CambiarEstado(int id, [FromBody] CambiarEstadoRequest request, CancellationToken ct)
     {
+        if (User.GetEstacionId().HasValue)
+            return Forbid();
+
         var result = await _alertaService.CambiarEstadoAsync(id, request, ct);
 
         await this.RegistrarAuditoriaAsync(_logService,
@@ -96,6 +117,9 @@ public sealed class AlertasController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Asignar(int id, [FromBody] AsignarAlertaRequest request, CancellationToken ct)
     {
+        if (User.GetEstacionId().HasValue)
+            return Forbid();
+
         await _alertaService.AsignarAsync(id, request, ct);
 
         await this.RegistrarAuditoriaAsync(_logService,
@@ -112,6 +136,9 @@ public sealed class AlertasController : ControllerBase
     [ProducesResponseType(typeof(IReadOnlyList<ComentarioResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetComentarios(int id, CancellationToken ct)
     {
+        if (User.GetEstacionId().HasValue)
+            return Forbid();
+
         var result = await _alertaService.GetComentariosAsync(id, ct);
         return Ok(result);
     }
@@ -125,6 +152,9 @@ public sealed class AlertasController : ControllerBase
     public async Task<IActionResult> AgregarComentario(
         int id, [FromBody] AgregarComentarioRequest request, CancellationToken ct)
     {
+        if (User.GetEstacionId().HasValue)
+            return Forbid();
+
         var usuarioIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(usuarioIdClaim, out var usuarioId))
             return Unauthorized();

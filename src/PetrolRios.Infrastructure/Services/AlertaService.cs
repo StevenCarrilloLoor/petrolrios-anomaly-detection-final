@@ -48,7 +48,10 @@ public sealed class AlertaService : IAlertaService
     }
 
     public async Task<IReadOnlyList<ProblemaEstacionGrupo>> GetProblemasEstacionAsync(
-        int? estacionId, int dias, CancellationToken ct = default)
+        int? estacionId,
+        int dias,
+        bool soloActivos = false,
+        CancellationToken ct = default)
     {
         var desde = DateTime.UtcNow.Date.AddDays(-Math.Max(0, dias));
 
@@ -58,6 +61,9 @@ public sealed class AlertaService : IAlertaService
 
         if (estacionId is not null)
             query = query.Where(a => a.EstacionId == estacionId);
+
+        if (soloActivos)
+            query = query.Where(a => !EstadosResueltos.Contains(a.Estado));
 
         var alertas = await query
             .OrderByDescending(a => a.FechaDeteccion)

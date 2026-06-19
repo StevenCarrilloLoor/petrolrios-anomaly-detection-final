@@ -8,7 +8,7 @@ namespace PetrolRios.Api.Controllers.V1;
 
 [ApiController]
 [Route("api/v1/usuarios")]
-[Authorize(Roles = "Administrador")]
+[Authorize(Roles = "Administrador", Policy = "Central")]
 public sealed class UsuariosController : ControllerBase
 {
     private readonly IUsuarioService _usuarioService;

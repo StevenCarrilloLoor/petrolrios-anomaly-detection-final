@@ -12,7 +12,7 @@ namespace PetrolRios.Api.Controllers.V1;
 /// </summary>
 [ApiController]
 [Route("api/v1/monitoreo")]
-[Authorize]
+[Authorize(Policy = "Central")]
 public sealed class MonitoreoController : ControllerBase
 {
     private readonly IMonitoreoService _monitoreoService;

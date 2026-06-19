@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usuariosService } from "@/services/usuarios.service";
+import { estacionesService } from "@/services/estaciones.service";
 import { Spinner } from "@/components/ui/Spinner";
 import { UserPlus, Edit, Trash2 } from "lucide-react";
 import type { UsuarioResponse } from "@/types/usuario";
@@ -19,6 +20,10 @@ export function UsuariosPage() {
   const { data: usuarios, isLoading } = useQuery({
     queryKey: ["usuarios"],
     queryFn: usuariosService.getAll,
+  });
+  const { data: estaciones = [] } = useQuery({
+    queryKey: ["estaciones"],
+    queryFn: estacionesService.getAll,
   });
 
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -86,6 +91,9 @@ export function UsuariosPage() {
                 Rol
               </th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">
+                Acceso
+              </th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">
                 Estado
               </th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">
@@ -103,6 +111,16 @@ export function UsuariosPage() {
                 <td className="px-4 py-3 font-medium">{u.nombreCompleto}</td>
                 <td className="px-4 py-3">{u.email}</td>
                 <td className="px-4 py-3">{u.rol}</td>
+                <td className="px-4 py-3">
+                  {u.estacionId == null ? (
+                    <span className="text-muted-foreground">Sistema central</span>
+                  ) : (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      {estaciones.find((e) => e.id === u.estacionId)?.codigo ??
+                        `Estación #${u.estacionId}`}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -154,11 +172,16 @@ export function UsuariosPage() {
 
 function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { data: estaciones = [] } = useQuery({
+    queryKey: ["estaciones"],
+    queryFn: estacionesService.getAll,
+  });
   const [form, setForm] = useState({
     email: "",
     nombreCompleto: "",
     password: "",
     rolId: 1,
+    estacionId: null as number | null,
   });
   const [confirma, setConfirma] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -258,6 +281,29 @@ function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
             ))}
           </select>
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Ámbito de acceso
+          </label>
+          <select
+            value={form.estacionId ?? 0}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setForm({ ...form, estacionId: value === 0 ? null : value });
+            }}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value={0}>Sistema central (sin estación fija)</option>
+            {estaciones.map((estacion) => (
+              <option key={estacion.id} value={estacion.id}>
+                {estacion.codigo} — {estacion.nombre}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Al asignar una estación, la cuenta solo puede leer sus problemas operativos.
+          </p>
+        </div>
       </div>
       <div className="mt-4 flex gap-3">
         <button
@@ -315,10 +361,16 @@ function EditUsuarioFormCargado({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { data: estaciones = [] } = useQuery({
+    queryKey: ["estaciones"],
+    queryFn: estacionesService.getAll,
+  });
   const [form, setForm] = useState({
     nombreCompleto: usuario.nombreCompleto,
     rolId: usuario.rolId,
     activo: usuario.activo,
+    estacionId: usuario.estacionId,
+    actualizarEstacion: true,
   });
 
   const mutation = useMutation({
@@ -332,7 +384,7 @@ function EditUsuarioFormCargado({
   return (
     <div className="rounded-lg border border-border bg-background p-6">
       <h3 className="mb-4 text-lg font-semibold">Editar Usuario #{usuario.id}</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="mb-1 block text-sm font-medium">Nombre</label>
           <input
@@ -370,6 +422,30 @@ function EditUsuarioFormCargado({
           >
             <option value="true">Activo</option>
             <option value="false">Inactivo</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Ámbito de acceso
+          </label>
+          <select
+            value={form.estacionId ?? 0}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setForm({
+                ...form,
+                estacionId: value === 0 ? null : value,
+                actualizarEstacion: true,
+              });
+            }}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value={0}>Sistema central</option>
+            {estaciones.map((estacion) => (
+              <option key={estacion.id} value={estacion.id}>
+                {estacion.codigo} — {estacion.nombre}
+              </option>
+            ))}
           </select>
         </div>
       </div>

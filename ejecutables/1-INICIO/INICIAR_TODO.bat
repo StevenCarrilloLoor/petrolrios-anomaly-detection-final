@@ -10,8 +10,8 @@ echo   Arranque automatico de todos los servicios
 echo ============================================================
 echo.
 
-rem ── [1/6] Docker ─────────────────────────────────────────────
-echo [1/6] Verificando Docker...
+rem ── [1/7] Docker ─────────────────────────────────────────────
+echo [1/7] Verificando Docker...
 docker info >nul 2>&1
 if errorlevel 1 (
   echo        Docker no responde. Iniciando Docker Desktop...
@@ -33,14 +33,14 @@ if errorlevel 1 (
 )
 echo        Docker OK.
 
-rem ── [2/6] PostgreSQL ─────────────────────────────────────────
-echo [2/6] PostgreSQL...
+rem ── [2/7] PostgreSQL ─────────────────────────────────────────
+echo [2/7] PostgreSQL...
 docker start petrolrios-postgres >nul 2>&1
 if errorlevel 1 docker compose up -d >nul 2>&1
 echo        PostgreSQL arrancando en :5432
 
-rem ── [3/6] Firebird (opcional, demo con BD real) ──────────────
-echo [3/6] Firebird (BD Contaplus real)...
+rem ── [3/7] Firebird (opcional, demo con BD real) ──────────────
+echo [3/7] Firebird (BD Contaplus real)...
 docker start petrolrios-firebird >nul 2>&1
 if errorlevel 1 (
   echo        Contenedor no existe. Para crearlo: ejecutables\3-DIAGNOSTICO\restaurar_firebird.bat
@@ -48,8 +48,8 @@ if errorlevel 1 (
   echo        Firebird arrancando en :3051
 )
 
-rem ── [4/6] API central ────────────────────────────────────────
-echo [4/6] API central (compilando y arrancando)...
+rem ── [4/7] API central ────────────────────────────────────────
+echo [4/7] API central (compilando y arrancando)...
 start "PetrolRios API" cmd /c "cd /d "%RAIZ%" && dotnet run --project src\PetrolRios.Api && pause"
 
 echo        Esperando a que la API responda en :5170...
@@ -65,13 +65,17 @@ if errorlevel 1 (
   echo        API OK.
 )
 
-rem ── [5/6] Frontend ───────────────────────────────────────────
-echo [5/6] Frontend (Vite)...
+rem ── [5/7] Frontend ───────────────────────────────────────────
+echo [5/7] Frontend (Vite)...
 start "PetrolRios Frontend" cmd /c "cd /d "%RAIZ%\frontend" && npm run dev && pause"
 
-rem ── [6/6] Station Agent ──────────────────────────────────────
-echo [6/6] Station Agent EST-001 (con panel local)...
+rem ── [6/7] Station Agent ──────────────────────────────────────
+echo [6/7] Station Agent EST-001 (con panel local)...
 start "PetrolRios Agente" cmd /c "cd /d "%RAIZ%\src\PetrolRios.StationAgent" && dotnet run && pause"
+
+rem ── [7/7] Monitor de estación ─────────────────────────────────
+echo [7/7] Monitor local de problemas operativos...
+start "PetrolRios Monitor" cmd /c "cd /d "%RAIZ%\src\PetrolRios.StationMonitor" && dotnet run && pause"
 
 timeout /t 8 /nobreak >nul
 echo.
@@ -79,6 +83,7 @@ echo ============================================================
 echo   TODO LISTO
 echo   - Aplicacion:        http://localhost:5173
 echo   - Panel del agente:  http://localhost:5180
+echo   - Monitor estacion:  http://localhost:5190
 echo   - Swagger:           http://localhost:5170/swagger
 echo   - Hangfire:          http://localhost:5170/hangfire
 echo   Usuario: admin@petrolrios.com / Admin123!
@@ -86,6 +91,8 @@ echo ============================================================
 start http://localhost:5173
 timeout /t 4 /nobreak >nul
 start http://localhost:5180
+timeout /t 2 /nobreak >nul
+start http://localhost:5190
 echo.
 echo (esta ventana puede cerrarse; los servicios siguen en sus ventanas)
 pause

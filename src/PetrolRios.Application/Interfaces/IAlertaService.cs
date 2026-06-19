@@ -16,7 +16,10 @@ public interface IAlertaService
     /// "Problemas de estación". <paramref name="dias"/> acota la ventana hacia atrás.
     /// </summary>
     Task<IReadOnlyList<ProblemaEstacionGrupo>> GetProblemasEstacionAsync(
-        int? estacionId, int dias, CancellationToken ct = default);
+        int? estacionId,
+        int dias,
+        bool soloActivos = false,
+        CancellationToken ct = default);
 
     Task<AlertaResponse?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<AlertaResponse> CambiarEstadoAsync(int id, CambiarEstadoRequest request, CancellationToken ct = default);

@@ -1,19 +1,19 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: junio 2026.
+Última actualización: 19 de junio de 2026.
 
 ---
 
 ## 🔴 Feedback del 18-jun (revisión en vivo de Steven)
 1. [x] **HECHO (commit a63f64b, verificado en Chrome)** — Regla personalizada con ámbito: selector **Operativa/Auditoría** al crear y editar, `ReglaPersonalizada.Ambito` + migración, `CustomRuleDetector` setea `DetectedAnomaly.Ambito`, badge en la lista, tests (Domain + Detector). Probado: regla "PRUEBA Operativa - factura alta" creada con badge OPERATIVA.
 2. [x] **HECHO (commit a63f64b, verificado en Chrome)** — La tabla registrada en el central ya aparece en el desplegable "Fuente de datos" del builder (Tanques/TANQ_REPO visible) aunque aún no haya datos en staging. *Falta su documentación de campos → punto 3.*
-3. [~] **EN CURSO (a verificar)**: el agente ahora **reporta su esquema** (todas las tablas + columnas) al central cada arranque y cada 6 h (`POST /api/v1/esquema`, entidad `EsquemaTabla`). El registro de fuentes ya documenta los campos desde ese esquema, y el builder ofrece los campos de la fuente central.
-4. [~] **EN CURSO (a verificar)**: **navegador de tablas con búsqueda en el central** — en Reglas → Fuentes de datos, el campo "Tabla" busca por nombre contra el esquema y muestra las columnas (auto-documentación). *Falta: quitar el explorador/fuentes locales del panel del agente (siguiente paso, una vez verificado el navegador central).*
+3. [x] **HECHO Y VERIFICADO**: el agente reportó en vivo **239 tablas** al central; el esquema y las columnas quedan disponibles para fuentes y reglas.
+4. [x] **HECHO Y VERIFICADO**: navegador de tablas con búsqueda y auto-documentación en el central. El explorador local se conserva como diagnóstico de respaldo.
 5. [ ] **Editor de reglas del motor demasiado simple**: solo cambia umbral. Revisar si debe permitir más (activar/desactivar ya está; evaluar editar descripción u otros parámetros con cuidado de no romper la lógica fija del detector).
 6. [ ] **No se probó el agente con datos reales**: insertar datos en Firebird (turno abierto, factura backdated, fila de tabla extra) para ver que el agente extrae y el central genera alertas **Operativa y Auditoría**.
-7. [ ] **No se probó la interfaz nueva de gestión de notificaciones de la estación** ni todas las del agente en Chrome.
-8. [ ] **Faltan tests** que validen los métodos nuevos (memoria de envío, fuentes centrales, ámbito de reglas personalizadas).
+7. [x] **HECHO (19-jun-2026)**: se creó y probó en Chrome el tercer subsistema independiente **PetrolRios.StationMonitor** (`localhost:5190`), de solo lectura. También se recorrieron central y agente; Firebird fue levantado y TANQ_REPO quedó `Sincronizada`.
+8. [x] **HECHO**: cobertura para memoria de envío, fuentes, reglas por ámbito, aislamiento por estación, JWT y grupos SignalR. Totales actuales: Domain 34, Detectors 110, API 47, Monitor 2.
 
 ## 🟡 Hecho en esta ronda (a verificar/commitear con `scripts/verificar_ronda_fuentes.bat`)
 - **Memoria de envío del agente** (`SentMemory`): huella de contenido por registro, persistida en `enviados.huellas`. Corta el bucle de "1 transacción enviada" cada ciclo (el turno abierto `EST_TURN='0'` ya no se reenvía). Si el contenido cambia (turno se cierra) vuelve a enviarse una sola vez. El almacenamiento del central siempre estuvo a salvo por la idempotencia; esto evita el tráfico/ruido inútil.
@@ -34,39 +34,40 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 
 ---
 
-## 🔜 Subsistema de alertas por estación (terminar lo empezado)
-- [ ] **Endpoint de agregación**: problemas operativos agrupados por estación, con conteo por día.
-- [ ] **Pestaña "Problemas de estación"** en el frontend: tabla por estación → clic en el nombre despliega la lista (documentación), separada de la bandeja principal de auditoría.
-- [ ] **Asociación usuario ↔ estación**: un administrador de estación ve/recibe solo lo de SU estación.
-- [ ] **Correo de contacto por estación** + aviso por email de problemas operativos (decisión "Ambas": in-app/SignalR + correo).
-- [ ] **Gobernanza/auditoría**: quién puede ver/gestionar cada carril, registrado en el log.
+## ✅ Subsistema de alertas por estación
+- [x] Endpoint de agregación para el central y modo `soloActivos` para el monitor local.
+- [x] Pestaña global "Problemas de estación" en el central.
+- [x] Asociación usuario ↔ estación editable desde Usuarios.
+- [x] Correo de contacto y avisos operativos.
+- [x] Aislamiento real por JWT en API, SignalR e ingesta: una cuenta de estación no puede forzar otra estación ni consultar el dashboard/bandeja central.
+- [x] Tercer ejecutable **Monitor de estación**: consulta periódica, avisos del navegador, historial local y configuración editable.
 
 ## 🔜 Detectores nuevos (patrones del ingeniero + tesis)
 Operativos (carril Operativa → estación):
-- [ ] **Turno sin cerrar** (TURN.EST_TURN abierto / FFI_TURN viejo). *Lo del inge: "se olvidan de cerrar turno".*
-- [ ] **Despacho mal cerrado / no facturado** (DESP.FAC_DESP / EST_DESP). *"No lo colgó bien".*
+- [x] **Turno sin cerrar** (TURN.EST_TURN abierto / FFI_TURN viejo). *Lo del inge: "se olvidan de cerrar turno".*
+- [x] **Despacho mal cerrado / no facturado** (DESP.FAC_DESP / EST_DESP). *"No lo colgó bien".*
 - [ ] **Campos faltantes** (ya parcial; ampliar a más campos/condiciones).
 
 De auditoría/fraude (carril Auditoría → central):
-- [ ] **Cuadre de tanque** (TANQ_REPO.DIFERENCIA / TANQ_RIND.DIF_VEN_RIND > tolerancia).
-- [ ] **Crédito no autorizado / sin garante / a cliente no habilitado** (CRED_CABE: COD_GARA, COD_SOCI). *Lo del inge: "autorizan créditos a quien no debe".*
-- [ ] **Cancelar-reingresar recurrente (kiting)** (ANUL + re-creación al día siguiente). *Lo del inge.*
+- [x] **Cuadre de tanque** mediante TANQ_REPO como fuente configurable + regla por DIFERENCIA.
+- [x] **Crédito no autorizado / sin garante** (CRED_CABE: COD_GARA). *Lo del inge: "autorizan créditos a quien no debe".*
+- [x] **Cancelar-reingresar recurrente (kiting)** (ANUL + repetición en varios días).
 - [ ] **Placa bloqueada / sobre cupo** (PLACA_BLOQ / PLACA_CUPO).
 - [ ] **Cuadre forzado** (faltan $X y aparece justo un crédito/ajuste de ~$X pegado al cierre que lleva el faltante a 0; recurrente/escalado). *Requiere estudiar primero cómo funciona el cuadre y el conteo de efectivo para no alertar de más.*
 
 ## 🔜 LA IDEA GRANDE — Plataforma de detección configurable (lo que más me recalcaste)
 > "que el agente pueda enviar info de múltiples tablas o las que selecciones… mejorar el creador de reglas para que funcione afuera de CONTAC… agregar una tabla nueva, verificar que exista, devolver la documentación automática de sus campos, y crear reglas sin tocar código ni llamar a un ingeniero."
 
-- [ ] **Fuentes de extracción configurables (multi-tabla):** reemplazar el SQL fijo del agente por una config editable (`FuenteExtraccion`: tabla, columnas, columna de watermark, filtro). Enviar las tablas que se elijan sin recompilar. (Hoy el agente solo manda 7 consultas fijas de CONTAC.)
-- [ ] **Registro dinámico de tablas con verificación:** al agregar una tabla nueva, comprobar que existe en Firebird (`RDB$RELATIONS`); si no, rechazar con mensaje claro.
-- [ ] **Auto-documentación de la tabla:** leer `RDB$RELATION_FIELDS` + `RDB$FIELDS` y mostrar campos, tipos, longitud y nullabilidad — un "diccionario" de la tabla en pantalla.
-- [ ] **Creador de reglas genérico (fuera de CONTAC):** que una regla apunte a cualquier fuente registrada y referencie sus campos por nombre; evaluador acotado y seguro.
-- [ ] **Seguridad/gobernanza de la plataforma:** solo lectura, lista blanca de tablas/columnas (anti-inyección), evaluador sin código arbitrario, solo Supervisor/Admin registran fuentes/reglas, todo auditado.
+- [x] **Fuentes de extracción configurables (multi-tabla)** con catálogo central y respaldo local.
+- [x] **Registro dinámico de tablas con verificación** contra el esquema reportado por el agente.
+- [x] **Auto-documentación de la tabla** desde `RDB$RELATION_FIELDS` + `RDB$FIELDS`.
+- [x] **Creador de reglas genérico (fuera de CONTAC)** básico y avanzado.
+- [x] **Seguridad/gobernanza de la plataforma:** solo lectura, nombres validados, evaluador acotado, RBAC y auditoría.
 - [ ] **Investigación tabla-por-tabla exhaustiva:** profundizar el catálogo (hoy revisé las ~15 tablas de más valor; faltan el resto de las ~200 para no dejar señales útiles fuera).
 
 ## 🔜 Centralizar fuentes — mejoras pendientes (la base ya está hecha esta ronda)
-- [ ] **Selector de tabla en el central tirando de un agente conectado:** hoy el admin escribe el nombre de la tabla a mano en "Fuentes de datos". Falta un endpoint puente (central → agente conectado) que liste/describa tablas para elegirla con buscador y ver sus campos sin salir del central. Mientras tanto se usa el explorador del panel del agente.
-- [ ] **Verificación al registrar en el central:** avisar si la tabla no existe en alguna estación (requiere el puente anterior). Hoy cada agente la omite en silencio si no existe.
+- [x] **Selector de tabla en el central:** el central solicita/reutiliza el esquema reportado por un agente y ofrece buscador + columnas.
+- [x] **Verificación por estación:** la matriz de sincronización informa tabla inexistente, cursor inválido, versión aplicada, filas y error.
 - [ ] **Migrar fuentes locales existentes** de algún agente al catálogo central (utilidad de una sola vez), si llegan a usarse.
 
 ## 🔜 Watermark robusto (cerrar puntos ciegos)
@@ -74,8 +75,8 @@ De auditoría/fraude (carril Auditoría → central):
 - [x] **Memoria de envío en el agente** — HECHO esta ronda (`SentMemory`): ya no reenvía el mismo registro cada ciclo.
 
 ## 🔜 Empaquetado plug-and-play + limpieza
-- [ ] **Purgar/arreglar los .bat** obsoletos o redundantes (incluye limpiar los `commit_*.bat`, `diag_*`, `build_errors.txt`, `*.done` que fui dejando).
-- [ ] **Setup/.exe plug-and-play** del central y agente, fácil de actualizar (el agente ya tiene feed de actualización; falta rematar el central y un instalador único).
+- [x] **Purgar/arreglar los .bat** obsoletos o redundantes.
+- [x] **Setup/.exe plug-and-play** del central, agente y monitor, con instaladores independientes.
 
 ## 🔜 Despliegue en la nube (solo explicar por ahora, no implementar)
 - [ ] **Decidir Azure vs AWS** (la tesis dice AWS RDS; tú mencionaste Azure). Recomendación: por créditos gratis (Azure for Students si hay correo .edu).
@@ -100,23 +101,23 @@ De auditoría/fraude (carril Auditoría → central):
 - ✅ **Guía de despliegue en la nube** (`docs/DESPLIEGUE-NUBE.md`, Azure/AWS).
 - ✅ Cobertura de pruebas para todo lo nuevo (Domain 16, Detectors 108, Api 29).
 
-**Pendiente:**
+**Pendiente real después de la verificación del 19-jun:**
 - [ ] Watermark por ID monotónico + ventana de solapamiento (punto ciego de fecha).
-- [ ] UI para asignar estación/correo a un usuario desde el formulario (hoy por API).
-- [ ] Pruebas de seguridad sin huecos (revisión dedicada).
-- [ ] Empaquetado final del instalador (.iss) del central, si se quiere un setup único.
+- [ ] Ejecutar una prueba física en otra PC de estación con el instalador publicado y la red real.
+- [ ] Despliegue productivo con TLS/HTTPS y secretos definitivos.
 
 ---
 
 ## Nuevos pedidos (junio 2026)
 
-- [ ] **Central — apartado de configuración de conexiones (solo Admin):** sección para gestionar y
+- [x] **Central — apartado de configuración de conexiones (solo Admin):** sección para gestionar y
   configurar las conexiones/estaciones (nombre, zona, horario, correo de contacto, activa) desde la
   interfaz; restringido a Administrador.
-- [ ] **Central — Monitoreo: usuarios conectados:** sección que muestre los usuarios actualmente
+- [x] **Central — Monitoreo: usuarios conectados:** sección que muestre los usuarios actualmente
   conectados al sistema central (vía SignalR: rastrear conexiones del hub y exponerlas).
-- [ ] **Agente — autodetección de Firebird:** botón junto a la conexión Firebird que busque
+- [x] **Agente — autodetección de Firebird:** botón junto a la conexión Firebird que busque
   automáticamente la base CONTAC.FDB (host/puerto/ruta comunes) sin escribir la dirección a mano.
   (Nombre propuesto: "Detectar Firebird automáticamente".)
-- [ ] **Pruebas rigurosas en Chrome:** recorrer todas las interfaces y procesos ya implementados,
-  verificar que reflejan y funcionan según lo previsto, y corregir cualquier bug de inmediato.
+- [x] **Pruebas rigurosas en Chrome (19-jun-2026):** central, formulario usuario↔estación,
+  problemas globales, Station Agent, fuente dinámica sincronizada y Monitor de estación con
+  actualización automática al insertar una alerta nueva.

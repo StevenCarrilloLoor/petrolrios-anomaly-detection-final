@@ -7,12 +7,14 @@ Todos los scripts del proyecto, organizados por propósito y en orden de ejecuci
 
 | Orden | Script | Qué hace |
 |---|---|---|
-| 1 | `INICIAR_TODO.bat` | **Plug and play:** arranca Docker (PostgreSQL + Firebird), la API, el frontend y el Station Agent, espera a que cada servicio esté listo y abre el navegador. Un solo doble clic. |
-| 2 | `DETENER_TODO.bat` | Detiene la API, el agente, el frontend y los contenedores. |
+| 1 | `INICIAR_TODO.bat` | **Plug and play:** arranca Docker (PostgreSQL + Firebird), la API, el frontend, el Station Agent y el Monitor de estación. |
+| 2 | `INICIAR_MONITOR_ESTACION.bat` | Arranca únicamente el cliente local de solo lectura que muestra los problemas operativos de la estación. |
+| 3 | `DETENER_TODO.bat` | Detiene la API, el agente, el monitor, el frontend y los contenedores. |
 
 Tras `INICIAR_TODO`:
 - Aplicación: http://localhost:5173 (`admin@petrolrios.com` / `Admin123!`)
 - Panel del agente: http://localhost:5180
+- Monitor de estación: http://localhost:5190
 - Swagger: http://localhost:5170/swagger · Hangfire: http://localhost:5170/hangfire
 
 ## 2-DEMO — datos de demostración (para la sustentación)
@@ -40,8 +42,9 @@ Hangfire (o esperar 5 min) → ver las alertas en el dashboard.
 
 | Script | Qué hace |
 |---|---|
-| `publicar.bat` | Genera `dist\PetrolRios-Servidor\` (API self-contained con el frontend integrado: **un solo .exe sirve todo**) y `dist\PetrolRios-Agente\` (agente self-contained con su panel). No requiere .NET en la máquina destino. |
-| `instalador_servidor.iss` / `instalador_agente.iss` | Scripts de Inno Setup para generar instaladores `setup.exe` (requiere [Inno Setup 6](https://jrsoftware.org/isinfo.php); `publicar.bat` los compila automáticamente si está instalado). |
+| `publicar.bat` | Genera el servidor, el agente y `dist\PetrolRios-Monitor\` como ejecutables self-contained. |
+| `instalador_servidor.iss` / `instalador_agente.iss` / `instalador_monitor.iss` | Instaladores Inno Setup independientes para cada subsistema. |
+| `instalar_monitor_servicio.bat` | Instala el Monitor como servicio de Windows desde su carpeta publicada. |
 
 ## 5-DESARROLLO — verificación de código
 

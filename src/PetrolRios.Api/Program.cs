@@ -12,6 +12,7 @@ using PetrolRios.Infrastructure;
 using PetrolRios.Infrastructure.Hubs;
 using PetrolRios.Infrastructure.Jobs;
 using PetrolRios.Infrastructure.Persistence;
+using PetrolRios.Application.Security;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -83,7 +84,15 @@ try
             }
         };
     });
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("Central", policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireAssertion(context =>
+                !context.User.HasClaim(c => c.Type == PetrolRiosClaimTypes.EstacionId));
+        });
+    });
 
     // FluentValidation
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();

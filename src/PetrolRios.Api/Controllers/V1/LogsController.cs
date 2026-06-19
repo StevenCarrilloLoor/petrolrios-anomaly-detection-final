@@ -8,7 +8,7 @@ namespace PetrolRios.Api.Controllers.V1;
 
 [ApiController]
 [Route("api/v1/logs")]
-[Authorize(Roles = "Administrador")]
+[Authorize(Roles = "Administrador", Policy = "Central")]
 public sealed class LogsController : ControllerBase
 {
     private readonly ILogService _logService;

@@ -10,6 +10,8 @@ export interface UsuarioInfo {
   nombreCompleto: string;
   rol: string;
   estacionId: number | null;
+  estacionCodigo: string | null;
+  estacionNombre: string | null;
 }
 
 export interface LoginResponse {

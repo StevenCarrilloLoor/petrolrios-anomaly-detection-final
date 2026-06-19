@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using PetrolRios.Application.Security;
 
 namespace PetrolRios.Infrastructure.Hubs;
 
@@ -13,6 +15,7 @@ public sealed record UsuarioConectado(string UsuarioId, string Nombre, string Ro
 /// Ruta: /hubs/alerts
 /// Grupos: "auditores", "supervisores", "administradores", "estacion-{id}"
 /// </summary>
+[Authorize]
 public sealed class AlertsHub : Hub
 {
     private static int _conexionesActivas;
@@ -44,48 +47,25 @@ public sealed class AlertsHub : Hub
     public override async Task OnConnectedAsync()
     {
         Interlocked.Increment(ref _conexionesActivas);
-        var httpContext = Context.GetHttpContext();
-        var rol = httpContext?.Request.Query["rol"].ToString();
-        var estacionId = httpContext?.Request.Query["estacionId"].ToString();
 
-        // Registrar el usuario conectado (de los claims del JWT; respaldo en query).
+        // La identidad, el rol y la estación salen exclusivamente del JWT autenticado.
         var user = Context.User;
-        var usuarioId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                        ?? httpContext?.Request.Query["usuarioId"].ToString();
-        var nombre = user?.FindFirst(ClaimTypes.Name)?.Value
-                     ?? httpContext?.Request.Query["nombre"].ToString();
+        var usuarioId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var nombre = user?.FindFirst(ClaimTypes.Name)?.Value;
+        var rol = user?.FindFirst(ClaimTypes.Role)?.Value ?? "";
+        var estacionId = user?.FindFirst(PetrolRiosClaimTypes.EstacionId)?.Value;
         if (string.IsNullOrWhiteSpace(usuarioId)) usuarioId = Context.ConnectionId;
         if (string.IsNullOrWhiteSpace(nombre)) nombre = "Usuario";
-        var rolEfectivo = user?.FindFirst(ClaimTypes.Role)?.Value
-                          ?? (string.IsNullOrWhiteSpace(rol) ? "" : rol);
         _conectados[Context.ConnectionId] = new UsuarioConectado(
-            usuarioId, nombre, rolEfectivo,
+            usuarioId, nombre, rol,
             string.IsNullOrWhiteSpace(estacionId) ? null : estacionId, DateTime.UtcNow);
 
-        // Unir al grupo según rol
-        if (!string.IsNullOrWhiteSpace(rol))
+        // Una cuenta asignada a estación recibe únicamente su carril operativo. Las cuentas
+        // del central (sin claim de estación) se unen al grupo correspondiente a su rol.
+        foreach (var grupo in AlertHubGroupResolver.Resolve(user))
         {
-            var grupo = rol.ToLowerInvariant() switch
-            {
-                "auditor" => "auditores",
-                "supervisor" => "supervisores",
-                "administrador" => "administradores",
-                _ => null
-            };
-
-            if (grupo is not null)
-            {
-                await Groups.AddToGroupAsync(Context.ConnectionId, grupo);
-                _logger.LogDebug("Cliente {Id} unido al grupo {Grupo}", Context.ConnectionId, grupo);
-            }
-        }
-
-        // Unir al grupo de estación si aplica
-        if (!string.IsNullOrWhiteSpace(estacionId))
-        {
-            var grupoEstacion = $"estacion-{estacionId}";
-            await Groups.AddToGroupAsync(Context.ConnectionId, grupoEstacion);
-            _logger.LogDebug("Cliente {Id} unido al grupo {Grupo}", Context.ConnectionId, grupoEstacion);
+            await Groups.AddToGroupAsync(Context.ConnectionId, grupo);
+            _logger.LogDebug("Cliente {Id} unido al grupo {Grupo}", Context.ConnectionId, grupo);
         }
 
         await base.OnConnectedAsync();

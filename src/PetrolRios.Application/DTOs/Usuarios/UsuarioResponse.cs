@@ -25,4 +25,5 @@ public sealed record ActualizarUsuarioRequest(
     string? NombreCompleto,
     int? RolId,
     bool? Activo,
-    int? EstacionId = null);
+    int? EstacionId = null,
+    bool ActualizarEstacion = false);

@@ -55,7 +55,7 @@ public sealed class FuentesDatosController : ControllerBase
 
     /// <summary>Listado completo para administración (Supervisor/Administrador).</summary>
     [HttpGet]
-    [Authorize(Roles = "Supervisor,Administrador")]
+    [Authorize(Roles = "Supervisor,Administrador", Policy = "Central")]
     [ProducesResponseType(typeof(IReadOnlyList<FuenteDatosResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
@@ -80,7 +80,7 @@ public sealed class FuentesDatosController : ControllerBase
 
     /// <summary>Registrar una nueva fuente en el catálogo central (solo Administrador).</summary>
     [HttpPost]
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = "Administrador", Policy = "Central")]
     [ProducesResponseType(typeof(FuenteDatosResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Crear([FromBody] CrearFuenteDatosRequest request, CancellationToken ct)
@@ -109,7 +109,7 @@ public sealed class FuentesDatosController : ControllerBase
 
     /// <summary>Actualizar una fuente (solo Administrador).</summary>
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = "Administrador", Policy = "Central")]
     [ProducesResponseType(typeof(FuenteDatosResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Actualizar(int id, [FromBody] ActualizarFuenteDatosRequest request, CancellationToken ct)
@@ -140,7 +140,7 @@ public sealed class FuentesDatosController : ControllerBase
 
     /// <summary>Eliminar una fuente del catálogo (solo Administrador).</summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Administrador")]
+    [Authorize(Roles = "Administrador", Policy = "Central")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Eliminar(int id, CancellationToken ct)
@@ -170,6 +170,8 @@ public sealed class FuentesDatosController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request.CodigoEstacion))
             return BadRequest(new { mensaje = "El código de estación es obligatorio." });
+        if (!await User.PuedeUsarEstacionAsync(_dbContext, request.CodigoEstacion, ct))
+            return Forbid();
 
         var codigo = request.CodigoEstacion.Trim().ToUpperInvariant();
         var estacion = await _dbContext.Estaciones

@@ -19,7 +19,7 @@ namespace PetrolRios.Api.Controllers.V1;
 /// </summary>
 [ApiController]
 [Route("api/v1/reglas-personalizadas")]
-[Authorize(Roles = "Supervisor,Administrador")]
+[Authorize(Roles = "Supervisor,Administrador", Policy = "Central")]
 public sealed class ReglasPersonalizadasController : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
