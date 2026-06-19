@@ -5,6 +5,12 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 
 ---
 
+## 🟡 Hecho en esta ronda (a verificar/commitear con `scripts/verificar_ronda_fuentes.bat`)
+- **Memoria de envío del agente** (`SentMemory`): huella de contenido por registro, persistida en `enviados.huellas`. Corta el bucle de "1 transacción enviada" cada ciclo (el turno abierto `EST_TURN='0'` ya no se reenvía). Si el contenido cambia (turno se cierra) vuelve a enviarse una sola vez. El almacenamiento del central siempre estuvo a salvo por la idempotencia; esto evita el tráfico/ruido inútil.
+- **Reglas diferenciadas por carril** en la UI de Reglas: badge **Operativa** vs **Auditoría** (derivado del parámetro en `ReglaService`). Las operativas (turno sin cerrar, despacho no facturado, fuera de horario) quedan visibles y editables como las demás.
+- **Buscador de tablas escribible** en el panel del agente: el desplegable de ~200 tablas pasó a un `input + datalist` donde se escribe el nombre y se filtra; describe la tabla al coincidir.
+- **Registro CENTRAL de fuentes (tablas extra)** — el cambio grande: entidad `FuenteDatos` + migración `FuentesDatos`, controlador `/api/v1/fuentes-datos` (CRUD admin + `/activas` para agentes), sección **"Fuentes de datos (tablas)"** en Reglas (admin gestiona, demás ven). El agente descarga el catálogo central cada ciclo (`ObtenerFuentesCentralAsync`) y lo combina con sus fuentes locales (central tiene prioridad). Así el ingeniero registra una tabla **una sola vez** y todas las estaciones la reciben; cada agente verifica que la tabla/columna exista en SU base antes de extraer. Test de dominio `FuenteDatosTests`.
+
 ## ✅ Hecho y commiteado
 - Login del agente opt-in + "re-sincronizar desde fecha" (QoL del panel).
 - Publicación multiplataforma del agente (Windows / Linux / macOS) + instaladores de servicio (sc / systemd / launchd) + LEEME por SO.
@@ -48,9 +54,14 @@ De auditoría/fraude (carril Auditoría → central):
 - [ ] **Seguridad/gobernanza de la plataforma:** solo lectura, lista blanca de tablas/columnas (anti-inyección), evaluador sin código arbitrario, solo Supervisor/Admin registran fuentes/reglas, todo auditado.
 - [ ] **Investigación tabla-por-tabla exhaustiva:** profundizar el catálogo (hoy revisé las ~15 tablas de más valor; faltan el resto de las ~200 para no dejar señales útiles fuera).
 
+## 🔜 Centralizar fuentes — mejoras pendientes (la base ya está hecha esta ronda)
+- [ ] **Selector de tabla en el central tirando de un agente conectado:** hoy el admin escribe el nombre de la tabla a mano en "Fuentes de datos". Falta un endpoint puente (central → agente conectado) que liste/describa tablas para elegirla con buscador y ver sus campos sin salir del central. Mientras tanto se usa el explorador del panel del agente.
+- [ ] **Verificación al registrar en el central:** avisar si la tabla no existe en alguna estación (requiere el puente anterior). Hoy cada agente la omite en silencio si no existe.
+- [ ] **Migrar fuentes locales existentes** de algún agente al catálogo central (utilidad de una sola vez), si llegan a usarse.
+
 ## 🔜 Watermark robusto (cerrar puntos ciegos)
 - [ ] **Watermark por ID monotónico** (generadores GEN_*_ID) + ventana de solapamiento, para que registros viejos/backdated o con reloj desfasado no se salten.
-- [ ] **Memoria de envío en el agente** (que no reenvíe el mismo registro cada ciclo aunque la idempotencia del central ya lo blinde — ahorra red).
+- [x] **Memoria de envío en el agente** — HECHO esta ronda (`SentMemory`): ya no reenvía el mismo registro cada ciclo.
 
 ## 🔜 Empaquetado plug-and-play + limpieza
 - [ ] **Purgar/arreglar los .bat** obsoletos o redundantes (incluye limpiar los `commit_*.bat`, `diag_*`, `build_errors.txt`, `*.done` que fui dejando).

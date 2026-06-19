@@ -35,6 +35,7 @@ try
     builder.Services.AddSingleton<AgentState>();
     builder.Services.AddSingleton<FirebirdExtractor>();
     builder.Services.AddSingleton<LocalStore>();
+    builder.Services.AddSingleton<SentMemory>();
     builder.Services.AddSingleton<CycleRunner>();
 
     // HttpClient sin BaseAddress fija: ServerClient construye la URL absoluta a

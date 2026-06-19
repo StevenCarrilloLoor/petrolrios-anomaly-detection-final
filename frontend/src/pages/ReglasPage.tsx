@@ -4,6 +4,7 @@ import { reglasService } from "@/services/reglas.service";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { ReglasPersonalizadasSection } from "@/components/reglas/ReglasPersonalizadasSection";
+import { FuentesDatosSection } from "@/components/reglas/FuentesDatosSection";
 import type { ReglaDeteccionResponse } from "@/types/regla";
 import { TIPO_DETECTOR_LABELS } from "@/types/alert";
 import type { TipoDetector } from "@/types/alert";
@@ -128,10 +129,16 @@ export function ReglasPage() {
           desde esta pantalla. Además, en{" "}
           <span className="font-medium text-foreground">Reglas personalizadas</span>{" "}
           puede crear nuevas reglas de negocio adaptadas a sus necesidades sin
-          modificar el sistema. Todo cambio se aplica en el siguiente ciclo de
-          análisis y queda registrado en los logs de auditoría.
+          modificar el sistema. Cada regla indica su carril:{" "}
+          <span className="font-medium text-amber-600 dark:text-amber-400">Operativa</span>{" "}
+          (problema de estación → avisa al administrador de la estación) o{" "}
+          <span className="font-medium text-primary">Auditoría</span> (fraude → central).
+          Todo cambio se aplica en el siguiente ciclo de análisis y queda registrado
+          en los logs de auditoría.
         </p>
       </div>
+
+      <FuentesDatosSection />
 
       <ReglasPersonalizadasSection />
 
@@ -162,7 +169,24 @@ export function ReglasPage() {
                   } ${!regla.activa ? "opacity-60" : ""}`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground">{regla.nombre}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-foreground">{regla.nombre}</p>
+                      {regla.ambito === "Operativa" ? (
+                        <span
+                          className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400"
+                          title="Genera un problema de estación (se avisa al administrador de la estación)"
+                        >
+                          Operativa
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                          title="Genera una alerta de auditoría/fraude (carril central)"
+                        >
+                          Auditoría
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {regla.descripcion}
                     </p>

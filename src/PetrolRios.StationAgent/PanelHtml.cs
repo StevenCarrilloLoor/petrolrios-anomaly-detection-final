@@ -205,21 +205,26 @@ internal static class PanelHtml
       </p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="sec" onclick="cargarTablas()">Cargar tablas</button>
-        <select id="f-tabla" onchange="describirTabla()"
-          style="background:#0a0f1c;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;min-width:220px">
-          <option value="">— elige una tabla —</option>
-        </select>
+        <input id="f-tabla" list="f-tabla-lista" autocomplete="off"
+          placeholder="Escribe el nombre (ej: TURN)…"
+          onchange="describirTabla()" oninput="quizaDescribir()"
+          style="background:#0a0f1c;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;min-width:240px">
+        <datalist id="f-tabla-lista"></datalist>
+        <button class="sec" onclick="describirTabla()">Ver campos</button>
         <span id="tabla-info" style="color:var(--muted);font-size:12px"></span>
       </div>
       <div id="tabla-cols" style="margin-top:10px"></div>
     </div>
 
     <div class="card" style="margin-top:14px">
-      <h3>Fuentes de extracción adicionales</h3>
+      <h3>Fuentes de extracción adicionales (locales)</h3>
       <p style="color:var(--muted);font-size:12px;margin:0 0 8px">
-        Tablas extra que el agente enviará al central en cada ciclo (además de las estándar), sin
-        recompilar. Usa el explorador de arriba para ver los campos y elegir la columna de fecha
-        (watermark) que filtra solo lo nuevo. Si la dejas vacía, envía un tope de filas por ciclo.
+        Recomendado: registra las tablas extra UNA sola vez en el sistema central
+        (Reglas → "Fuentes de datos") y todos los agentes las reciben automáticamente.
+        Lo de aquí abajo es un respaldo local solo para esta estación. Tablas extra que el
+        agente enviará al central en cada ciclo (además de las estándar), sin recompilar. Usa
+        el explorador de arriba para ver los campos y elegir la columna de fecha (watermark)
+        que filtra solo lo nuevo. Si la dejas vacía, envía un tope de filas por ciclo.
       </p>
       <div id="fuentes-lista" style="margin-bottom:8px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -580,22 +585,29 @@ async function reiniciarWatermark(){
   refrescar();
 }
 
+let tablasDisponibles = [];
 async function cargarTablas(){
-  const sel = document.getElementById('f-tabla');
+  const lista = document.getElementById('f-tabla-lista');
   const info = document.getElementById('tabla-info');
   info.textContent = 'Cargando…';
   try{
     const r = await fetch('/api/firebird/tablas');
     const j = await r.json();
     if(!j.ok){ info.textContent = j.mensaje || 'No se pudo leer el esquema.'; return; }
-    sel.innerHTML = '<option value="">— elige una tabla —</option>' +
-      j.tablas.map(t => '<option value="'+t+'">'+t+'</option>').join('');
-    info.textContent = j.tablas.length + ' tablas en la base.';
+    tablasDisponibles = j.tablas || [];
+    lista.innerHTML = tablasDisponibles.map(t => '<option value="'+t+'">').join('');
+    info.textContent = tablasDisponibles.length + ' tablas en la base. Escribe para filtrar.';
   }catch(e){ info.textContent = 'No se pudo contactar al agente.'; }
 }
 
+// Si lo que el usuario escribió coincide exactamente con una tabla, la describe sola.
+function quizaDescribir(){
+  const v = (document.getElementById('f-tabla').value || '').trim().toUpperCase();
+  if(tablasDisponibles.some(t => t.toUpperCase() === v)) describirTabla();
+}
+
 async function describirTabla(){
-  const tabla = document.getElementById('f-tabla').value;
+  const tabla = (document.getElementById('f-tabla').value || '').trim();
   const cont = document.getElementById('tabla-cols');
   const info = document.getElementById('tabla-info');
   if(!tabla){ cont.innerHTML=''; info.textContent=''; return; }

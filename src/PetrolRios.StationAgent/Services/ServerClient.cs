@@ -157,6 +157,42 @@ public sealed class ServerClient
         }
     }
 
+    /// <summary>
+    /// Descarga del servidor central el catálogo de fuentes de datos ACTIVAS (tablas extra
+    /// que todos los agentes deben extraer). Devuelve null si el servidor no respondió, de
+    /// modo que el ciclo siga con las fuentes locales sin fallar.
+    /// </summary>
+    public async Task<List<FuenteExtraccion>?> ObtenerFuentesCentralAsync(CancellationToken ct)
+    {
+        var settings = _config.Actual;
+        try
+        {
+            await EnsureAuthenticatedAsync(settings, ct);
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _token);
+
+            var resp = await _httpClient.GetAsync(
+                Url(settings.ServerUrl, "/api/v1/fuentes-datos/activas"), ct);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            var arr = await resp.Content.ReadFromJsonAsync<List<FuenteCentralDto>>(cancellationToken: ct);
+            return arr?.Select(a => new FuenteExtraccion
+            {
+                Nombre = a.Nombre,
+                Tabla = a.Tabla,
+                ColumnaWatermark = a.ColumnaWatermark,
+                Activa = true
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No se pudo obtener el catálogo central de fuentes");
+            return null;
+        }
+    }
+
+    private sealed record FuenteCentralDto(string Nombre, string Tabla, string? ColumnaWatermark);
+
     private async Task EnsureAuthenticatedAsync(AgentSettings settings, CancellationToken ct)
     {
         if (_token is not null && DateTime.UtcNow < _tokenExpiration.AddMinutes(-5))

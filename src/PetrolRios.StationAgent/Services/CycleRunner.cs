@@ -13,6 +13,7 @@ public sealed class CycleRunner
     private readonly FirebirdExtractor _extractor;
     private readonly ServerClient _serverClient;
     private readonly LocalStore _localStore;
+    private readonly SentMemory _sentMemory;
     private readonly AgentState _state;
     private readonly AgentConfigStore _config;
     private readonly ILogger<CycleRunner> _logger;
@@ -36,6 +37,7 @@ public sealed class CycleRunner
         FirebirdExtractor extractor,
         ServerClient serverClient,
         LocalStore localStore,
+        SentMemory sentMemory,
         AgentState state,
         AgentConfigStore config,
         ILogger<CycleRunner> logger)
@@ -43,6 +45,7 @@ public sealed class CycleRunner
         _extractor = extractor;
         _serverClient = serverClient;
         _localStore = localStore;
+        _sentMemory = sentMemory;
         _state = state;
         _config = config;
         _logger = logger;
@@ -67,39 +70,53 @@ public sealed class CycleRunner
             // 1. Reintentar lotes pendientes (store-and-forward)
             var pendientesEnviados = await RetrySendPendingBatchesAsync(ct);
 
-            // 2. Extraer nuevas transacciones desde Firebird
-            var items = await _extractor.ExtractSinceAsync(_lastWatermark, ct);
+            // 2. Extraer nuevas transacciones desde Firebird. Antes pedimos al central el
+            //    catálogo de fuentes extra (registradas una sola vez por el ingeniero). Si el
+            //    central no responde, se devuelve null y se sigue con las fuentes locales.
+            var fuentesCentrales = await _serverClient.ObtenerFuentesCentralAsync(ct);
+            var items = await _extractor.ExtractSinceAsync(_lastWatermark, fuentesCentrales, ct);
 
-            if (items.Count == 0)
+            // 2b. Filtrar lo ya enviado: algunos registros "vivos" reaparecen ciclo a ciclo
+            //     (p. ej. un turno aún sin cerrar, EST_TURN='0') aunque su marca de agua sea
+            //     anterior. La memoria de envío evita reenviarlos una y otra vez.
+            var nuevos = _sentMemory.FiltrarNuevos(items);
+            var omitidos = items.Count - nuevos.Count;
+
+            if (nuevos.Count == 0)
             {
-                var resumenVacio = pendientesEnviados > 0
-                    ? $"Sin datos nuevos; {pendientesEnviados} pendientes reenviados"
+                var partes = new List<string>();
+                if (omitidos > 0) partes.Add($"{omitidos} ya enviados (omitidos)");
+                if (pendientesEnviados > 0) partes.Add($"{pendientesEnviados} pendientes reenviados");
+                var resumenVacio = partes.Count > 0
+                    ? string.Join("; ", partes)
                     : "Sin transacciones nuevas";
                 Completar(true, resumenVacio, 0);
                 return resumenVacio;
             }
 
             // 3. Enviar al servidor central
-            var sent = await _serverClient.SendBatchAsync(items, ct);
+            var sent = await _serverClient.SendBatchAsync(nuevos, ct);
 
             if (sent)
             {
+                _sentMemory.MarcarEnviados(nuevos);
                 _lastWatermark = DateTime.UtcNow;
                 SaveWatermark(_lastWatermark);
-                _state.TotalTransaccionesEnviadas += items.Count;
+                _state.TotalTransaccionesEnviadas += nuevos.Count;
                 _state.UltimaConexionServidor = DateTime.UtcNow;
 
-                var resumen = $"{items.Count} transacciones enviadas en {sw.Elapsed.TotalSeconds:F1}s";
-                Completar(true, resumen, items.Count);
+                var sufijo = omitidos > 0 ? $" ({omitidos} ya enviados, omitidos)" : "";
+                var resumen = $"{nuevos.Count} transacciones enviadas en {sw.Elapsed.TotalSeconds:F1}s{sufijo}";
+                Completar(true, resumen, nuevos.Count);
                 return resumen;
             }
 
             // 4. Store-and-forward: guardar localmente para reintento
-            await _localStore.SavePendingAsync(items, ct);
+            await _localStore.SavePendingAsync(nuevos, ct);
             _state.UltimaDesconexionServidor = DateTime.UtcNow;
 
-            var resumenFallo = $"Servidor no disponible — {items.Count} transacciones guardadas localmente";
-            Completar(false, resumenFallo, items.Count);
+            var resumenFallo = $"Servidor no disponible — {nuevos.Count} transacciones guardadas localmente";
+            Completar(false, resumenFallo, nuevos.Count);
             return resumenFallo;
         }
         catch (Exception ex)
@@ -154,6 +171,7 @@ public sealed class CycleRunner
             var sent = await _serverClient.SendBatchAsync(items, ct);
             if (sent)
             {
+                _sentMemory.MarcarEnviados(items);
                 _localStore.RemovePending(filePath);
                 enviados += items.Count;
             }

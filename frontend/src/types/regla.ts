@@ -6,6 +6,8 @@ export interface ReglaDeteccionResponse {
   parametroNombre: string;
   valorUmbral: number;
   activa: boolean;
+  /** Carril: "Operativa" (problema de estación) o "Auditoria" (fraude). */
+  ambito: "Operativa" | "Auditoria";
 }
 
 export interface CrearReglaRequest {

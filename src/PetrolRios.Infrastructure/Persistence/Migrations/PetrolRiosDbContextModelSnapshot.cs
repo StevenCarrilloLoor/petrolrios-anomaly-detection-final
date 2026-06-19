@@ -308,6 +308,50 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.ToTable("estacion_watermarks", (string)null);
                 });
 
+            modelBuilder.Entity("PetrolRios.Domain.Entities.FuenteDatos", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ColumnaWatermark")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Tabla")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Tabla")
+                        .IsUnique();
+
+                    b.ToTable("fuentes_datos", (string)null);
+                });
+
             modelBuilder.Entity("PetrolRios.Domain.Entities.LogAuditoria", b =>
                 {
                     b.Property<int>("Id")

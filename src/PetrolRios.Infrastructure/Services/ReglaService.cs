@@ -63,6 +63,17 @@ public sealed class ReglaService : IReglaService
         await _unitOfWork.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Parámetros cuyas alertas van al carril Operativa (problema de estación, no fraude).
+    /// El ámbito está fijado por la lógica del detector; aquí lo reflejamos para la UI.
+    /// </summary>
+    private static readonly HashSet<string> ParametrosOperativos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "TurnoSinCerrarHorasUmbral",     // Turno que sigue abierto: el operador no lo cerró
+        "DespachoNoFacturadoHabilitado", // Combustible despachado que no se facturó
+        "FueraHorarioHabilitado"         // Operación fuera del horario configurado de la estación
+    };
+
     private static ReglaDeteccionResponse MapToResponse(ReglaDeteccion r) => new()
     {
         Id = r.Id,
@@ -71,6 +82,7 @@ public sealed class ReglaService : IReglaService
         Descripcion = r.Descripcion,
         ParametroNombre = r.ParametroNombre,
         ValorUmbral = r.ValorUmbral,
-        Activa = r.Activa
+        Activa = r.Activa,
+        Ambito = ParametrosOperativos.Contains(r.ParametroNombre) ? "Operativa" : "Auditoria"
     };
 }

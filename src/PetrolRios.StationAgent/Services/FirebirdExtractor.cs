@@ -65,7 +65,8 @@ public sealed class FirebirdExtractor
     /// Extrae todas las transacciones nuevas desde la marca de agua indicada.
     /// Retorna un diccionario: TipoTransaccion → lista de objetos serializados a JSON.
     /// </summary>
-    public async Task<List<TransaccionBatchItem>> ExtractSinceAsync(DateTime watermark, CancellationToken ct)
+    public async Task<List<TransaccionBatchItem>> ExtractSinceAsync(
+        DateTime watermark, IReadOnlyList<FuenteExtraccion>? fuentesCentrales, CancellationToken ct)
     {
         var items = new List<TransaccionBatchItem>();
 
@@ -93,9 +94,22 @@ public sealed class FirebirdExtractor
         items.AddRange(await ExtractTypeAsync<CreditoDto>(connection, "Credito", GetCreditosSql, watermark, r => r.FechaCabecera, ct));
         items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>(connection, "TarjetaTurno", GetTarjetasSql, watermark, _ => DateTime.UtcNow, ct));
 
-        // Fuentes de extracción configurables (multi-tabla) definidas desde el panel.
-        // Se toleran fallos individuales: una fuente mal configurada no rompe el ciclo.
-        foreach (var fuente in _config.Actual.FuentesExtraccion.Where(f => f.Activa))
+        // Fuentes de extracción configurables (multi-tabla). Se combinan dos orígenes:
+        //   1) El catálogo CENTRAL (registrado una sola vez por el ingeniero en el servidor;
+        //      llega vía parámetro). Es el camino recomendado y escalable.
+        //   2) Las fuentes LOCALES del panel del agente (respaldo / casos puntuales).
+        // Se deduplican por tabla (el central tiene prioridad). Cada agente verifica que la
+        // tabla y la columna existan en SU base antes de extraer, así que una fuente que no
+        // aplique a esta estación simplemente se omite. Se toleran fallos individuales: una
+        // fuente mal configurada no rompe el ciclo.
+        var efectivas = new Dictionary<string, FuenteExtraccion>(StringComparer.OrdinalIgnoreCase);
+        if (fuentesCentrales is not null)
+            foreach (var f in fuentesCentrales.Where(f => f.Activa && !string.IsNullOrWhiteSpace(f.Tabla)))
+                efectivas[f.Tabla] = f;
+        foreach (var f in _config.Actual.FuentesExtraccion.Where(f => f.Activa && !string.IsNullOrWhiteSpace(f.Tabla)))
+            efectivas.TryAdd(f.Tabla, f); // no pisa una ya definida por el central
+
+        foreach (var fuente in efectivas.Values)
         {
             try
             {

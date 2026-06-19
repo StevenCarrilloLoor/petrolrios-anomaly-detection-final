@@ -9,6 +9,13 @@ public sealed record ReglaDeteccionResponse
     public string ParametroNombre { get; init; } = string.Empty;
     public double ValorUmbral { get; init; }
     public bool Activa { get; init; }
+
+    /// <summary>
+    /// Carril al que pertenece la regla: "Operativa" (problema de estación → administrador de
+    /// la estación) o "Auditoria" (fraude → central). Se deriva del parámetro, ya que el ámbito
+    /// está fijado por la lógica del detector.
+    /// </summary>
+    public string Ambito { get; init; } = "Auditoria";
 }
 
 public sealed record CrearReglaRequest(
