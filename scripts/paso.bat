@@ -4,8 +4,8 @@ title PetrolRios - Paso: build + migracion + tests + commit
 cd /d "%~dp0.."
 
 rem ====== EDITAR ESTAS 2 LINEAS POR CADA PASO ======
-set "MIGRACION=EsquemaTabla"
-set "MENSAJE=El agente reporta su esquema al central + navegador de tablas con busqueda y auto-documentacion en Reglas"
+set "MIGRACION="
+set "MENSAJE=Cargar esquema bajo demanda desde una estacion conectada (el central pide al agente reportar su esquema en el proximo heartbeat) + selector en Reglas"
 rem  (Si el paso NO necesita migracion, deja MIGRACION vacio: set "MIGRACION=")
 rem =================================================
 

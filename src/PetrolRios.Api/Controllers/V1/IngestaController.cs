@@ -11,10 +11,12 @@ namespace PetrolRios.Api.Controllers.V1;
 public sealed class IngestaController : ControllerBase
 {
     private readonly IIngestaService _ingestaService;
+    private readonly ISolicitudesEsquema _solicitudesEsquema;
 
-    public IngestaController(IIngestaService ingestaService)
+    public IngestaController(IIngestaService ingestaService, ISolicitudesEsquema solicitudesEsquema)
     {
         _ingestaService = ingestaService;
+        _solicitudesEsquema = solicitudesEsquema;
     }
 
     /// <summary>
@@ -34,15 +36,17 @@ public sealed class IngestaController : ControllerBase
 
     /// <summary>
     /// Heartbeat del agente: señal de vida periódica aunque no haya datos nuevos.
-    /// Si la estación no existe, se auto-registra en el sistema.
+    /// Si la estación no existe, se auto-registra en el sistema. La respuesta puede pedirle al
+    /// agente que reporte su esquema (cuando un administrador solicitó "cargar esquema" de la estación).
     /// </summary>
     [HttpPost("heartbeat")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Heartbeat(
         [FromBody] HeartbeatRequest request,
         CancellationToken ct)
     {
         await _ingestaService.HeartbeatAsync(request, ct);
-        return NoContent();
+        var reportarEsquema = _solicitudesEsquema.TomarPendiente(request.CodigoEstacion);
+        return Ok(new { reportarEsquema });
     }
 }

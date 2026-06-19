@@ -21,10 +21,27 @@ public sealed class EsquemaController : ControllerBase
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     private readonly PetrolRiosDbContext _dbContext;
+    private readonly PetrolRios.Application.Interfaces.ISolicitudesEsquema _solicitudes;
 
-    public EsquemaController(PetrolRiosDbContext dbContext)
+    public EsquemaController(
+        PetrolRiosDbContext dbContext,
+        PetrolRios.Application.Interfaces.ISolicitudesEsquema solicitudes)
     {
         _dbContext = dbContext;
+        _solicitudes = solicitudes;
+    }
+
+    /// <summary>
+    /// Solicita que una estación conectada cargue/reporte su esquema. En su próximo heartbeat
+    /// (segundos) el agente recibirá la señal y enviará sus tablas y columnas al central.
+    /// </summary>
+    [HttpPost("solicitar/{codigoEstacion}")]
+    [Authorize(Roles = "Supervisor,Administrador")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    public IActionResult Solicitar(string codigoEstacion)
+    {
+        _solicitudes.Solicitar(codigoEstacion);
+        return Accepted(new { mensaje = $"Se pedirá el esquema a {codigoEstacion} en su próximo latido." });
     }
 
     /// <summary>El agente reporta el esquema de su Firebird (upsert por nombre de tabla).</summary>

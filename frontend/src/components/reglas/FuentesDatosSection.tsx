@@ -6,9 +6,20 @@ import {
 } from "@/services/fuentesDatos.service";
 import { useAuth } from "@/contexts/AuthContext";
 import { esquemaService } from "@/services/esquema.service";
+import { estacionesService } from "@/services/estaciones.service";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Database, Plus, Trash2, Pencil, X, Save, Info, Search } from "lucide-react";
+import {
+  Database,
+  Plus,
+  Trash2,
+  Pencil,
+  X,
+  Save,
+  Info,
+  Search,
+  DownloadCloud,
+} from "lucide-react";
 
 const inputClass =
   "rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -37,11 +48,34 @@ export function FuentesDatosSection() {
   const [editandoId, setEditandoId] = useState<number | "nueva" | null>(null);
   const [form, setForm] = useState<Formulario>(formularioVacio);
   const [error, setError] = useState<string | null>(null);
+  const [estacionEsquema, setEstacionEsquema] = useState("");
+  const [avisoEsquema, setAvisoEsquema] = useState<string | null>(null);
 
   const { data: fuentes, isLoading } = useQuery({
     queryKey: ["fuentes-datos"],
     queryFn: fuentesDatosService.getAll,
   });
+
+  // Estaciones para elegir de cuál cargar el esquema (las conectadas tienen heartbeat reciente).
+  const { data: estaciones } = useQuery({
+    queryKey: ["estaciones"],
+    queryFn: estacionesService.getAll,
+    enabled: esAdmin,
+  });
+
+  const solicitarEsquemaMutation = useMutation({
+    mutationFn: (codigo: string) => esquemaService.solicitar(codigo),
+    onSuccess: () =>
+      setAvisoEsquema(
+        "Solicitud enviada. La estación reportará su esquema en unos segundos; vuelve a buscar la tabla.",
+      ),
+    onError: () => setAvisoEsquema("No se pudo solicitar el esquema."),
+  });
+
+  function estacionConectada(ultimoHeartbeat: string | null): boolean {
+    if (!ultimoHeartbeat) return false;
+    return Date.now() - new Date(ultimoHeartbeat).getTime() < 3 * 60 * 1000;
+  }
 
   const invalidar = () =>
     void queryClient.invalidateQueries({ queryKey: ["fuentes-datos"] });
@@ -134,9 +168,49 @@ export function FuentesDatosSection() {
             tabla y la columna existan en <span className="font-medium">su</span> base
             antes de extraer, así que registrar una tabla que falte en alguna estación
             no causa errores: esa estación simplemente la omite. Para ver los campos de
-            una tabla, usa el explorador del panel del agente.
+            una tabla, búscala abajo o cárgala desde una estación conectada.
           </p>
         </div>
+
+        {/* Cargar el esquema (tablas+columnas) desde una estación conectada. El central no toca
+            Firebird; el agente de la estación elegida envía su esquema en su próximo latido. */}
+        {esAdmin && (
+          <div className="rounded-lg border border-border bg-background p-3">
+            <p className="mb-2 flex items-center gap-2 text-xs font-medium text-foreground">
+              <DownloadCloud size={14} className="text-primary" />
+              Cargar el esquema de una estación (para poder buscar tablas y ver sus columnas)
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className={`${inputClass} min-w-[220px]`}
+                value={estacionEsquema}
+                onChange={(e) => setEstacionEsquema(e.target.value)}
+              >
+                <option value="">Elige una estación…</option>
+                {(estaciones ?? []).map((e) => (
+                  <option key={e.id} value={e.codigo}>
+                    {e.codigo} — {e.nombre}
+                    {estacionConectada(e.ultimoHeartbeat) ? " (en línea)" : " (sin conexión)"}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!estacionEsquema || solicitarEsquemaMutation.isPending}
+                onClick={() => {
+                  setAvisoEsquema(null);
+                  solicitarEsquemaMutation.mutate(estacionEsquema);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <DownloadCloud size={14} /> Cargar esquema
+              </button>
+            </div>
+            {avisoEsquema && (
+              <p className="mt-2 text-xs text-muted-foreground">{avisoEsquema}</p>
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <Skeleton className="h-24" />

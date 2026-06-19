@@ -29,4 +29,10 @@ export const esquemaService = {
   /** Columnas (documentación automática) de una tabla. */
   getTabla: (nombre: string) =>
     api.get<TablaDetalle>(`/esquema/tabla/${encodeURIComponent(nombre)}`).then((r) => r.data),
+
+  /** Pide a una estación conectada que reporte su esquema (lo envía en su próximo latido). */
+  solicitar: (codigoEstacion: string) =>
+    api
+      .post(`/esquema/solicitar/${encodeURIComponent(codigoEstacion)}`)
+      .then((r) => r.data),
 };

@@ -72,7 +72,7 @@ public sealed class ServerClient
     /// Envía un heartbeat al servidor: señal de vida del agente aunque no haya
     /// transacciones nuevas. Reporta también el nombre y la zona de la estación.
     /// </summary>
-    public async Task<bool> SendHeartbeatAsync(CancellationToken ct)
+    public async Task<HeartbeatResultado> SendHeartbeatAsync(CancellationToken ct)
     {
         var settings = _config.Actual;
         try
@@ -91,14 +91,31 @@ public sealed class ServerClient
             };
             var response = await _httpClient.PostAsJsonAsync(
                 Url(settings.ServerUrl, "/api/v1/ingesta/heartbeat"), payload, ct);
-            return response.IsSuccessStatusCode;
+            if (!response.IsSuccessStatusCode)
+                return new HeartbeatResultado(false, false);
+
+            // La respuesta puede pedir que reportemos el esquema (el admin lo solicitó desde el central).
+            var reportar = false;
+            try
+            {
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+                reportar = body.ValueKind == JsonValueKind.Object
+                           && body.TryGetProperty("reportarEsquema", out var r)
+                           && r.ValueKind == JsonValueKind.True;
+            }
+            catch { /* cuerpo vacío o no-JSON: sin solicitud */ }
+
+            return new HeartbeatResultado(true, reportar);
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Heartbeat no entregado (servidor no disponible)");
-            return false;
+            return new HeartbeatResultado(false, false);
         }
     }
+
+    /// <summary>Resultado de un heartbeat: si se entregó y si el central pide reportar el esquema.</summary>
+    public sealed record HeartbeatResultado(bool Ok, bool ReportarEsquema);
 
     /// <summary>
     /// Prueba la conexión y autenticación con el servidor central (panel del agente).

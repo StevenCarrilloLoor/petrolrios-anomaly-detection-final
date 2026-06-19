@@ -61,7 +61,7 @@ public sealed class Worker : BackgroundService
                     // Heartbeat SIEMPRE (también en modo manual): el panel central
                     // debe saber que el agente está vivo aunque no haya datos nuevos.
                     var latido = await _serverClient.SendHeartbeatAsync(stoppingToken);
-                    if (latido)
+                    if (latido.Ok)
                         _state.UltimaConexionServidor = DateTime.UtcNow;
                     else
                         _state.UltimaDesconexionServidor = DateTime.UtcNow;
@@ -69,9 +69,9 @@ public sealed class Worker : BackgroundService
                     if (_state.ModoAutomatico)
                         await _cycleRunner.RunCycleAsync(stoppingToken);
 
-                    // Reportar el esquema de Firebird al central poco después de arrancar y
-                    // luego cada ~6 horas (para el navegador de tablas y la auto-documentación).
-                    if (DateTime.UtcNow - _ultimoReporteEsquema > TimeSpan.FromHours(6))
+                    // Reportar el esquema de Firebird al central: poco después de arrancar, cada ~6 h,
+                    // o de inmediato si el central lo solicitó (botón "Cargar esquema" de una estación).
+                    if (latido.ReportarEsquema || DateTime.UtcNow - _ultimoReporteEsquema > TimeSpan.FromHours(6))
                         await ReportarEsquemaAsync(stoppingToken);
 
                     // Revisar el feed de actualización cada ~5 minutos (no en cada vuelta)
