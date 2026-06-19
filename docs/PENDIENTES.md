@@ -5,9 +5,9 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 
 ---
 
-## 🔴 Feedback del 18-jun (revisión en vivo de Steven) — pendiente
-1. [ ] **Regla personalizada sin ámbito**: al crear/editar una regla personalizada no se puede elegir si es **Operativa** o **Auditoría** (no hay tag/selector). Hoy su alerta siempre cae en Auditoría. → `ReglaPersonalizada.Ambito` + selector en el builder y editor + `CustomRuleDetector` setea `DetectedAnomaly.Ambito` + badge en la lista.
-2. [ ] **La tabla registrada no aparece en el builder**: el desplegable "Fuente de datos" se arma SOLO con lo que ya llegó al staging; una tabla recién registrada en el central (p. ej. TANQ_REPO) no aparece ni se documentan sus campos hasta que el agente envíe filas. → `GetCatalogo` debe incluir las `FuentesDatos` del registro central.
+## 🔴 Feedback del 18-jun (revisión en vivo de Steven)
+1. [x] **HECHO (commit a63f64b, verificado en Chrome)** — Regla personalizada con ámbito: selector **Operativa/Auditoría** al crear y editar, `ReglaPersonalizada.Ambito` + migración, `CustomRuleDetector` setea `DetectedAnomaly.Ambito`, badge en la lista, tests (Domain + Detector). Probado: regla "PRUEBA Operativa - factura alta" creada con badge OPERATIVA.
+2. [x] **HECHO (commit a63f64b, verificado en Chrome)** — La tabla registrada en el central ya aparece en el desplegable "Fuente de datos" del builder (Tanques/TANQ_REPO visible) aunque aún no haya datos en staging. *Falta su documentación de campos → punto 3.*
 3. [ ] **Sin documentación automática de la tabla registrada**: al registrar una tabla no se ve qué columnas tiene (el central no conoce el esquema de Firebird). → el agente debe **reportar su esquema** (tablas+columnas) al central; el central lo guarda y lo muestra.
 4. [ ] **Falta navegador de tablas en el CENTRAL con búsqueda avanzada**: quien no conoce la base no sabe los nombres de tabla. El explorador/fuentes locales del **agente** deben **quitarse** (se está centralizando) y moverse al central (buscar tabla por nombre, ver columnas, registrarla).
 5. [ ] **Editor de reglas del motor demasiado simple**: solo cambia umbral. Revisar si debe permitir más (activar/desactivar ya está; evaluar editar descripción u otros parámetros con cuidado de no romper la lógica fija del detector).
