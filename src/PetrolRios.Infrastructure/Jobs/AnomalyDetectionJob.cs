@@ -357,8 +357,13 @@ public sealed class AnomalyDetectionJob
 
     private async Task NotifyAlertAsync(Alerta alerta, int estacionId)
     {
+        // La entidad todavía puede no tener Id (SaveChanges ocurre al finalizar el lote).
+        // Este identificador permite deduplicar el mismo aviso enviado por dos grupos sin
+        // confundir dos alertas distintas que temporalmente tienen Id = 0.
+        var notificationId = Guid.NewGuid().ToString("N");
         var payload = new
         {
+            NotificationId = notificationId,
             alerta.Id,
             TipoDetector = alerta.TipoDetector.ToString(),
             NivelRiesgo = alerta.NivelRiesgo.ToString(),

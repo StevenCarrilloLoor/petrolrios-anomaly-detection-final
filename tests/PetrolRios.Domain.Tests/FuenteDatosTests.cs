@@ -20,6 +20,15 @@ public class FuenteDatosTests
         fuente.Activa.Should().BeTrue();
     }
 
+    [Fact]
+    public void Create_NormalizaTablaYWatermarkAMayusculas()
+    {
+        var fuente = FuenteDatos.Create("Tanques", " tanq_repo ", " fec_fin_repo ", "");
+
+        fuente.Tabla.Should().Be("TANQ_REPO");
+        fuente.ColumnaWatermark.Should().Be("FEC_FIN_REPO");
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

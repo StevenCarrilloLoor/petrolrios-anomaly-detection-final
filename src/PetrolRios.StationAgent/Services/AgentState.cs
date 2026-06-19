@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using PetrolRios.StationAgent.Configuration;
 
 namespace PetrolRios.StationAgent.Services;
 
@@ -9,6 +10,8 @@ namespace PetrolRios.StationAgent.Services;
 public sealed class AgentState
 {
     private readonly ConcurrentQueue<EventoAgente> _eventos = new();
+    private readonly object _fuentesLock = new();
+    private IReadOnlyList<FuenteCentralEstadoPanel> _fuentesCentrales = [];
     private const int MaxEventos = 60;
 
     /// <summary>Si es false, el agente NO sincroniza automáticamente (modo manual).</summary>
@@ -47,6 +50,59 @@ public sealed class AgentState
     }
 
     public IReadOnlyList<EventoAgente> Eventos => _eventos.Reverse().ToList();
+
+    public IReadOnlyList<FuenteCentralEstadoPanel> FuentesCentrales
+    {
+        get
+        {
+            lock (_fuentesLock)
+                return _fuentesCentrales.ToList();
+        }
+    }
+
+    public void ActualizarFuentesCentrales(
+        IReadOnlyList<FuenteExtraccion> fuentes,
+        IReadOnlyList<EstadoFuenteAgente>? estados = null)
+    {
+        var porId = (estados ?? [])
+            .Where(e => e.FuenteDatosId > 0)
+            .ToDictionary(e => e.FuenteDatosId);
+
+        lock (_fuentesLock)
+        {
+            _fuentesCentrales = fuentes.Select(f =>
+            {
+                porId.TryGetValue(f.Id, out var estado);
+                return new FuenteCentralEstadoPanel(
+                    f.Id,
+                    f.Nombre,
+                    f.Tabla,
+                    f.ColumnaWatermark,
+                    f.Version,
+                    estado?.Estado ?? "Recibida",
+                    estado?.TablaExiste,
+                    estado?.ColumnaWatermarkValida,
+                    estado?.FilasLeidas ?? 0,
+                    estado?.FilasEnviadas ?? 0,
+                    estado?.UltimoError,
+                    DateTime.UtcNow);
+            }).ToList();
+        }
+    }
 }
 
 public sealed record EventoAgente(DateTime Fecha, string Nivel, string Mensaje);
+
+public sealed record FuenteCentralEstadoPanel(
+    int Id,
+    string Nombre,
+    string Tabla,
+    string? ColumnaWatermark,
+    DateTime Version,
+    string Estado,
+    bool? TablaExiste,
+    bool? ColumnaWatermarkValida,
+    int FilasLeidas,
+    int FilasEnviadas,
+    string? UltimoError,
+    DateTime Actualizado);

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.ReglasPersonalizadas;
 using PetrolRios.Detectors;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
@@ -133,6 +134,28 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         _dbContext.ReglasDeteccion.AddRange(reglas);
         _dbContext.SaveChanges();
 
+        // Dos reglas sobre una fuente genérica: una de auditoría y otra operativa.
+        // Esto prueba el recorrido completo de una tabla agregada dinámicamente.
+        var condicionesTanque = JsonSerializer.Serialize(
+            new[] { new CondicionRegla("DIFERENCIA", ">", "500") });
+        var reglaAuditoria = ReglaPersonalizada.Create(
+            "Tanque con diferencia para auditoría",
+            "Prueba E2E de fuente genérica",
+            "TanquesE2E",
+            condicionesTanque,
+            null,
+            70);
+        var reglaOperativa = ReglaPersonalizada.Create(
+            "Tanque con diferencia operativa",
+            "Prueba E2E de fuente genérica",
+            "TanquesE2E",
+            condicionesTanque,
+            null,
+            60);
+        reglaOperativa.Ambito = "Operativa";
+        _dbContext.ReglasPersonalizadas.AddRange(reglaAuditoria, reglaOperativa);
+        _dbContext.SaveChanges();
+
         // --- Datos de staging sintéticos diseñados para disparar alertas ---
 
         // 1. CashFraud: CierreTurno con Faltante=$100 (umbral es $50)
@@ -216,6 +239,14 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
             TransaccionStaging.Create(estacion.Id, "Credito",
                 JsonSerializer.Serialize(creditoSinAuth), DateTime.UtcNow.AddMinutes(-15)));
 
+        // 4. Fuente genérica recibida desde una tabla extra del agente.
+        _dbContext.TransaccionesStaging.Add(
+            TransaccionStaging.Create(
+                estacion.Id,
+                "TanquesE2E",
+                """{"COD_TANQ":"T-01","DIFERENCIA":650,"VENTAS_TANQ":100}""",
+                DateTime.UtcNow.AddMinutes(-2)));
+
         _dbContext.SaveChanges();
     }
 
@@ -262,6 +293,30 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
                 Times.AtLeastOnce,
                 "las alertas detectadas deben notificarse por SignalR");
         }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FuenteGenerica_CreaAlertasEnAmbosAmbitosYNotificaEstacion()
+    {
+        await _job.ExecuteAsync();
+
+        var personalizadas = await _dbContext.Alertas
+            .Where(a => a.TipoDetector == TipoDetector.Personalizada)
+            .ToListAsync();
+
+        personalizadas.Should().Contain(a => a.Ambito == AmbitoAlerta.Auditoria);
+        personalizadas.Should().Contain(a => a.Ambito == AmbitoAlerta.Operativa);
+
+        var estacionId = await _dbContext.Estaciones.Select(e => e.Id).SingleAsync();
+        _hubClientsMock.Verify(
+            c => c.Group($"estacion-{estacionId}"),
+            Times.AtLeastOnce);
+        _clientProxyMock.Verify(
+            p => p.SendCoreAsync(
+                "ProblemaEstacion",
+                It.IsAny<object?[]>(),
+                It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
     }
 
     [Fact]

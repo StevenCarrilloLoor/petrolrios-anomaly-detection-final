@@ -36,6 +36,7 @@ try
     builder.Services.AddSingleton<FirebirdExtractor>();
     builder.Services.AddSingleton<LocalStore>();
     builder.Services.AddSingleton<SentMemory>();
+    builder.Services.AddSingleton<SourceWatermarkStore>();
     builder.Services.AddSingleton<CycleRunner>();
 
     // HttpClient sin BaseAddress fija: ServerClient construye la URL absoluta a
@@ -180,6 +181,7 @@ try
             notasActualizacion = state.NotasActualizacion,
             actualizacionObligatoria = state.ActualizacionObligatoria,
             aplicandoActualizacion = state.AplicandoActualizacion,
+            fuentesCentrales = state.FuentesCentrales,
             eventos = state.Eventos
         });
     });

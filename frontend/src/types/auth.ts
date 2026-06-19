@@ -9,6 +9,7 @@ export interface UsuarioInfo {
   email: string;
   nombreCompleto: string;
   rol: string;
+  estacionId: number | null;
 }
 
 export interface LoginResponse {

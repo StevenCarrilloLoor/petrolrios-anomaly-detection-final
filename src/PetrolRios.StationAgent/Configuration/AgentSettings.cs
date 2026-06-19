@@ -100,8 +100,10 @@ public sealed class AgentSettings
         copia.FuentesExtraccion = FuentesExtraccion
             .Select(f => new FuenteExtraccion
             {
+                Id = f.Id,
                 Nombre = f.Nombre, Tabla = f.Tabla,
-                ColumnaWatermark = f.ColumnaWatermark, Activa = f.Activa
+                ColumnaWatermark = f.ColumnaWatermark, Activa = f.Activa,
+                Version = f.Version
             })
             .ToList();
         return copia;
@@ -115,8 +117,11 @@ public sealed class AgentSettings
 /// </summary>
 public sealed class FuenteExtraccion
 {
+    /// <summary>Id del catálogo central. Cero para fuentes locales heredadas.</summary>
+    public int Id { get; set; }
     public string Nombre { get; set; } = "";
     public string Tabla { get; set; } = "";
     public string? ColumnaWatermark { get; set; }
     public bool Activa { get; set; } = true;
+    public DateTime Version { get; set; }
 }

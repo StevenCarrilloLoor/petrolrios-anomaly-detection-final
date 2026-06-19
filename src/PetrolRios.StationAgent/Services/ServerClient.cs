@@ -195,10 +195,12 @@ public sealed class ServerClient
             var arr = await resp.Content.ReadFromJsonAsync<List<FuenteCentralDto>>(cancellationToken: ct);
             return arr?.Select(a => new FuenteExtraccion
             {
+                Id = a.Id,
                 Nombre = a.Nombre,
                 Tabla = a.Tabla,
                 ColumnaWatermark = a.ColumnaWatermark,
-                Activa = true
+                Activa = true,
+                Version = a.Version
             }).ToList();
         }
         catch (Exception ex)
@@ -208,7 +210,46 @@ public sealed class ServerClient
         }
     }
 
-    private sealed record FuenteCentralDto(string Nombre, string Tabla, string? ColumnaWatermark);
+    private sealed record FuenteCentralDto(
+        int Id,
+        string Nombre,
+        string Tabla,
+        string? ColumnaWatermark,
+        DateTime Version);
+
+    /// <summary>
+    /// Reporta al central el estado observado de cada fuente: existencia, validez del cursor,
+    /// filas leídas/enviadas y errores. Se intenta incluso cuando una fuente no produjo datos.
+    /// </summary>
+    public async Task<bool> ReportarEstadoFuentesAsync(
+        IReadOnlyList<EstadoFuenteAgente> fuentes,
+        CancellationToken ct)
+    {
+        if (fuentes.Count == 0)
+            return true;
+
+        var settings = _config.Actual;
+        try
+        {
+            await EnsureAuthenticatedAsync(settings, ct);
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _token);
+
+            var payload = new
+            {
+                CodigoEstacion = settings.CodigoEstacion,
+                Fuentes = fuentes
+            };
+            var resp = await _httpClient.PostAsJsonAsync(
+                Url(settings.ServerUrl, "/api/v1/fuentes-datos/estado-agente"), payload, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No se pudo reportar el estado de las fuentes al central");
+            return false;
+        }
+    }
 
     /// <summary>
     /// Reporta al central el esquema completo de la base Firebird (tablas + columnas), para que el

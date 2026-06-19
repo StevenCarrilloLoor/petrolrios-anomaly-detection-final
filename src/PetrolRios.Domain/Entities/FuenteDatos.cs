@@ -34,8 +34,10 @@ public class FuenteDatos : BaseEntity
         new()
         {
             Nombre = nombre.Trim(),
-            Tabla = tabla.Trim(),
-            ColumnaWatermark = string.IsNullOrWhiteSpace(columnaWatermark) ? null : columnaWatermark.Trim(),
+            Tabla = tabla.Trim().ToUpperInvariant(),
+            ColumnaWatermark = string.IsNullOrWhiteSpace(columnaWatermark)
+                ? null
+                : columnaWatermark.Trim().ToUpperInvariant(),
             Descripcion = descripcion?.Trim() ?? string.Empty,
             Activa = true
         };
@@ -43,8 +45,10 @@ public class FuenteDatos : BaseEntity
     public void Actualizar(string nombre, string tabla, string? columnaWatermark, string descripcion, bool activa)
     {
         Nombre = nombre.Trim();
-        Tabla = tabla.Trim();
-        ColumnaWatermark = string.IsNullOrWhiteSpace(columnaWatermark) ? null : columnaWatermark.Trim();
+        Tabla = tabla.Trim().ToUpperInvariant();
+        ColumnaWatermark = string.IsNullOrWhiteSpace(columnaWatermark)
+            ? null
+            : columnaWatermark.Trim().ToUpperInvariant();
         Descripcion = descripcion?.Trim() ?? string.Empty;
         Activa = activa;
         UpdatedAt = DateTime.UtcNow;

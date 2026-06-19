@@ -14,6 +14,7 @@ public sealed class CycleRunner
     private readonly ServerClient _serverClient;
     private readonly LocalStore _localStore;
     private readonly SentMemory _sentMemory;
+    private readonly SourceWatermarkStore _sourceWatermarks;
     private readonly AgentState _state;
     private readonly AgentConfigStore _config;
     private readonly ILogger<CycleRunner> _logger;
@@ -38,6 +39,7 @@ public sealed class CycleRunner
         ServerClient serverClient,
         LocalStore localStore,
         SentMemory sentMemory,
+        SourceWatermarkStore sourceWatermarks,
         AgentState state,
         AgentConfigStore config,
         ILogger<CycleRunner> logger)
@@ -46,6 +48,7 @@ public sealed class CycleRunner
         _serverClient = serverClient;
         _localStore = localStore;
         _sentMemory = sentMemory;
+        _sourceWatermarks = sourceWatermarks;
         _state = state;
         _config = config;
         _logger = logger;
@@ -62,6 +65,7 @@ public sealed class CycleRunner
             return "Ya hay un ciclo en ejecución";
 
         var sw = Stopwatch.StartNew();
+        List<FuenteExtraccion>? fuentesCentrales = null;
         try
         {
             _logger.LogInformation("Ciclo iniciado — extrayendo desde {Watermark:O}", _lastWatermark);
@@ -73,8 +77,12 @@ public sealed class CycleRunner
             // 2. Extraer nuevas transacciones desde Firebird. Antes pedimos al central el
             //    catálogo de fuentes extra (registradas una sola vez por el ingeniero). Si el
             //    central no responde, se devuelve null y se sigue con las fuentes locales.
-            var fuentesCentrales = await _serverClient.ObtenerFuentesCentralAsync(ct);
-            var items = await _extractor.ExtractSinceAsync(_lastWatermark, fuentesCentrales, ct);
+            fuentesCentrales = await _serverClient.ObtenerFuentesCentralAsync(ct);
+            if (fuentesCentrales is not null)
+                _state.ActualizarFuentesCentrales(fuentesCentrales);
+            var extraccion = await _extractor.ExtractSinceAsync(
+                _lastWatermark, fuentesCentrales, ct);
+            var items = extraccion.Items;
 
             // 2b. Filtrar lo ya enviado: algunos registros "vivos" reaparecen ciclo a ciclo
             //     (p. ej. un turno aún sin cerrar, EST_TURN='0') aunque su marca de agua sea
@@ -84,6 +92,14 @@ public sealed class CycleRunner
 
             if (nuevos.Count == 0)
             {
+                GuardarCursores(extraccion.CursoresFuentes);
+                await ReportarEstadosAsync(
+                    extraccion.EstadosFuentes,
+                    nuevos,
+                    "Sincronizada",
+                    fuentesCentrales,
+                    ct);
+
                 var partes = new List<string>();
                 if (omitidos > 0) partes.Add($"{omitidos} ya enviados (omitidos)");
                 if (pendientesEnviados > 0) partes.Add($"{pendientesEnviados} pendientes reenviados");
@@ -100,6 +116,13 @@ public sealed class CycleRunner
             if (sent)
             {
                 _sentMemory.MarcarEnviados(nuevos);
+                GuardarCursores(extraccion.CursoresFuentes);
+                await ReportarEstadosAsync(
+                    extraccion.EstadosFuentes,
+                    nuevos,
+                    "Sincronizada",
+                    fuentesCentrales,
+                    ct);
                 _lastWatermark = DateTime.UtcNow;
                 SaveWatermark(_lastWatermark);
                 _state.TotalTransaccionesEnviadas += nuevos.Count;
@@ -113,6 +136,15 @@ public sealed class CycleRunner
 
             // 4. Store-and-forward: guardar localmente para reintento
             await _localStore.SavePendingAsync(nuevos, ct);
+            // El lote ya quedó persistido localmente: avanzar el cursor de las fuentes
+            // evita crear el mismo archivo pendiente en cada ciclo mientras vuelve la red.
+            GuardarCursores(extraccion.CursoresFuentes);
+            await ReportarEstadosAsync(
+                extraccion.EstadosFuentes,
+                nuevos,
+                "PendienteEnvio",
+                fuentesCentrales,
+                ct);
             _state.UltimaDesconexionServidor = DateTime.UtcNow;
 
             var resumenFallo = $"Servidor no disponible — {nuevos.Count} transacciones guardadas localmente";
@@ -122,6 +154,20 @@ public sealed class CycleRunner
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error en el ciclo del agente");
+            if (fuentesCentrales is { Count: > 0 })
+            {
+                var estadosError = fuentesCentrales.Select(f => new EstadoFuenteAgente(
+                    f.Id,
+                    f.Version,
+                    "Error",
+                    false,
+                    false,
+                    0,
+                    0,
+                    ex.Message)).ToList();
+                _state.ActualizarFuentesCentrales(fuentesCentrales, estadosError);
+                await _serverClient.ReportarEstadoFuentesAsync(estadosError, ct);
+            }
             var resumenError = $"Error: {ex.Message}";
             Completar(false, resumenError, 0);
             return resumenError;
@@ -181,6 +227,49 @@ public sealed class CycleRunner
             }
         }
         return enviados;
+    }
+
+    private void GuardarCursores(IReadOnlyList<CursorFuenteExtraida> cursores)
+    {
+        foreach (var cursor in cursores)
+            _sourceWatermarks.Save(
+                cursor.FuenteDatosId,
+                cursor.VersionFuente,
+                cursor.CursorMaximo);
+    }
+
+    private async Task ReportarEstadosAsync(
+        IReadOnlyList<EstadoFuenteAgente> estados,
+        IReadOnlyList<TransaccionBatchItem> enviados,
+        string estadoExitoso,
+        IReadOnlyList<FuenteExtraccion>? fuentes,
+        CancellationToken ct)
+    {
+        if (estados.Count == 0)
+            return;
+
+        var enviadosPorFuente = enviados
+            .Where(i => i.FuenteDatosId.HasValue)
+            .GroupBy(i => i.FuenteDatosId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var reporte = estados.Select(e =>
+        {
+            if (e.Estado is "TablaNoExiste" or "WatermarkInvalido" or "Error")
+                return e;
+
+            var filasEnviadas = enviadosPorFuente.GetValueOrDefault(e.FuenteDatosId);
+            return e with
+            {
+                Estado = estadoExitoso,
+                FilasEnviadas = filasEnviadas
+            };
+        }).ToList();
+
+        if (fuentes is not null)
+            _state.ActualizarFuentesCentrales(fuentes, reporte);
+
+        await _serverClient.ReportarEstadoFuentesAsync(reporte, ct);
     }
 
     private DateTime LoadWatermark()

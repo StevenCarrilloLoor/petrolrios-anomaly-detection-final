@@ -1,13 +1,15 @@
+/* eslint-disable react-refresh/only-export-components -- El contexto y sus hooks forman una API cohesiva. */
 import {
   createContext,
   useContext,
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import type { ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getConnectionReady, getSignalRConnection } from "@/services/signalr";
+import { subscribeSignalREvent } from "@/services/signalr";
 import type { AlertaResponse } from "@/types/alert";
 import { ToastContainer, type Toast } from "./ToastContainer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +37,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [alertCount, setAlertCount] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const recibidas = useRef(new Set<string>());
 
   const addToast = useCallback((toast: Omit<Toast, "id">) => {
     const id = crypto.randomUUID();
@@ -55,12 +58,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!token) return;
 
-    let cancelled = false;
-
     const handler = (alerta: AlertaResponse) => {
+      // Un administrador adscrito a una estación pertenece al grupo de su rol y al
+      // grupo de estación. La misma alerta operativa puede llegar por ambos eventos.
+      const claveNotificacion =
+        alerta.notificationId ??
+        `${alerta.id}:${String(alerta.ambito)}:${alerta.descripcion}`;
+      if (recibidas.current.has(claveNotificacion)) return;
+      recibidas.current.add(claveNotificacion);
+      setTimeout(() => recibidas.current.delete(claveNotificacion), 60_000);
+
+      const operativa = esAlertaOperativa(alerta.ambito);
       setAlertCount((prev) => prev + 1);
       addToast({
-        title: `Nueva alerta: ${alerta.tipoDetector}`,
+        title: operativa
+          ? "Nuevo problema de estación"
+          : `Nueva alerta: ${alerta.tipoDetector}`,
         message: alerta.descripcion,
         level: alerta.nivelRiesgo,
       });
@@ -70,24 +83,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       void queryClient.invalidateQueries({ queryKey: ["alertas"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
+      if (operativa) {
+        void queryClient.invalidateQueries({ queryKey: ["problemas-estacion"] });
+      }
     };
 
-    const promise = getConnectionReady();
-    if (promise) {
-      promise
-        .then((conn) => {
-          if (cancelled) return;
-          conn.on("NuevaAlerta", handler);
-        })
-        .catch(() => {});
-    }
+    const unsubscribeAlerta = subscribeSignalREvent<AlertaResponse>(
+      "NuevaAlerta",
+      handler,
+    );
+    const unsubscribeProblema = subscribeSignalREvent<AlertaResponse>(
+      "ProblemaEstacion",
+      handler,
+    );
 
     return () => {
-      cancelled = true;
-      const conn = getSignalRConnection();
-      if (conn) {
-        conn.off("NuevaAlerta", handler);
-      }
+      unsubscribeAlerta();
+      unsubscribeProblema();
     };
   }, [token, addToast, queryClient]);
 
@@ -97,4 +109,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </NotificationContext.Provider>
   );
+}
+
+function esAlertaOperativa(ambito: unknown): boolean {
+  if (typeof ambito === "number") return ambito === 1;
+  return String(ambito).trim().toLowerCase() === "operativa";
 }

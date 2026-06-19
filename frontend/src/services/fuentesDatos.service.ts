@@ -7,6 +7,26 @@ export interface FuenteDatosResponse {
   columnaWatermark: string | null;
   descripcion: string;
   activa: boolean;
+  version: string;
+  sincronizaciones: FuenteDatosEstacionEstado[];
+}
+
+export interface FuenteDatosEstacionEstado {
+  estacionId: number;
+  estacionCodigo: string;
+  estacionNombre: string;
+  agenteEnLinea: boolean;
+  estado: string;
+  tablaExiste: boolean;
+  columnaWatermarkValida: boolean;
+  filasLeidas: number;
+  filasEnviadas: number;
+  totalFilasEnviadas: number;
+  ultimoError: string | null;
+  versionFuente: string;
+  configuracionActualizada: boolean;
+  ultimoReporte: string;
+  ultimoExito: string | null;
 }
 
 export interface CrearFuenteDatosRequest {

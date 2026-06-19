@@ -17,6 +17,7 @@ export type EstadoAlerta =
 export type AmbitoAlerta = "Operativa" | "Auditoria";
 
 export interface AlertaResponse {
+  notificationId?: string;
   id: number;
   tipoDetector: TipoDetector;
   nivelRiesgo: NivelRiesgo;

@@ -19,6 +19,9 @@ import {
   Info,
   Search,
   DownloadCloud,
+  CheckCircle2,
+  AlertTriangle,
+  Clock3,
 } from "lucide-react";
 
 const inputClass =
@@ -54,6 +57,7 @@ export function FuentesDatosSection() {
   const { data: fuentes, isLoading } = useQuery({
     queryKey: ["fuentes-datos"],
     queryFn: fuentesDatosService.getAll,
+    refetchInterval: 10_000,
   });
 
   // Estaciones para elegir de cuál cargar el esquema (las conectadas tienen heartbeat reciente).
@@ -71,11 +75,6 @@ export function FuentesDatosSection() {
       ),
     onError: () => setAvisoEsquema("No se pudo solicitar el esquema."),
   });
-
-  function estacionConectada(ultimoHeartbeat: string | null): boolean {
-    if (!ultimoHeartbeat) return false;
-    return Date.now() - new Date(ultimoHeartbeat).getTime() < 3 * 60 * 1000;
-  }
 
   const invalidar = () =>
     void queryClient.invalidateQueries({ queryKey: ["fuentes-datos"] });
@@ -163,12 +162,11 @@ export function FuentesDatosSection() {
         <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3">
           <Info size={16} className="mt-0.5 shrink-0 text-muted-foreground" />
           <p className="text-xs text-muted-foreground">
-            Estas tablas se suman a las estándar que el agente ya envía (turnos,
-            despachos, facturas, anulaciones, créditos). Cada agente verifica que la
-            tabla y la columna existan en <span className="font-medium">su</span> base
-            antes de extraer, así que registrar una tabla que falte en alguna estación
-            no causa errores: esa estación simplemente la omite. Para ver los campos de
-            una tabla, búscala abajo o cárgala desde una estación conectada.
+            <span className="font-medium text-foreground">Documentar</span> una tabla
+            solo carga sus nombres y columnas para ayudarte a crear reglas. Para que
+            genere alertas también debes registrarla como fuente activa. Debajo de cada
+            fuente verás qué agentes confirmaron la tabla, validaron su marca de agua y
+            enviaron filas al sistema central.
           </p>
         </div>
 
@@ -190,7 +188,7 @@ export function FuentesDatosSection() {
                 {(estaciones ?? []).map((e) => (
                   <option key={e.id} value={e.codigo}>
                     {e.codigo} — {e.nombre}
-                    {estacionConectada(e.ultimoHeartbeat) ? " (en línea)" : " (sin conexión)"}
+                    {e.enLinea ? " (en línea)" : " (sin conexión)"}
                   </option>
                 ))}
               </select>
@@ -251,9 +249,66 @@ export function FuentesDatosSection() {
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {f.descripcion || "Sin descripción"}
                       {f.columnaWatermark
-                        ? ` · marca de agua: ${f.columnaWatermark}`
-                        : " · tope de filas por ciclo"}
+                        ? ` · cursor incremental: ${f.columnaWatermark}`
+                        : " · modo muestra: primeras 500 filas por ciclo"}
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {f.sincronizaciones.length === 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
+                          <Clock3 size={11} /> Esperando el primer reporte de los agentes
+                        </span>
+                      ) : (
+                        f.sincronizaciones.map((s) => (
+                          <span
+                            key={s.estacionId}
+                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] ${
+                              estadoCorrecto(
+                                s.configuracionActualizada
+                                  ? s.estado
+                                  : "ConfiguracionPendiente",
+                              )
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                                : "border-amber-500/30 bg-amber-500/10 text-amber-600"
+                            }`}
+                            title={
+                              s.ultimoError ??
+                              `${s.filasLeidas} leídas · ${s.filasEnviadas} enviadas en el último ciclo`
+                            }
+                          >
+                            {estadoCorrecto(
+                              s.configuracionActualizada
+                                ? s.estado
+                                : "ConfiguracionPendiente",
+                            ) ? (
+                              <CheckCircle2 size={11} />
+                            ) : (
+                              <AlertTriangle size={11} />
+                            )}
+                            {s.estacionCodigo}:{" "}
+                            {etiquetaEstado(
+                              s.configuracionActualizada
+                                ? s.estado
+                                : "ConfiguracionPendiente",
+                            )}
+                            {!s.agenteEnLinea && " · fuera de línea"}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                    {f.sincronizaciones.some((s) => s.ultimoError) && (
+                      <div className="mt-2 space-y-1">
+                        {f.sincronizaciones
+                          .filter((s) => s.ultimoError)
+                          .map((s) => (
+                            <p
+                              key={s.estacionId}
+                              className="text-[11px] text-amber-600"
+                            >
+                              {s.estacionCodigo}: {s.ultimoError}
+                            </p>
+                          ))}
+                      </div>
+                    )}
                   </div>
                   {esAdmin && (
                     <div className="flex shrink-0 items-center gap-2">
@@ -345,6 +400,9 @@ function FormularioFila({
     retry: false,
     staleTime: 30_000,
   });
+  const columnasTemporales = (detalle?.columnas ?? []).filter((c) =>
+    esTipoTemporal(c.tipo),
+  );
 
   return (
     <div className="space-y-3 bg-muted/30 px-4 py-4">
@@ -399,15 +457,27 @@ function FormularioFila({
           </div>
         </div>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Columna de fecha (marca de agua, opcional)
-          <input
+          Cursor incremental (columna DATE/TIME/TIMESTAMP)
+          <select
             className={`${inputClass} font-mono`}
-            placeholder="Ej: FECHA"
             value={form.columnaWatermark}
             onChange={(e) =>
-              setForm({ ...form, columnaWatermark: e.target.value.toUpperCase() })
+              setForm({ ...form, columnaWatermark: e.target.value })
             }
-          />
+            disabled={!detalle}
+          >
+            <option value="">Sin cursor — muestra de hasta 500 filas</option>
+            {columnasTemporales.map((c) => (
+              <option key={c.nombre} value={c.nombre}>
+                {c.nombre} ({c.tipo})
+              </option>
+            ))}
+          </select>
+          {detalle && columnasTemporales.length === 0 && (
+            <span className="text-[11px] text-amber-600">
+              Esta tabla no tiene columnas temporales; solo puede usarse en modo muestra.
+            </span>
+          )}
         </label>
         <label className="flex items-center gap-2 self-end text-sm text-foreground">
           <input
@@ -427,16 +497,13 @@ function FormularioFila({
           </p>
           <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
             {detalle.columnas.map((c) => (
-              <button
+              <div
                 key={c.nombre}
-                type="button"
-                onClick={() => setForm({ ...form, columnaWatermark: c.nombre })}
                 className="flex items-center justify-between rounded px-1.5 py-0.5 text-left text-xs hover:bg-muted"
-                title="Usar como columna de fecha (marca de agua)"
               >
                 <span className="font-mono text-foreground">{c.nombre}</span>
                 <span className="font-mono text-[10px] text-primary">{c.tipo}</span>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -475,6 +542,33 @@ function FormularioFila({
 function capitalizar(tabla: string): string {
   const t = tabla.toLowerCase().replace(/_/g, " ").trim();
   return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function esTipoTemporal(tipo: string): boolean {
+  const normalizado = tipo.trim().toUpperCase();
+  return (
+    normalizado.startsWith("DATE") ||
+    normalizado.startsWith("TIME") ||
+    normalizado.startsWith("TIMESTAMP")
+  );
+}
+
+function estadoCorrecto(estado: string): boolean {
+  return estado === "Sincronizada" || estado === "DatosLeidos" || estado === "SinDatos";
+}
+
+function etiquetaEstado(estado: string): string {
+  const etiquetas: Record<string, string> = {
+    Sincronizada: "sincronizada",
+    DatosLeidos: "datos leídos",
+    SinDatos: "sin filas nuevas",
+    TablaNoExiste: "tabla ausente",
+    WatermarkInvalido: "cursor inválido",
+    PendienteEnvio: "pendiente de envío",
+    ConfiguracionPendiente: "configuración pendiente",
+    Error: "error",
+  };
+  return etiquetas[estado] ?? estado;
 }
 
 function mensajeError(e: unknown): string {

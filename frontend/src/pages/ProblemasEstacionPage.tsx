@@ -103,7 +103,7 @@ export function ProblemasEstacionPage() {
                       <MapPin size={16} className="text-primary" />
                       {g.estacionNombre || `Estación ${g.estacionId}`}
                       <span className="text-xs font-normal text-muted-foreground">
-                        · {new Date(g.fecha).toLocaleDateString()}
+                        · {formatearFechaLocal(g.fecha)}
                       </span>
                     </span>
                     <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600">
@@ -133,4 +133,10 @@ export function ProblemasEstacionPage() {
       )}
     </div>
   );
+}
+
+function formatearFechaLocal(fechaIso: string): string {
+  const [anio, mes, dia] = fechaIso.slice(0, 10).split("-").map(Number);
+  if (!anio || !mes || !dia) return fechaIso;
+  return new Date(anio, mes - 1, dia).toLocaleDateString();
 }

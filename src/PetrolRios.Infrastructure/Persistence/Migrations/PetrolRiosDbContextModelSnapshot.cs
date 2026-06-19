@@ -387,6 +387,69 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.ToTable("fuentes_datos", (string)null);
                 });
 
+            modelBuilder.Entity("PetrolRios.Domain.Entities.FuenteDatosEstacionEstado", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("ColumnaWatermarkValida")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EstacionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("FilasEnviadas")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FilasLeidas")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FuenteDatosId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("TablaExiste")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("TotalFilasEnviadas")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("UltimoError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("UltimoExito")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UltimoReporte")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("VersionFuente")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EstacionId");
+
+                    b.HasIndex("FuenteDatosId", "EstacionId")
+                        .IsUnique();
+
+                    b.ToTable("fuentes_datos_estados_estacion", (string)null);
+                });
+
             modelBuilder.Entity("PetrolRios.Domain.Entities.LogAuditoria", b =>
                 {
                     b.Property<int>("Id")
@@ -804,6 +867,25 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Estacion");
+                });
+
+            modelBuilder.Entity("PetrolRios.Domain.Entities.FuenteDatosEstacionEstado", b =>
+                {
+                    b.HasOne("PetrolRios.Domain.Entities.Estacion", "Estacion")
+                        .WithMany()
+                        .HasForeignKey("EstacionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetrolRios.Domain.Entities.FuenteDatos", "FuenteDatos")
+                        .WithMany()
+                        .HasForeignKey("FuenteDatosId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Estacion");
+
+                    b.Navigation("FuenteDatos");
                 });
 
             modelBuilder.Entity("PetrolRios.Domain.Entities.LogAuditoria", b =>

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- El proveedor y useAuth comparten el mismo contexto. */
 import {
   createContext,
   useContext,

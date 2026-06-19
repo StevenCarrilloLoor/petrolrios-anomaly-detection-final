@@ -824,3 +824,64 @@ reglas editables.
 **Con esto quedan implementados los cuatro patrones del ingeniero:** turno sin cerrar (operativa),
 crédito sin garante, despacho no facturado (operativa) y kiting. El cuadre de tanque se cubre con
 la plataforma de fuentes configurables + reglas, sin detector dedicado.
+
+---
+
+## 31. Sincronización observable de tablas dinámicas y prueba real de alertas
+
+Se cerró la diferencia entre “la tabla está documentada” y “el agente realmente la está
+extrayendo”. La marca de agua ahora se presenta y usa como **cursor incremental de extracción**,
+no como parte de la autodocumentación.
+
+### Estado por fuente y estación
+
+- Nueva entidad y migración `FuenteDatosEstacionEstado`: guarda por fuente/estación si la tabla
+  existe, si el cursor es válido, estado del ciclo, filas leídas/enviadas, total enviado, versión
+  de configuración, último éxito y error accionable.
+- Nuevo endpoint `POST /api/v1/fuentes-datos/estado-agente`; los agentes reportan estado incluso
+  cuando no hay filas o la tabla/columna está mal configurada.
+- `GET /api/v1/fuentes-datos` incluye la matriz de sincronización y detecta agentes que todavía
+  no recibieron la versión vigente de la fuente.
+
+### Watermark/cursor seguro
+
+- El backend y el agente rechazan como cursor columnas que no sean `DATE`, `TIME` o `TIMESTAMP`.
+- La UI ya no permite escribir cualquier nombre: ofrece únicamente las columnas temporales
+  descubiertas en el esquema. Sin cursor queda explícito el “modo muestra” (máximo 500 filas).
+- Cada fuente central tiene su propio cursor persistente (`source-watermarks.json`); una fuente
+  recién registrada no hereda el watermark global y carga primero sus 500 filas más recientes.
+- Se corrigió un defecto de zona horaria: Firebird `TIMESTAMP` no tiene zona; el cursor conserva
+  el reloj nativo de Firebird y solo la fecha enviada al central se convierte a UTC.
+
+### Doble check en las interfaces
+
+- En Reglas → Fuentes de datos, cada tabla muestra el estado por estación, agente en línea,
+  versión aplicada, filas del último ciclo, total y error.
+- El panel local del Station Agent incorpora “Fuentes dinámicas recibidas del sistema central”
+  con tabla, cursor, estado, filas leídas/enviadas y hora del reporte.
+- Nuevo diagnóstico `ejecutables/3-DIAGNOSTICO/verificar_fuentes_dinamicas.bat`, que compara el
+  estado del agente con el registrado en el central.
+
+### Notificaciones y carriles
+
+- El usuario autenticado transmite su `EstacionId` a SignalR y escucha `NuevaAlerta` y
+  `ProblemaEstacion`.
+- Las suscripciones sobreviven al montaje estricto de React y a recreaciones/reconexiones de la
+  conexión SignalR.
+- Cada aviso lleva `NotificationId`; así se deduplica el mismo problema recibido por grupo de rol
+  y grupo de estación sin confundir dos alertas nuevas que aún tienen `Id = 0`.
+- Las alertas operativas invalidan en tiempo real la consulta de “Problemas de estación”.
+- Se corrigió el desfase de un día al mostrar agrupaciones `DateOnly` en esa pantalla.
+
+### Verificación
+
+- Prueba E2E automatizada: una fila de fuente genérica crea una alerta de Auditoría y otra
+  Operativa, persiste ambas y emite `NuevaAlerta`/`ProblemaEstacion`.
+- Prueba real con `TANQ_REPO`, cursor `FEC_FIN_REPO` y condición `DIFERENCIA > 500`: el agente
+  reportó 1 fila leída/1 enviada; Hangfire creó ambos ámbitos; Chrome mostró simultáneamente
+  “Nueva alerta: Personalizada” y “Nuevo problema de estación”; la operativa apareció en su
+  pestaña. Los datos temporales de la prueba se limpiaron al finalizar.
+- Totales verdes: **Domain 34, Detectors 110, API 40**. Frontend: lint sin errores y build
+  de producción correcto.
+- Se restauró `scripts/verificar-mejoras.bat` para ejecutar restore, build Release, pruebas,
+  comprobación de migraciones, lint y build frontend con log en `verificacion.log`.

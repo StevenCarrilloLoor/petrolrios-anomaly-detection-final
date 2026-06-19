@@ -15,6 +15,8 @@ public class PetrolRiosDbContext : DbContext
     public DbSet<EstacionWatermark> EstacionWatermarks => Set<EstacionWatermark>();
     public DbSet<EsquemaTabla> EsquemasTabla => Set<EsquemaTabla>();
     public DbSet<FuenteDatos> FuentesDatos => Set<FuenteDatos>();
+    public DbSet<FuenteDatosEstacionEstado> FuentesDatosEstadosEstacion =>
+        Set<FuenteDatosEstacionEstado>();
     public DbSet<LogAuditoria> LogsAuditoria => Set<LogAuditoria>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<ReglaDeteccion> ReglasDeteccion => Set<ReglaDeteccion>();

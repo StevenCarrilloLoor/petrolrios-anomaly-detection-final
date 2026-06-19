@@ -39,6 +39,10 @@ internal static class PanelHtml
   .row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}
   .row span:first-child{color:var(--muted)}
   .mono{font-family:Consolas,monospace;font-size:12px}
+  .source-table{width:100%;border-collapse:collapse;font-size:12px}
+  .source-table th,.source-table td{padding:8px;border-bottom:1px solid var(--border);text-align:left}
+  .source-table th{color:var(--muted);font-weight:600}
+  .source-ok{color:var(--ok)} .source-warn{color:var(--warn)} .source-err{color:var(--err)}
   .acciones{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
   button{background:var(--accent);border:none;color:#fff;font-weight:600;font-size:13px;
          padding:10px 18px;border-radius:8px;cursor:pointer}
@@ -157,6 +161,17 @@ internal static class PanelHtml
         <h3>Conexión con el servidor</h3>
         <div class="big" id="latencia">—</div>
         <div class="sub" id="ultima-conexion">sin datos</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <h3>Fuentes dinámicas recibidas del sistema central</h3>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 10px">
+        Doble verificación local: muestra las tablas que este agente recibió del catálogo
+        central y el resultado real del último ciclo de extracción y envío.
+      </p>
+      <div id="fuentes-centrales" style="overflow-x:auto">
+        <span style="color:var(--muted);font-size:12px">Esperando el primer ciclo…</span>
       </div>
     </div>
 
@@ -412,6 +427,29 @@ let tabActual = 'monitoreo';
 
 function fmtFecha(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('es-EC',{dateStyle:'short',timeStyle:'medium'}); }
 function fmtUptime(s){ if(s<60) return Math.round(s)+' s'; if(s<3600) return Math.floor(s/60)+' min'; return Math.floor(s/3600)+' h '+Math.floor(s%3600/60)+' min'; }
+function esc(v){ return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function claseFuente(estado){
+  if(estado==='Sincronizada'||estado==='DatosLeidos'||estado==='SinDatos') return 'source-ok';
+  if(estado==='TablaNoExiste'||estado==='WatermarkInvalido'||estado==='Error') return 'source-err';
+  return 'source-warn';
+}
+function renderFuentesCentrales(fuentes){
+  const cont = document.getElementById('fuentes-centrales');
+  if(!fuentes || !fuentes.length){
+    cont.innerHTML='<span style="color:var(--muted);font-size:12px">El central no ha enviado fuentes adicionales activas.</span>';
+    return;
+  }
+  cont.innerHTML='<table class="source-table"><thead><tr><th>Fuente</th><th>Tabla</th><th>Cursor</th><th>Estado</th><th>Leídas</th><th>Enviadas</th><th>Actualizado</th></tr></thead><tbody>' +
+    fuentes.map(f => '<tr>' +
+      '<td>'+esc(f.nombre)+'</td>' +
+      '<td class="mono">'+esc(f.tabla)+'</td>' +
+      '<td class="mono">'+esc(f.columnaWatermark || 'sin cursor')+'</td>' +
+      '<td class="'+claseFuente(f.estado)+'" title="'+esc(f.ultimoError || '')+'">'+esc(f.estado)+'</td>' +
+      '<td>'+Number(f.filasLeidas || 0)+'</td>' +
+      '<td>'+Number(f.filasEnviadas || 0)+'</td>' +
+      '<td>'+esc(fmtFecha(f.actualizado))+'</td>' +
+    '</tr>').join('') + '</tbody></table>';
+}
 
 function cambiarTab(tab){
   tabActual = tab;
@@ -454,6 +492,7 @@ async function refrescar(){
     document.getElementById('cfg-watermark').textContent = fmtFecha(e.watermark);
     document.getElementById('cfg-uptime').textContent = fmtFecha(e.inicioAgente) + ' (hace ' + fmtUptime(e.uptimeSegundos) + ')';
     document.getElementById('cfg-version').textContent = e.versionAgente || '—';
+    renderFuentesCentrales(e.fuentesCentrales || []);
 
     // Banner de actualización disponible
     const bu = document.getElementById('banner-update');

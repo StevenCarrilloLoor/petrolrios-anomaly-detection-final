@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usuariosService } from "@/services/usuarios.service";
 import { Spinner } from "@/components/ui/Spinner";
 import { UserPlus, Edit, Trash2 } from "lucide-react";
+import type { UsuarioResponse } from "@/types/usuario";
 
 const ROLES = [
   { id: 1, nombre: "Auditor" },
@@ -290,30 +291,38 @@ function EditUsuarioForm({
   id: number;
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    nombreCompleto: "",
-    rolId: 1,
-    activo: true,
-  });
-
   const { data: usuario } = useQuery({
     queryKey: ["usuarios", id],
     queryFn: () => usuariosService.getById(id),
   });
 
-  useEffect(() => {
-    if (usuario) {
-      setForm({
-        nombreCompleto: usuario.nombreCompleto,
-        rolId: usuario.rolId,
-        activo: usuario.activo,
-      });
-    }
-  }, [usuario]);
+  if (!usuario) {
+    return (
+      <div className="flex justify-center rounded-lg border border-border bg-background p-6">
+        <Spinner />
+      </div>
+    );
+  }
+
+  return <EditUsuarioFormCargado key={usuario.id} usuario={usuario} onClose={onClose} />;
+}
+
+function EditUsuarioFormCargado({
+  usuario,
+  onClose,
+}: {
+  usuario: UsuarioResponse;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    nombreCompleto: usuario.nombreCompleto,
+    rolId: usuario.rolId,
+    activo: usuario.activo,
+  });
 
   const mutation = useMutation({
-    mutationFn: () => usuariosService.update(id, form),
+    mutationFn: () => usuariosService.update(usuario.id, form),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["usuarios"] });
       onClose();
@@ -322,7 +331,7 @@ function EditUsuarioForm({
 
   return (
     <div className="rounded-lg border border-border bg-background p-6">
-      <h3 className="mb-4 text-lg font-semibold">Editar Usuario #{id}</h3>
+      <h3 className="mb-4 text-lg font-semibold">Editar Usuario #{usuario.id}</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <label className="mb-1 block text-sm font-medium">Nombre</label>

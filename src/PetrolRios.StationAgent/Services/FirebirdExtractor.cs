@@ -2,6 +2,7 @@ using Dapper;
 using FirebirdSql.Data.FirebirdClient;
 using Microsoft.Extensions.Logging;
 using PetrolRios.Application.DTOs.Firebird;
+using PetrolRios.Application.Fuentes;
 using PetrolRios.StationAgent.Configuration;
 
 namespace PetrolRios.StationAgent.Services;
@@ -15,11 +16,16 @@ namespace PetrolRios.StationAgent.Services;
 public sealed class FirebirdExtractor
 {
     private readonly AgentConfigStore _config;
+    private readonly SourceWatermarkStore _sourceWatermarks;
     private readonly ILogger<FirebirdExtractor> _logger;
 
-    public FirebirdExtractor(AgentConfigStore config, ILogger<FirebirdExtractor> logger)
+    public FirebirdExtractor(
+        AgentConfigStore config,
+        SourceWatermarkStore sourceWatermarks,
+        ILogger<FirebirdExtractor> logger)
     {
         _config = config;
+        _sourceWatermarks = sourceWatermarks;
         _logger = logger;
     }
 
@@ -65,10 +71,12 @@ public sealed class FirebirdExtractor
     /// Extrae todas las transacciones nuevas desde la marca de agua indicada.
     /// Retorna un diccionario: TipoTransaccion → lista de objetos serializados a JSON.
     /// </summary>
-    public async Task<List<TransaccionBatchItem>> ExtractSinceAsync(
+    public async Task<ResultadoExtraccionAgente> ExtractSinceAsync(
         DateTime watermark, IReadOnlyList<FuenteExtraccion>? fuentesCentrales, CancellationToken ct)
     {
         var items = new List<TransaccionBatchItem>();
+        var estados = new List<EstadoFuenteAgente>();
+        var cursores = new List<CursorFuenteExtraida>();
 
         // Abrir UNA sola conexión para todo el ciclo. Si la conexión falla
         // (WireCrypt, credenciales, archivo no encontrado, servicio caído), la
@@ -113,16 +121,39 @@ public sealed class FirebirdExtractor
         {
             try
             {
-                items.AddRange(await ExtractFuenteAsync(fuente, watermark, ct));
+                var cursor = fuente.Id > 0 ? _sourceWatermarks.Get(fuente) : watermark;
+                var resultado = await ExtractFuenteConEstadoAsync(fuente, cursor, ct);
+                items.AddRange(resultado.Items);
+                if (fuente.Id > 0)
+                {
+                    estados.Add(resultado.Estado);
+                    if (resultado.CursorMaximo.HasValue)
+                        cursores.Add(new CursorFuenteExtraida(
+                            fuente.Id,
+                            fuente.Version,
+                            resultado.CursorMaximo.Value));
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error extrayendo la fuente configurable '{Fuente}'", fuente.Nombre);
+                if (fuente.Id > 0)
+                {
+                    estados.Add(new EstadoFuenteAgente(
+                        fuente.Id,
+                        fuente.Version,
+                        "Error",
+                        false,
+                        false,
+                        0,
+                        0,
+                        ex.Message));
+                }
             }
         }
 
         _logger.LogInformation("Extraídas {Count} transacciones desde watermark {Watermark:O}", items.Count, watermark);
-        return items;
+        return new ResultadoExtraccionAgente(items, estados, cursores);
     }
 
     private async Task<IEnumerable<TransaccionBatchItem>> ExtractTypeAsync<T>(
@@ -368,31 +399,68 @@ public sealed class FirebirdExtractor
     public async Task<IReadOnlyList<TransaccionBatchItem>> ExtractFuenteAsync(
         FuenteExtraccion fuente, DateTime watermark, CancellationToken ct)
     {
+        var resultado = await ExtractFuenteConEstadoAsync(fuente, watermark, ct);
+        if (resultado.Estado.Estado is "TablaNoExiste" or "WatermarkInvalido" or "Error")
+            throw new InvalidOperationException(resultado.Estado.UltimoError);
+        return resultado.Items;
+    }
+
+    private async Task<ResultadoFuenteExtraida> ExtractFuenteConEstadoAsync(
+        FuenteExtraccion fuente, DateTime? watermark, CancellationToken ct)
+    {
         var tabla = (fuente.Tabla ?? "").Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(tabla))
-            return [];
+            return ErrorFuente(fuente, "Error", false, false, "La tabla no puede estar vacía.");
 
         var tablas = await ListarTablasAsync(ct);
         if (!tablas.Any(t => t.Equals(tabla, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException($"La tabla '{fuente.Tabla}' no existe en la base.");
+            return ErrorFuente(
+                fuente,
+                "TablaNoExiste",
+                false,
+                false,
+                $"La tabla '{fuente.Tabla}' no existe en la base de esta estación.");
 
         using var connection = CreateConnection();
         string sql;
         object? parametros = null;
+        ColumnaFirebird? columnaWatermark = null;
 
         var colWm = (fuente.ColumnaWatermark ?? "").Trim();
         if (!string.IsNullOrWhiteSpace(colWm))
         {
             var desc = await DescribirTablaAsync(tabla, ct);
-            var columna = desc.Columnas.FirstOrDefault(c =>
+            columnaWatermark = desc.Columnas.FirstOrDefault(c =>
                 c.Nombre.Equals(colWm, StringComparison.OrdinalIgnoreCase));
-            if (columna is null)
-                throw new InvalidOperationException(
-                    $"La columna de watermark '{colWm}' no existe en la tabla {tabla}.");
+            if (columnaWatermark is null)
+                return ErrorFuente(
+                    fuente,
+                    "WatermarkInvalido",
+                    true,
+                    false,
+                    $"La columna de marca de agua '{colWm}' no existe en la tabla {tabla}.");
+            if (!FuenteDatosPolicy.EsTipoTemporal(columnaWatermark.Tipo))
+                return ErrorFuente(
+                    fuente,
+                    "WatermarkInvalido",
+                    true,
+                    false,
+                    $"La columna '{colWm}' es de tipo {columnaWatermark.Tipo}; debe ser DATE, TIME o TIMESTAMP.");
 
             // Nombre de columna validado contra el catálogo: seguro para interpolar.
-            sql = $"SELECT * FROM \"{tabla}\" WHERE \"{columna.Nombre}\" > @wm ORDER BY \"{columna.Nombre}\"";
-            parametros = new { wm = watermark };
+            if (watermark.HasValue)
+            {
+                sql = $"SELECT * FROM \"{tabla}\" WHERE \"{columnaWatermark.Nombre}\" > @wm " +
+                      $"ORDER BY \"{columnaWatermark.Nombre}\"";
+                parametros = new { wm = watermark.Value };
+            }
+            else
+            {
+                // Primera sincronización de una fuente nueva: obtiene las 500 filas más
+                // recientes. No hereda el watermark global, que podría saltarse toda la tabla.
+                sql = $"SELECT FIRST 500 * FROM \"{tabla}\" " +
+                      $"ORDER BY \"{columnaWatermark.Nombre}\" DESC";
+            }
         }
         else
         {
@@ -402,14 +470,73 @@ public sealed class FirebirdExtractor
         }
 
         var filas = await connection.QueryAsync(new CommandDefinition(sql, parametros, cancellationToken: ct));
-        return filas
-            .Select(fila => new TransaccionBatchItem
+        var items = new List<TransaccionBatchItem>();
+        DateTime? cursorMaximo = null;
+        foreach (var fila in filas)
+        {
+            var valores = (IDictionary<string, object>)fila;
+            DateTime? fechaFilaFirebird = null;
+            if (columnaWatermark is not null)
             {
+                var valor = valores.FirstOrDefault(v =>
+                    v.Key.Equals(columnaWatermark.Nombre, StringComparison.OrdinalIgnoreCase)).Value;
+                fechaFilaFirebird = ConvertirFechaFirebird(valor);
+                if (fechaFilaFirebird.HasValue
+                    && (!cursorMaximo.HasValue || fechaFilaFirebird > cursorMaximo))
+                    cursorMaximo = fechaFilaFirebird;
+            }
+
+            items.Add(new TransaccionBatchItem
+            {
+                FuenteDatosId = fuente.Id > 0 ? fuente.Id : null,
                 TipoTransaccion = string.IsNullOrWhiteSpace(fuente.Nombre) ? tabla : fuente.Nombre.Trim(),
-                DataJson = System.Text.Json.JsonSerializer.Serialize((IDictionary<string, object>)fila),
-                FechaOriginal = DateTime.UtcNow
-            })
-            .ToList();
+                DataJson = System.Text.Json.JsonSerializer.Serialize(valores),
+                FechaOriginal = fechaFilaFirebird.HasValue
+                    ? DateTime.SpecifyKind(fechaFilaFirebird.Value, DateTimeKind.Local).ToUniversalTime()
+                    : DateTime.UtcNow
+            });
+        }
+
+        var estado = new EstadoFuenteAgente(
+            fuente.Id,
+            fuente.Version,
+            items.Count == 0 ? "SinDatos" : "DatosLeidos",
+            true,
+            true,
+            items.Count,
+            0,
+            null);
+        return new ResultadoFuenteExtraida(items, estado, cursorMaximo);
+    }
+
+    private static ResultadoFuenteExtraida ErrorFuente(
+        FuenteExtraccion fuente,
+        string estado,
+        bool tablaExiste,
+        bool columnaWatermarkValida,
+        string error) =>
+        new(
+            [],
+            new EstadoFuenteAgente(
+                fuente.Id,
+                fuente.Version,
+                estado,
+                tablaExiste,
+                columnaWatermarkValida,
+                0,
+                0,
+                error),
+            null);
+
+    private static DateTime? ConvertirFechaFirebird(object? valor)
+    {
+        if (valor is null or DBNull)
+            return null;
+        if (valor is DateTime fecha)
+            return FuenteDatosPolicy.NormalizarCursorFirebird(fecha);
+        return DateTime.TryParse(Convert.ToString(valor), out var parsed)
+            ? FuenteDatosPolicy.NormalizarCursorFirebird(parsed)
+            : null;
     }
 
     #region SQL Queries (idénticas al servidor — tablas reales de Contaplus)
@@ -501,10 +628,37 @@ public sealed class FirebirdExtractor
 /// </summary>
 public sealed class TransaccionBatchItem
 {
+    /// <summary>Metadato local; el servidor sigue recibiendo el contrato de ingesta existente.</summary>
+    public int? FuenteDatosId { get; set; }
     public required string TipoTransaccion { get; set; }
     public required string DataJson { get; set; }
     public required DateTime FechaOriginal { get; set; }
 }
+
+public sealed record EstadoFuenteAgente(
+    int FuenteDatosId,
+    DateTime VersionFuente,
+    string Estado,
+    bool TablaExiste,
+    bool ColumnaWatermarkValida,
+    int FilasLeidas,
+    int FilasEnviadas,
+    string? UltimoError);
+
+public sealed record CursorFuenteExtraida(
+    int FuenteDatosId,
+    DateTime VersionFuente,
+    DateTime CursorMaximo);
+
+public sealed record ResultadoExtraccionAgente(
+    List<TransaccionBatchItem> Items,
+    List<EstadoFuenteAgente> EstadosFuentes,
+    List<CursorFuenteExtraida> CursoresFuentes);
+
+internal sealed record ResultadoFuenteExtraida(
+    IReadOnlyList<TransaccionBatchItem> Items,
+    EstadoFuenteAgente Estado,
+    DateTime? CursorMaximo);
 
 /// <summary>Fila cruda del catálogo de Firebird (RDB$RELATION_FIELDS).</summary>
 internal sealed class ColumnaRaw

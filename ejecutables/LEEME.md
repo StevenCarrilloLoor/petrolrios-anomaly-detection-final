@@ -34,6 +34,7 @@ Hangfire (o esperar 5 min) → ver las alertas en el dashboard.
 | `reiniciar_api.bat` | Mata la API y la vuelve a compilar/arrancar. |
 | `restaurar_firebird.bat` | Recrea el contenedor Firebird 3.0 y restaura el backup real CONTACONSTANZA (~1 min). |
 | `reparar_auth_firebird.bat` | Re-crea el usuario SYSDBA del contenedor si el agente no autentica. |
+| `verificar_fuentes_dinamicas.bat` | Muestra el doble check agente/central de cada tabla extra: cursor, estado, filas leídas/enviadas y último error. |
 
 ## 4-PUBLICACION — generar los .exe de distribución
 

@@ -34,4 +34,5 @@ public sealed record UsuarioInfo(
     int Id,
     string Email,
     string NombreCompleto,
-    string Rol);
+    string Rol,
+    int? EstacionId);

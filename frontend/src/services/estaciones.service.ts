@@ -9,6 +9,7 @@ export interface EstacionResponse {
   activa: boolean;
   ultimoHeartbeat: string | null;
   versionAgente: string | null;
+  enLinea: boolean;
 }
 
 export interface ActualizarEstacionRequest {
@@ -37,7 +38,16 @@ export interface ManifiestoVersionResponse {
 }
 
 export const estacionesService = {
-  getAll: () => api.get<EstacionResponse[]>("/estaciones").then((r) => r.data),
+  getAll: () =>
+    api.get<Omit<EstacionResponse, "enLinea">[]>("/estaciones").then((r) => {
+      const ahora = Date.now();
+      return r.data.map((estacion) => ({
+        ...estacion,
+        enLinea:
+          estacion.ultimoHeartbeat !== null &&
+          ahora - new Date(estacion.ultimoHeartbeat).getTime() < 3 * 60 * 1000,
+      }));
+    }),
 
   getVersionAgente: () =>
     api.get<ManifiestoVersionResponse>("/agente/version").then((r) => r.data),

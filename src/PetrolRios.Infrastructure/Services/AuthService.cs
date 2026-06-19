@@ -320,7 +320,12 @@ public sealed class AuthService : IAuthService
             jwt,
             refreshTokenStr,
             DateTime.UtcNow.AddMinutes(expirationMinutes),
-            new UsuarioInfo(usuario.Id, usuario.Email, usuario.NombreCompleto, rolNombre),
+            new UsuarioInfo(
+                usuario.Id,
+                usuario.Email,
+                usuario.NombreCompleto,
+                rolNombre,
+                usuario.EstacionId),
             usuario.DebeCambiarPassword);
     }
 }
