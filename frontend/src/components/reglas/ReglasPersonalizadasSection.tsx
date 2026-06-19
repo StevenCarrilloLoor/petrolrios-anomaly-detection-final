@@ -55,6 +55,7 @@ interface FormularioRegla {
   usarAgregacion: boolean;
   agregacion: AgregacionRegla;
   riesgoBase: number;
+  ambito: "Operativa" | "Auditoria";
 }
 
 const formularioVacio = (fuente: string): FormularioRegla => ({
@@ -67,6 +68,7 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
   usarAgregacion: false,
   agregacion: { agruparPor: "", funcion: "Conteo", campo: null, operador: ">", umbral: 1 },
   riesgoBase: 50,
+  ambito: "Auditoria",
 });
 
 export function ReglasPersonalizadasSection() {
@@ -116,6 +118,7 @@ export function ReglasPersonalizadasSection() {
         agregacion: regla.agregacion,
         expresionAvanzada: regla.expresionAvanzada,
         riesgoBase: regla.riesgoBase,
+        ambito: regla.ambito,
         activa: !regla.activa,
       }),
     onSuccess: invalidar,
@@ -150,6 +153,7 @@ export function ReglasPersonalizadasSection() {
         umbral: 1,
       },
       riesgoBase: regla.riesgoBase,
+      ambito: regla.ambito ?? "Auditoria",
     });
     setEditando(regla.id);
     setErrores([]);
@@ -173,6 +177,7 @@ export function ReglasPersonalizadasSection() {
         agregacion: form.usarAgregacion ? form.agregacion : null,
         expresionAvanzada: form.modoAvanzado ? form.expresion : null,
         riesgoBase: form.riesgoBase,
+        ambito: form.ambito,
         activa: true,
       },
     });
@@ -239,6 +244,7 @@ export function ReglasPersonalizadasSection() {
                       modoAvanzado: form.modoAvanzado,
                       expresion: form.expresion,
                       riesgoBase: form.riesgoBase,
+                      ambito: form.ambito,
                     })
                   }
                   className={`${inputClass} w-full`}
@@ -259,6 +265,35 @@ export function ReglasPersonalizadasSection() {
                   className={`${inputClass} w-full`}
                 />
               </label>
+              <div className="space-y-1 sm:col-span-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Carril de la alerta
+                </span>
+                <div className="flex gap-2 rounded-lg border border-border bg-background p-1">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, ambito: "Auditoria" })}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      form.ambito === "Auditoria"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Auditoría (fraude → central)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, ambito: "Operativa" })}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      form.ambito === "Operativa"
+                        ? "bg-amber-500 text-white"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Operativa (problema de estación)
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Selector de modo: básico (visual) vs avanzado (expresión) */}
@@ -597,7 +632,18 @@ export function ReglasPersonalizadasSection() {
               } ${!regla.activa ? "opacity-60" : ""}`}
             >
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-foreground">{regla.nombre}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-foreground">{regla.nombre}</p>
+                  {regla.ambito === "Operativa" ? (
+                    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                      Operativa
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                      Auditoría
+                    </span>
+                  )}
+                </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {regla.descripcion || resumenRegla(regla)}
                 </p>

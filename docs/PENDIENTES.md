@@ -5,6 +5,16 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 
 ---
 
+## 🔴 Feedback del 18-jun (revisión en vivo de Steven) — pendiente
+1. [ ] **Regla personalizada sin ámbito**: al crear/editar una regla personalizada no se puede elegir si es **Operativa** o **Auditoría** (no hay tag/selector). Hoy su alerta siempre cae en Auditoría. → `ReglaPersonalizada.Ambito` + selector en el builder y editor + `CustomRuleDetector` setea `DetectedAnomaly.Ambito` + badge en la lista.
+2. [ ] **La tabla registrada no aparece en el builder**: el desplegable "Fuente de datos" se arma SOLO con lo que ya llegó al staging; una tabla recién registrada en el central (p. ej. TANQ_REPO) no aparece ni se documentan sus campos hasta que el agente envíe filas. → `GetCatalogo` debe incluir las `FuentesDatos` del registro central.
+3. [ ] **Sin documentación automática de la tabla registrada**: al registrar una tabla no se ve qué columnas tiene (el central no conoce el esquema de Firebird). → el agente debe **reportar su esquema** (tablas+columnas) al central; el central lo guarda y lo muestra.
+4. [ ] **Falta navegador de tablas en el CENTRAL con búsqueda avanzada**: quien no conoce la base no sabe los nombres de tabla. El explorador/fuentes locales del **agente** deben **quitarse** (se está centralizando) y moverse al central (buscar tabla por nombre, ver columnas, registrarla).
+5. [ ] **Editor de reglas del motor demasiado simple**: solo cambia umbral. Revisar si debe permitir más (activar/desactivar ya está; evaluar editar descripción u otros parámetros con cuidado de no romper la lógica fija del detector).
+6. [ ] **No se probó el agente con datos reales**: insertar datos en Firebird (turno abierto, factura backdated, fila de tabla extra) para ver que el agente extrae y el central genera alertas **Operativa y Auditoría**.
+7. [ ] **No se probó la interfaz nueva de gestión de notificaciones de la estación** ni todas las del agente en Chrome.
+8. [ ] **Faltan tests** que validen los métodos nuevos (memoria de envío, fuentes centrales, ámbito de reglas personalizadas).
+
 ## 🟡 Hecho en esta ronda (a verificar/commitear con `scripts/verificar_ronda_fuentes.bat`)
 - **Memoria de envío del agente** (`SentMemory`): huella de contenido por registro, persistida en `enviados.huellas`. Corta el bucle de "1 transacción enviada" cada ciclo (el turno abierto `EST_TURN='0'` ya no se reenvía). Si el contenido cambia (turno se cierra) vuelve a enviarse una sola vez. El almacenamiento del central siempre estuvo a salvo por la idempotencia; esto evita el tráfico/ruido inútil.
 - **Reglas diferenciadas por carril** en la UI de Reglas: badge **Operativa** vs **Auditoría** (derivado del parámetro en `ReglaService`). Las operativas (turno sin cerrar, despacho no facturado, fuera de horario) quedan visibles y editables como las demás.

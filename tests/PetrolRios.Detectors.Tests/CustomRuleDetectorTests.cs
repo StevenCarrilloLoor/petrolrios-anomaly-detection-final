@@ -42,6 +42,35 @@ public class CustomRuleDetectorTests
     }
 
     [Fact]
+    public async Task DetectAsync_ReglaSinAmbito_AlertaEsAuditoria()
+    {
+        var regla = CrearRegla("Factura", [new CondicionRegla("TotalNeto", ">", "300")]);
+        var context = TestHelpers.CreateContext(
+            facturas: [TestHelpers.CreateFactura(totalNeto: 500)],
+            reglasPersonalizadas: [regla]);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().HaveCount(1);
+        result[0].Ambito.Should().Be(AmbitoAlerta.Auditoria);
+    }
+
+    [Fact]
+    public async Task DetectAsync_ReglaOperativa_AlertaEsOperativa()
+    {
+        var regla = CrearRegla("Factura", [new CondicionRegla("TotalNeto", ">", "300")]);
+        regla.Ambito = "Operativa";
+        var context = TestHelpers.CreateContext(
+            facturas: [TestHelpers.CreateFactura(totalNeto: 500)],
+            reglasPersonalizadas: [regla]);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().HaveCount(1);
+        result[0].Ambito.Should().Be(AmbitoAlerta.Operativa);
+    }
+
+    [Fact]
     public async Task DetectAsync_CondicionNumericaCumplida_GeneraAlertaPorRegistro()
     {
         // Regla: facturas con TotalNeto > 300

@@ -30,11 +30,18 @@ public class ReglaPersonalizada : BaseEntity
     /// <summary>Riesgo base de la alerta generada (1–100); el motor de scoring aplica multiplicadores.</summary>
     public double RiesgoBase { get; set; } = 50;
 
+    /// <summary>
+    /// Carril de las alertas que genera esta regla: "Operativa" (problema de estación → avisa al
+    /// administrador de la estación) o "Auditoria" (fraude → central). Por defecto Auditoría.
+    /// </summary>
+    public string Ambito { get; set; } = "Auditoria";
+
     public bool Activa { get; set; } = true;
 
     public static ReglaPersonalizada Create(
         string nombre, string descripcion, string fuenteDatos,
-        string condicionesJson, string? agregacionJson, double riesgoBase) =>
+        string condicionesJson, string? agregacionJson, double riesgoBase,
+        string ambito = "Auditoria") =>
         new()
         {
             Nombre = nombre,
@@ -42,6 +49,13 @@ public class ReglaPersonalizada : BaseEntity
             FuenteDatos = fuenteDatos,
             CondicionesJson = condicionesJson,
             AgregacionJson = agregacionJson,
-            RiesgoBase = riesgoBase
+            RiesgoBase = riesgoBase,
+            Ambito = NormalizarAmbito(ambito)
         };
+
+    /// <summary>Acepta solo "Operativa" o "Auditoria" (por defecto Auditoría).</summary>
+    public static string NormalizarAmbito(string? ambito) =>
+        string.Equals(ambito?.Trim(), "Operativa", StringComparison.OrdinalIgnoreCase)
+            ? "Operativa"
+            : "Auditoria";
 }

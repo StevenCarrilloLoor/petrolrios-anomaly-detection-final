@@ -499,6 +499,13 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<string>("AgregacionJson")
                         .HasColumnType("jsonb");
 
+                    b.Property<string>("Ambito")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Auditoria");
+
                     b.Property<string>("CondicionesJson")
                         .IsRequired()
                         .HasColumnType("jsonb");

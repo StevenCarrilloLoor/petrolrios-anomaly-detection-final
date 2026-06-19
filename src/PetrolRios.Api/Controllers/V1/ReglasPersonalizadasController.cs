@@ -69,6 +69,9 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             .Distinct()
             .ToListAsync(ct);
 
+        // Nombres ya presentes (conocidas + las que ya se agregaron) para no duplicar.
+        var agregadas = new HashSet<string>(fuentes.Select(f => f.Nombre), StringComparer.OrdinalIgnoreCase);
+
         foreach (var tipo in tiposCustom.Where(t => !conocidas.Contains(t)).OrderBy(t => t))
         {
             var muestra = await _dbContext.TransaccionesStaging
@@ -78,6 +81,24 @@ public sealed class ReglasPersonalizadasController : ControllerBase
                 .FirstOrDefaultAsync(ct);
 
             fuentes.Add(new FuenteCatalogo(tipo, $"{tipo} (tabla configurable)", InferirCampos(muestra)));
+            agregadas.Add(tipo);
+        }
+
+        // Fuentes registradas en el catálogo CENTRAL (Reglas → "Fuentes de datos"): aparecen en el
+        // builder aunque el agente todavía no haya enviado filas. Si ya llegaron datos al staging,
+        // sus campos se documentan solos arriba; si no, se ofrecen los campos del esquema reportado
+        // por el agente (tabla esquemas_tabla). Así el ingeniero puede crear reglas de inmediato.
+        var fuentesCentrales = await _dbContext.FuentesDatos
+            .AsNoTracking()
+            .Where(f => f.Activa)
+            .OrderBy(f => f.Nombre)
+            .ToListAsync(ct);
+
+        foreach (var fc in fuentesCentrales.Where(f => !agregadas.Contains(f.Nombre)))
+        {
+            var campos = await CamposDesdeEsquemaAsync(fc.Tabla, ct);
+            fuentes.Add(new FuenteCatalogo(fc.Nombre, $"{fc.Nombre} ({fc.Tabla})", campos));
+            agregadas.Add(fc.Nombre);
         }
 
         var catalogo = new CatalogoReglasResponse
@@ -89,6 +110,15 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         };
         return Ok(catalogo);
     }
+
+    /// <summary>
+    /// Campos de una tabla a partir del esquema que reporta el agente. (Pendiente Increment 3:
+    /// cuando el agente empuje su esquema al central, aquí se leerá la tabla de esquemas. Por
+    /// ahora devuelve vacío: la fuente igual aparece en el builder y, en cuanto llegue la primera
+    /// fila al staging, sus campos se documentan automáticamente.)
+    /// </summary>
+    private Task<List<CampoCatalogo>> CamposDesdeEsquemaAsync(string tabla, CancellationToken ct) =>
+        Task.FromResult(new List<CampoCatalogo>());
 
     /// <summary>Infiere los campos (nombre + tipo) de una fuente configurable desde una fila JSON.</summary>
     private static List<CampoCatalogo> InferirCampos(string? json)
@@ -154,7 +184,8 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             request.FuenteDatos,
             JsonSerializer.Serialize(request.Condiciones),
             request.Agregacion is null ? null : JsonSerializer.Serialize(request.Agregacion),
-            request.RiesgoBase);
+            request.RiesgoBase,
+            request.Ambito);
         regla.Activa = request.Activa;
         regla.ExpresionAvanzada = string.IsNullOrWhiteSpace(request.ExpresionAvanzada)
             ? null : request.ExpresionAvanzada.Trim();
@@ -193,6 +224,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.ExpresionAvanzada = string.IsNullOrWhiteSpace(request.ExpresionAvanzada)
             ? null : request.ExpresionAvanzada.Trim();
         regla.RiesgoBase = request.RiesgoBase;
+        regla.Ambito = ReglaPersonalizada.NormalizarAmbito(request.Ambito);
         regla.Activa = request.Activa;
         await _dbContext.SaveChangesAsync(ct);
 
@@ -270,6 +302,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             : JsonSerializer.Deserialize<AgregacionRegla>(regla.AgregacionJson, JsonOpts),
         ExpresionAvanzada = regla.ExpresionAvanzada,
         RiesgoBase = regla.RiesgoBase,
+        Ambito = regla.Ambito,
         Activa = regla.Activa
     };
 }

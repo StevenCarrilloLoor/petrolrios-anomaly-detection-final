@@ -107,6 +107,12 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         }
     }
 
+    /// <summary>Carril de la alerta según el ámbito configurado en la regla (por defecto Auditoría).</summary>
+    private static AmbitoAlerta AmbitoDe(ReglaPersonalizada regla) =>
+        string.Equals(regla.Ambito?.Trim(), "Operativa", StringComparison.OrdinalIgnoreCase)
+            ? AmbitoAlerta.Operativa
+            : AmbitoAlerta.Auditoria;
+
     private static List<object> ObtenerFuente(DetectionContext context, string fuente) => fuente switch
     {
         "Factura" => context.Facturas.Cast<object>().ToList(),
@@ -220,6 +226,7 @@ public sealed class CustomRuleDetector : IAnomalyDetector
                           (monto is not null ? $". Monto: ${monto:F2}" : ""),
             Score = score,
             NivelRiesgo = nivel,
+            Ambito = AmbitoDe(regla),
             EstacionId = context.EstacionId,
             EmpleadoCodigo = empleado,
             TransaccionReferencia = $"REGLA-{regla.Id}",
@@ -246,6 +253,7 @@ public sealed class CustomRuleDetector : IAnomalyDetector
                           $"{agregacion.Operador} {agregacion.Umbral} ({cantidadRegistros} registros de {regla.FuenteDatos})",
             Score = score,
             NivelRiesgo = nivel,
+            Ambito = AmbitoDe(regla),
             EstacionId = context.EstacionId,
             EmpleadoCodigo = esEmpleado && !string.IsNullOrWhiteSpace(grupo) ? grupo : null,
             TransaccionReferencia = $"REGLA-{regla.Id}-{grupo}",

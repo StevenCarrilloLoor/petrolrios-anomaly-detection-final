@@ -21,6 +21,7 @@ export interface ReglaPersonalizadaResponse {
   agregacion: AgregacionRegla | null;
   expresionAvanzada: string | null;
   riesgoBase: number;
+  ambito: "Operativa" | "Auditoria";
   activa: boolean;
 }
 
@@ -32,6 +33,7 @@ export interface GuardarReglaPersonalizadaRequest {
   agregacion: AgregacionRegla | null;
   expresionAvanzada: string | null;
   riesgoBase: number;
+  ambito: "Operativa" | "Auditoria";
   activa: boolean;
 }
 

@@ -15,6 +15,10 @@ public sealed record ReglaPersonalizadaResponse
     public string? ExpresionAvanzada { get; init; }
 
     public double RiesgoBase { get; init; }
+
+    /// <summary>Carril de las alertas que genera la regla: "Operativa" o "Auditoria".</summary>
+    public string Ambito { get; init; } = "Auditoria";
+
     public bool Activa { get; init; }
 }
 
@@ -30,6 +34,10 @@ public sealed record GuardarReglaPersonalizadaRequest
     public string? ExpresionAvanzada { get; init; }
 
     public double RiesgoBase { get; init; } = 50;
+
+    /// <summary>"Operativa" (problema de estación) o "Auditoria" (fraude). Por defecto Auditoría.</summary>
+    public string Ambito { get; init; } = "Auditoria";
+
     public bool Activa { get; init; } = true;
 }
 

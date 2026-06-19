@@ -16,6 +16,7 @@ public class ReglaPersonalizadaConfiguration : IEntityTypeConfiguration<ReglaPer
         builder.Property(r => r.CondicionesJson).HasColumnType("jsonb").IsRequired();
         builder.Property(r => r.AgregacionJson).HasColumnType("jsonb");
         builder.Property(r => r.ExpresionAvanzada).HasMaxLength(2000);
+        builder.Property(r => r.Ambito).HasMaxLength(20).IsRequired().HasDefaultValue("Auditoria");
 
         builder.HasIndex(r => r.Activa);
         builder.HasIndex(r => r.Nombre).IsUnique();
