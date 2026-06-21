@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PetrolRios.Application.DTOs.Dashboard;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 using PetrolRios.Infrastructure.Persistence;
 
@@ -18,9 +19,17 @@ public sealed class DashboardService : IDashboardService
         _dbContext = dbContext;
     }
 
+    /// <summary>
+    /// Alertas del carril de auditoría (fraude). El dashboard del central es la vista de los
+    /// auditores: los problemas operativos de estación NO se cuentan aquí (tienen su propia
+    /// pestaña "Problemas de estación"), para no inflar las métricas de fraude.
+    /// </summary>
+    private IQueryable<Alerta> AlertasAuditoria =>
+        _dbContext.Set<Alerta>().Where(a => a.Ambito == AmbitoAlerta.Auditoria);
+
     public async Task<KpiResponse> GetKpisAsync(CancellationToken ct = default)
     {
-        var alertas = _dbContext.Alertas.AsQueryable();
+        var alertas = AlertasAuditoria.AsQueryable();
 
         // Estaciones en línea de verdad: heartbeat del agente dentro de la ventana
         var limiteConexion = DateTime.UtcNow - MonitoreoService.VentanaConexion;
@@ -43,7 +52,7 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<IReadOnlyList<AlertasPorTipoResponse>> GetAlertasPorTipoAsync(CancellationToken ct = default)
     {
-        return await _dbContext.Alertas
+        return await AlertasAuditoria
             .GroupBy(a => a.TipoDetector)
             .Select(g => new AlertasPorTipoResponse(g.Key.ToString(), g.Count()))
             .ToListAsync(ct);
@@ -51,7 +60,7 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<IReadOnlyList<AlertasPorEstacionResponse>> GetAlertasPorEstacionAsync(CancellationToken ct = default)
     {
-        return await _dbContext.Alertas
+        return await AlertasAuditoria
             .Include(a => a.Estacion)
             .GroupBy(a => new { a.EstacionId, a.Estacion.Nombre })
             .Select(g => new AlertasPorEstacionResponse(g.Key.EstacionId, g.Key.Nombre, g.Count()))
@@ -60,7 +69,7 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<IReadOnlyList<AlertasPorNivelResponse>> GetAlertasPorNivelAsync(CancellationToken ct = default)
     {
-        return await _dbContext.Alertas
+        return await AlertasAuditoria
             .GroupBy(a => a.NivelRiesgo)
             .Select(g => new AlertasPorNivelResponse(g.Key.ToString(), g.Count()))
             .ToListAsync(ct);
@@ -71,7 +80,7 @@ public sealed class DashboardService : IDashboardService
         dias = Math.Clamp(dias, 1, 90);
         var desde = DateTime.UtcNow.Date.AddDays(-(dias - 1));
 
-        var agrupadas = await _dbContext.Alertas
+        var agrupadas = await AlertasAuditoria
             .Where(a => a.FechaDeteccion >= desde)
             .GroupBy(a => a.FechaDeteccion.Date)
             .Select(g => new
@@ -98,7 +107,7 @@ public sealed class DashboardService : IDashboardService
     {
         top = Math.Clamp(top, 1, 50);
 
-        var resultado = await _dbContext.Alertas
+        var resultado = await AlertasAuditoria
             .Where(a => a.EmpleadoCodigo != null && a.EmpleadoCodigo != "")
             .GroupBy(a => new { a.EmpleadoCodigo, a.Estacion.Nombre })
             .Select(g => new
@@ -126,7 +135,7 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<MetricasResolucionResponse> GetMetricasResolucionAsync(CancellationToken ct = default)
     {
-        var resueltas = await _dbContext.Alertas
+        var resueltas = await AlertasAuditoria
             .Where(a => EstadosResueltos.Contains(a.Estado))
             .Select(a => new { a.Estado, a.FechaDeteccion, a.FechaResolucion })
             .ToListAsync(ct);
@@ -154,10 +163,10 @@ public sealed class DashboardService : IDashboardService
             TasaAlertasValidas = totalResueltas > 0
                 ? Math.Round((double)confirmadas / totalResueltas * 100, 1)
                 : 0,
-            AlertasUltimas24Horas = await _dbContext.Alertas
+            AlertasUltimas24Horas = await AlertasAuditoria
                 .CountAsync(a => a.FechaDeteccion >= hace24Horas, ct),
             TotalResueltas = totalResueltas,
-            TotalPendientes = await _dbContext.Alertas
+            TotalPendientes = await AlertasAuditoria
                 .CountAsync(a => a.Estado == EstadoAlerta.Nueva || a.Estado == EstadoAlerta.EnRevision, ct)
         };
     }

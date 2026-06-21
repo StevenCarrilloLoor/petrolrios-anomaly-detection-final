@@ -58,43 +58,52 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!token) return;
 
-    const handler = (alerta: AlertaResponse) => {
-      // Un administrador adscrito a una estación pertenece al grupo de su rol y al
-      // grupo de estación. La misma alerta operativa puede llegar por ambos eventos.
-      const claveNotificacion =
+    const yaRecibida = (alerta: AlertaResponse): boolean => {
+      // La misma alerta puede llegar por el grupo de rol y el de estación; se deduplica.
+      const clave =
         alerta.notificationId ??
         `${alerta.id}:${String(alerta.ambito)}:${alerta.descripcion}`;
-      if (recibidas.current.has(claveNotificacion)) return;
-      recibidas.current.add(claveNotificacion);
-      setTimeout(() => recibidas.current.delete(claveNotificacion), 60_000);
+      if (recibidas.current.has(clave)) return true;
+      recibidas.current.add(clave);
+      setTimeout(() => recibidas.current.delete(clave), 60_000);
+      return false;
+    };
 
-      const operativa = esAlertaOperativa(alerta.ambito);
+    // Carril de AUDITORÍA (fraude): sube el contador del auditor y refresca la bandeja
+    // de alertas y el dashboard. Son las que un auditor debe revisar.
+    const handleNuevaAlerta = (alerta: AlertaResponse) => {
+      if (yaRecibida(alerta)) return;
       setAlertCount((prev) => prev + 1);
       addToast({
-        title: operativa
-          ? "Nuevo problema de estación"
-          : `Nueva alerta: ${alerta.tipoDetector}`,
+        title: `Nueva alerta: ${alerta.tipoDetector}`,
         message: alerta.descripcion,
         level: alerta.nivelRiesgo,
       });
-
-      // Tiempo real: refrescar automáticamente las vistas afectadas
-      // sin que el usuario tenga que recargar la página
       void queryClient.invalidateQueries({ queryKey: ["alertas"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
-      if (operativa) {
-        void queryClient.invalidateQueries({ queryKey: ["problemas-estacion"] });
-      }
+    };
+
+    // Carril OPERATIVO (problema de estación): NO toca el contador del auditor ni la
+    // bandeja/dashboard. Solo refresca la pestaña "Problemas de estación".
+    const handleProblemaEstacion = (alerta: AlertaResponse) => {
+      if (yaRecibida(alerta)) return;
+      addToast({
+        title: "Nuevo problema de estación",
+        message: alerta.descripcion,
+        level: alerta.nivelRiesgo,
+      });
+      void queryClient.invalidateQueries({ queryKey: ["problemas-estacion"] });
+      void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
     };
 
     const unsubscribeAlerta = subscribeSignalREvent<AlertaResponse>(
       "NuevaAlerta",
-      handler,
+      handleNuevaAlerta,
     );
     const unsubscribeProblema = subscribeSignalREvent<AlertaResponse>(
       "ProblemaEstacion",
-      handler,
+      handleProblemaEstacion,
     );
 
     return () => {
@@ -109,9 +118,4 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </NotificationContext.Provider>
   );
-}
-
-function esAlertaOperativa(ambito: unknown): boolean {
-  if (typeof ambito === "number") return ambito === 1;
-  return String(ambito).trim().toLowerCase() === "operativa";
 }

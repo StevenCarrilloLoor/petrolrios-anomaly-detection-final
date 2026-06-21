@@ -374,19 +374,26 @@ public sealed class AnomalyDetectionJob
             EstacionId = estacionId
         };
 
-        // El central (auditores/supervisores/admins) ve TODO.
-        var tareas = new List<Task>
-        {
-            _hubContext.Clients.Group("auditores").SendAsync("NuevaAlerta", payload),
-            _hubContext.Clients.Group("supervisores").SendAsync("NuevaAlerta", payload),
-            _hubContext.Clients.Group("administradores").SendAsync("NuevaAlerta", payload)
-        };
+        var tareas = new List<Task>();
 
-        // El grupo de la estación recibe en tiempo real SOLO sus problemas operativos
-        // (el administrador de la estación no debe ver el carril de auditoría/fraude).
         if (alerta.Ambito == AmbitoAlerta.Operativa)
-            tareas.Add(_hubContext.Clients.Group($"estacion-{estacionId}")
-                .SendAsync("ProblemaEstacion", payload));
+        {
+            // Problema operativo de estación: NO entra a la bandeja de auditoría. Se emite como
+            // "ProblemaEstacion" a los grupos del central (para la pestaña "Problemas de estación")
+            // y al grupo de la estación (Monitor de estación). NUNCA como "NuevaAlerta", para no
+            // confundir a los auditores con incidencias que resuelve la propia estación.
+            tareas.Add(_hubContext.Clients.Group("auditores").SendAsync("ProblemaEstacion", payload));
+            tareas.Add(_hubContext.Clients.Group("supervisores").SendAsync("ProblemaEstacion", payload));
+            tareas.Add(_hubContext.Clients.Group("administradores").SendAsync("ProblemaEstacion", payload));
+            tareas.Add(_hubContext.Clients.Group($"estacion-{estacionId}").SendAsync("ProblemaEstacion", payload));
+        }
+        else
+        {
+            // Alerta de auditoría (fraude): va a la bandeja del central (auditores/supervisores/admins).
+            tareas.Add(_hubContext.Clients.Group("auditores").SendAsync("NuevaAlerta", payload));
+            tareas.Add(_hubContext.Clients.Group("supervisores").SendAsync("NuevaAlerta", payload));
+            tareas.Add(_hubContext.Clients.Group("administradores").SendAsync("NuevaAlerta", payload));
+        }
 
         await Task.WhenAll(tareas);
     }

@@ -48,7 +48,11 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
         int? estacionId, DateTime? desde, DateTime? hasta)
     {
-        IQueryable<Alerta> query = DbSet;
+        // La bandeja de auditoría muestra SOLO alertas de ámbito Auditoría (fraude).
+        // Los problemas operativos (turno sin cerrar, despacho no facturado, campos
+        // faltantes) van exclusivamente a "Problemas de estación" y al Monitor de estación,
+        // para no confundir a los auditores con incidencias que resuelve la propia estación.
+        IQueryable<Alerta> query = DbSet.Where(a => a.Ambito == AmbitoAlerta.Auditoria);
         if (tipo.HasValue) query = query.Where(a => a.TipoDetector == tipo.Value);
         if (nivel.HasValue) query = query.Where(a => a.NivelRiesgo == nivel.Value);
         if (estado.HasValue) query = query.Where(a => a.Estado == estado.Value);
