@@ -950,3 +950,59 @@ estrictamente de solo lectura.
   - `149` operativa cerrada que `soloActivos` excluye,
   - `150` operativa creada con el monitor abierto; apareció automáticamente y generó el evento
     local `ALERTA`.
+
+---
+
+# Ronda de mejoras — sesión junio 2026 (5 etapas)
+
+Se trabajó en 5 etapas, cada una probada (build Release + 194 pruebas en verde + lint/build de
+frontend), verificada en vivo en el navegador y commiteada por separado.
+
+## 33. Etapa 1 — Inicio de sesión (commit `2704ae8`)
+- **Problema:** toda cuenta creada por el Administrador quedaba sin verificar y el login la
+  bloqueaba; además el enlace de verificación apuntaba a `localhost`, imposible de abrir desde un
+  móvil. Resultado: usuarios nuevos (p. ej. un compañero) no podían entrar.
+- **Solución:** las cuentas creadas por el Admin quedan **verificadas en el alta** (sistema interno
+  con altas avaladas). La verificación por correo pasa a ser **configurable**
+  (`Seguridad:RequerirVerificacionEmail`, **desactivada por defecto**) en `AuthService`,
+  `LoginConTotp` y `QrEstado`. Seed idempotente `EnsureCuentasAccesoAsync`: marca verificadas las
+  cuentas activas sin verificar, asegura al Administrador activo y sin bloqueo por intentos, y
+  permite recuperación "break-glass" del admin vía `Seguridad:AdminPasswordInicial`.
+- Test de integración nuevo: una cuenta creada por el Admin se auto-verifica y entra de inmediato.
+- **Correo verificado en vivo:** la recuperación de contraseña envía y **llega a la bandeja real**
+  (SMTP de Gmail operativo). El login ya no depende del correo.
+
+## 34. Etapa 2 — Alertas operativas fuera de la bandeja de auditoría (commit `4919509`)
+- Las alertas de ámbito **Operativa** (turno sin cerrar, despacho no facturado, campos faltantes)
+  ya no aparecen en la bandeja de **Alertas** (auditores) ni en sus notificaciones; quedan solo en
+  **"Problemas de estación"** y en el Monitor de estación.
+- `AlertaRepository.ApplyFilters` filtra `Ambito=Auditoria`; `DashboardService` excluye las
+  operativas de los KPIs; `AnomalyDetectionJob` emite las operativas como `ProblemaEstacion` (no
+  `NuevaAlerta`); el `NotificationProvider` del frontend separa los handlers (la operativa no toca
+  el contador del auditor). Verificado en vivo: la bandeja pasó de **141 a 135** y las 6 operativas
+  siguen en su pestaña.
+
+## 35. Etapa 3 — Reglas y Fuentes de datos (commit `438952f`)
+- El registro de tablas (**Fuentes de datos**) se separó a su **propia página** (`/fuentes-datos`,
+  con entrada de menú): registrar tablas y configurar reglas son tareas distintas.
+- La pantalla de **Reglas** se rediseñó con cabecera + **resumen** (reglas del motor, activas,
+  inactivas, detectores) y **pestañas** "Motor de detección" y "Reglas personalizadas".
+
+## 36. Etapa 4 — Ajustes del central (QOL) (commit `afd6795`)
+- Nueva página **Ajustes** (`/ajustes`) con funciones de calidad de vida: **tema
+  Sistema/Claro/Oscuro** (real, en toda la app, vía clases en `<html>` + variables CSS), **sonido
+  en alertas críticas** (tono Web Audio, sin archivo) y **avisos emergentes (toasts)** activables.
+  Preferencias persistidas en el navegador (`SettingsContext`).
+
+## 37. Etapa 5 — Interfaz del Monitor de estación (commit `07dd4ed`)
+- El Monitor (`:5190`) usaba un tema verde con gradientes que se veía poco profesional e
+  inconsistente. Se rediseñó a la **paleta slate + azul del panel central** (conservando TODAS las
+  clases CSS, sin tocar la lógica/JS): logo y botón principal en azul, tarjetas y bordes neutros.
+  Ahora se ve como parte del mismo producto.
+
+## 38. Secciones de la tesis a actualizar (esta ronda)
+- **4.1.6 / módulos:** página de Fuentes de datos separada, pantalla de Ajustes (QOL) y Monitor
+  rediseñado.
+- **Seguridad:** verificación de correo configurable + auto-verificación de altas + recuperación
+  break-glass del admin.
+- **Capturas:** regenerar Reglas (pestañas), Fuentes de datos, Ajustes y el Monitor.
