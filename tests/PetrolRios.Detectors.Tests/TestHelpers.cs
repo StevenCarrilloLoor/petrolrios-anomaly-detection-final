@@ -1,10 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
-using PetrolRios.Detectors.Rules.CashFraud;
-using PetrolRios.Detectors.Rules.ComplianceViolation;
-using PetrolRios.Detectors.Rules.InvoiceAnomaly;
-using PetrolRios.Detectors.Rules.PaymentFraud;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
@@ -78,63 +74,28 @@ internal static class TestHelpers
     ];
 
     /// <summary>
-    /// Construye el InvoiceAnomalyDetector con sus reglas Strategy (las mismas que registra la DI).
-    /// El detector ya no contiene la lógica: orquesta estas reglas.
+    /// Construye TODAS las reglas (<see cref="IDetectionRule"/>) del ensamblado de detectores por
+    /// reflexión — las mismas que registra la DI en producción. Cada detector luego filtra las de su
+    /// carril, así que agregar una regla nueva no obliga a tocar estos helpers: se incluye sola.
     /// </summary>
+    private static IDetectionRule[] TodasLasReglas(RiskScoringEngine scoring) =>
+        typeof(RiskScoringEngine).Assembly
+            .GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IDetectionRule).IsAssignableFrom(t))
+            .Select(t => (IDetectionRule)Activator.CreateInstance(t, scoring)!)
+            .ToArray();
+
     public static InvoiceAnomalyDetector CrearInvoiceAnomalyDetector(RiskScoringEngine scoring) =>
-        new(
-            new IDetectionRule[]
-            {
-                new TasaAnulacionesRule(scoring),
-                new PrecioFueraListaRule(scoring),
-                new CamposObligatoriosRule(scoring),
-                new DescuentoExcesivoRule(scoring),
-                new TotalInconsistenteRule(scoring),
-                new FechaFueraDeRangoRule(scoring),
-                new AnulacionRecurrenteRule(scoring),
-                new DespachoNoFacturadoRule(scoring),
-            },
-            NullLogger<InvoiceAnomalyDetector>.Instance);
+        new(TodasLasReglas(scoring), NullLogger<InvoiceAnomalyDetector>.Instance);
 
-    /// <summary>Construye el CashFraudDetector con sus reglas Strategy (las mismas que registra la DI).</summary>
     public static CashFraudDetector CrearCashFraudDetector(RiskScoringEngine scoring) =>
-        new(
-            new IDetectionRule[]
-            {
-                new DiferenciaEfectivoRule(scoring),
-                new FaltantesRecurrentesRule(scoring),
-                new CreditoSinClienteRule(scoring),
-                new EfectivoCorporativoRule(scoring),
-                new TurnoSinCerrarRule(scoring),
-            },
-            NullLogger<CashFraudDetector>.Instance);
+        new(TodasLasReglas(scoring), NullLogger<CashFraudDetector>.Instance);
 
-    /// <summary>Construye el PaymentFraudDetector con sus reglas Strategy (las mismas que registra la DI).</summary>
     public static PaymentFraudDetector CrearPaymentFraudDetector(RiskScoringEngine scoring) =>
-        new(
-            new IDetectionRule[]
-            {
-                new ReversionTardiaRule(scoring),
-                new CreditoSinAutorizacionRule(scoring),
-                new CreditoSinGaranteRule(scoring),
-                new TransaccionesDuplicadasRule(scoring),
-                new DespachosRapidosRule(scoring),
-            },
-            NullLogger<PaymentFraudDetector>.Instance);
+        new(TodasLasReglas(scoring), NullLogger<PaymentFraudDetector>.Instance);
 
-    /// <summary>Construye el ComplianceViolationDetector con sus reglas Strategy (las mismas que registra la DI).</summary>
     public static ComplianceViolationDetector CrearComplianceViolationDetector(RiskScoringEngine scoring) =>
-        new(
-            new IDetectionRule[]
-            {
-                new PlacaGenericaRule(scoring),
-                new MultipleCombustibleRule(scoring),
-                new VentaSinPlacaRule(scoring),
-                new FueraHorarioRule(scoring),
-                new VentaSinIdentificacionRule(scoring),
-                new AltoVolumenSinPlacaRule(scoring),
-            },
-            NullLogger<ComplianceViolationDetector>.Instance);
+        new(TodasLasReglas(scoring), NullLogger<ComplianceViolationDetector>.Instance);
 
     /// <summary>Crea una regla desactivada para probar el respeto al flag Activa.</summary>
     public static ReglaDeteccion CreateReglaInactiva(

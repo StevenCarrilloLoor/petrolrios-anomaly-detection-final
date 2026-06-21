@@ -1,9 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using PetrolRios.Application.Interfaces;
-using PetrolRios.Detectors.Rules.CashFraud;
-using PetrolRios.Detectors.Rules.ComplianceViolation;
-using PetrolRios.Detectors.Rules.InvoiceAnomaly;
-using PetrolRios.Detectors.Rules.PaymentFraud;
 
 namespace PetrolRios.Detectors;
 
@@ -11,47 +7,17 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddDetectors(this IServiceCollection services)
     {
-        // Motor de scoring
+        // Motor de scoring (compartido por todas las reglas)
         services.AddSingleton<RiskScoringEngine>();
 
-        // Reglas de detección individuales (Strategy por regla). Los detectores ya no contienen su
-        // lógica: la obtienen de estas reglas inyectadas. Agregar una regla nueva = registrar su
-        // clase aquí, sin modificar ningún detector (principio Abierto/Cerrado).
+        // Auto-registro de TODAS las reglas de detección (IDetectionRule) de este ensamblado.
+        // → Agregar una regla nueva = crear su clase en Rules/<Detector>/ y nada más: se descubre
+        //   y se registra sola, sin tocar este archivo (principio Abierto/Cerrado).
+        foreach (var regla in ReglasDelEnsamblado())
+            services.AddSingleton(typeof(IDetectionRule), regla);
 
-        // Anomalías de factura
-        services.AddSingleton<IDetectionRule, TasaAnulacionesRule>();
-        services.AddSingleton<IDetectionRule, PrecioFueraListaRule>();
-        services.AddSingleton<IDetectionRule, CamposObligatoriosRule>();
-        services.AddSingleton<IDetectionRule, DescuentoExcesivoRule>();
-        services.AddSingleton<IDetectionRule, TotalInconsistenteRule>();
-        services.AddSingleton<IDetectionRule, FechaFueraDeRangoRule>();
-        services.AddSingleton<IDetectionRule, AnulacionRecurrenteRule>();
-        services.AddSingleton<IDetectionRule, DespachoNoFacturadoRule>();
-
-        // Anomalías de efectivo
-        services.AddSingleton<IDetectionRule, DiferenciaEfectivoRule>();
-        services.AddSingleton<IDetectionRule, FaltantesRecurrentesRule>();
-        services.AddSingleton<IDetectionRule, CreditoSinClienteRule>();
-        services.AddSingleton<IDetectionRule, EfectivoCorporativoRule>();
-        services.AddSingleton<IDetectionRule, TurnoSinCerrarRule>();
-
-        // Anomalías de pago
-        services.AddSingleton<IDetectionRule, ReversionTardiaRule>();
-        services.AddSingleton<IDetectionRule, CreditoSinAutorizacionRule>();
-        services.AddSingleton<IDetectionRule, CreditoSinGaranteRule>();
-        services.AddSingleton<IDetectionRule, TransaccionesDuplicadasRule>();
-        services.AddSingleton<IDetectionRule, DespachosRapidosRule>();
-
-        // Violaciones de cumplimiento
-        services.AddSingleton<IDetectionRule, PlacaGenericaRule>();
-        services.AddSingleton<IDetectionRule, MultipleCombustibleRule>();
-        services.AddSingleton<IDetectionRule, VentaSinPlacaRule>();
-        services.AddSingleton<IDetectionRule, FueraHorarioRule>();
-        services.AddSingleton<IDetectionRule, VentaSinIdentificacionRule>();
-        services.AddSingleton<IDetectionRule, AltoVolumenSinPlacaRule>();
-
-        // Detectores (Strategy Pattern) — inyectados como IEnumerable<IAnomalyDetector>:
-        // 4 detectores del motor + el detector genérico de reglas personalizadas
+        // Detectores (Strategy Pattern). Cada uno es un orquestador delgado que ejecuta las
+        // reglas de su propio carril (ver RuleBasedDetector).
         services.AddScoped<IAnomalyDetector, CashFraudDetector>();
         services.AddScoped<IAnomalyDetector, InvoiceAnomalyDetector>();
         services.AddScoped<IAnomalyDetector, PaymentFraudDetector>();
@@ -60,4 +26,14 @@ public static class DependencyInjection
 
         return services;
     }
+
+    /// <summary>
+    /// Todas las clases concretas que implementan <see cref="IDetectionRule"/> en el ensamblado de
+    /// detectores. Es el punto único que hace escalable el sistema: las reglas se descubren por
+    /// reflexión, así que sumar reglas no obliga a editar la composición de dependencias.
+    /// </summary>
+    private static IEnumerable<Type> ReglasDelEnsamblado() =>
+        typeof(DependencyInjection).Assembly
+            .GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IDetectionRule).IsAssignableFrom(t));
 }

@@ -27,5 +27,5 @@ public interface IDetectionRule
     /// Evalúa la regla sobre el contexto del ciclo. <paramref name="regla"/> es la configuración
     /// persistida (umbral y carril vigentes) o <c>null</c> si la regla aún no existe en la base.
     /// </summary>
-    IEnumerable<DetectedAnomaly> Evaluar(DetectionContext contexto, ReglaDeteccion? regla);
+    IEnumerable<DetectedAnomaly> Evaluar(DetectionContext context, ReglaDeteccion? regla);
 }

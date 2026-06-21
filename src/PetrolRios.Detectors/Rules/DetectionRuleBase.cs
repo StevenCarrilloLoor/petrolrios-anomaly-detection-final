@@ -19,7 +19,7 @@ public abstract class DetectionRuleBase : IDetectionRule
     public abstract double UmbralPorDefecto { get; }
     public virtual AmbitoAlerta AmbitoPorDefecto => AmbitoAlerta.Auditoria;
 
-    public abstract IEnumerable<DetectedAnomaly> Evaluar(DetectionContext contexto, ReglaDeteccion? regla);
+    public abstract IEnumerable<DetectedAnomaly> Evaluar(DetectionContext context, ReglaDeteccion? regla);
 
     /// <summary>Umbral efectivo: el configurado en la base o, si no existe, el de por defecto.</summary>
     protected double Umbral(ReglaDeteccion? regla) => regla?.ValorUmbral ?? UmbralPorDefecto;
