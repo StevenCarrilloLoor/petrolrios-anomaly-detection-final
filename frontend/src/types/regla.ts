@@ -21,4 +21,6 @@ export interface CrearReglaRequest {
 export interface ActualizarReglaRequest {
   valorUmbral?: number | null;
   activa?: boolean | null;
+  /** Cambia el carril: "Operativa" o "Auditoria". */
+  ambito?: "Operativa" | "Auditoria" | null;
 }
