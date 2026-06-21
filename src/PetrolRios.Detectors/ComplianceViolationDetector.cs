@@ -37,6 +37,8 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
         var multipleCombustibleHabilitado = GetUmbral(reglas, "MultipleCombustibleHabilitado", 1.0) >= 1.0;
         var fueraHorarioHabilitado = GetUmbral(reglas, "FueraHorarioHabilitado", 1.0) >= 1.0;
         var montoMinimoSinPlaca = GetUmbral(reglas, "VentaSinPlacaMontoMinimo", 200.0);
+        var montoSinIdentificacion = GetUmbral(reglas, "VentaSinIdentificacionMontoMinimo", 50.0);
+        var galonesSinPlaca = GetUmbral(reglas, "GalonesSinPlacaMaximo", 20.0);
 
         // Regla 1: Placa genérica con exceso de galones
         if (galonesMaxPlacaGenerica is not null)
@@ -53,6 +55,14 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
         // Regla 4: Operaciones fuera de horario (solo si la estación define horario restringido)
         if (fueraHorarioHabilitado)
             DetectFueraHorario(context, anomalies);
+
+        // Regla 5: Venta sin cédula/RUC del cliente en monto material (exigido por el SRI)
+        if (montoSinIdentificacion is not null)
+            DetectVentaSinIdentificacion(context, montoSinIdentificacion.Value, anomalies);
+
+        // Regla 6: Despacho de alto volumen sin placa (patrón de desvío de combustible)
+        if (galonesSinPlaca is not null)
+            DetectAltoVolumenSinPlaca(context, galonesSinPlaca.Value, anomalies);
 
         _logger.LogDebug("ComplianceViolationDetector: {Count} anomalías en estación {Est}",
             anomalies.Count, context.EstacionNombre);
@@ -207,6 +217,86 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
                     ["Monto"] = factura.TotalNeto,
                     ["MontoMinimo"] = montoMinimo,
                     ["Cliente"] = factura.CodigoCliente.Trim()
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Venta sin identificación del cliente (cédula/RUC) en monto material. El SRI
+    /// (Resolución NAC-DGERCGC13-00382) exige registrar la cédula/RUC del comprador en las
+    /// facturas de combustibles líquidos; una venta significativa sin ese dato rompe la
+    /// trazabilidad tributaria y puede encubrir fraccionamiento de ventas.
+    /// </summary>
+    private void DetectVentaSinIdentificacion(
+        DetectionContext context, double montoMinimo, List<DetectedAnomaly> anomalies)
+    {
+        var ventas = context.Facturas
+            .Where(f => string.IsNullOrWhiteSpace(f.RucCliente) && f.TotalNeto > montoMinimo);
+
+        foreach (var factura in ventas)
+        {
+            var (score, nivel) = _scoring.Calculate(
+                riesgoBase: 45,
+                montoInvolucrado: factura.TotalNeto);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.ComplianceViolation,
+                Ambito = GetAmbito(context.Reglas, "VentaSinIdentificacionMontoMinimo", AmbitoAlerta.Auditoria),
+                Descripcion = $"Venta de ${factura.TotalNeto:F2} sin cédula/RUC del cliente " +
+                              $"(el SRI lo exige; mínimo: ${montoMinimo:F2}). Doc: {factura.NumeroDocumento}",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                EmpleadoCodigo = factura.CodigoVendedor.Trim(),
+                TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["NumeroDocumento"] = factura.NumeroDocumento,
+                    ["Monto"] = factura.TotalNeto,
+                    ["MontoMinimo"] = montoMinimo,
+                    ["Placa"] = factura.Placa.Trim()
+                }
+            });
+        }
+    }
+
+    /// <summary>
+    /// Despacho de alto volumen sin placa registrada. Cargar muchos galones sin identificar el
+    /// vehículo es el patrón típico de desvío de combustible (llenado de tanques o canecas para
+    /// reventa), que la ARCERNNR controla mediante cupos y trazabilidad por placa.
+    /// </summary>
+    private void DetectAltoVolumenSinPlaca(
+        DetectionContext context, double galonesMaximo, List<DetectedAnomaly> anomalies)
+    {
+        foreach (var factura in context.Facturas.Where(f => string.IsNullOrWhiteSpace(f.Placa)))
+        {
+            var galones = context.Detalles
+                .Where(d => d.CodigoManguera.Trim() == factura.CodigoManguera.Trim())
+                .Sum(d => d.Cantidad);
+            if (galones <= galonesMaximo) continue;
+
+            var (score, nivel) = _scoring.Calculate(
+                riesgoBase: 60,
+                montoInvolucrado: galones);
+
+            anomalies.Add(new DetectedAnomaly
+            {
+                TipoDetector = TipoDetector.ComplianceViolation,
+                Ambito = GetAmbito(context.Reglas, "GalonesSinPlacaMaximo", AmbitoAlerta.Auditoria),
+                Descripcion = $"Despacho de {galones:F2} galones sin placa registrada " +
+                              $"(máximo sin placa: {galonesMaximo:F0} gal; posible desvío). Doc: {factura.NumeroDocumento}",
+                Score = score,
+                NivelRiesgo = nivel,
+                EstacionId = context.EstacionId,
+                EmpleadoCodigo = factura.CodigoVendedor.Trim(),
+                TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["NumeroDocumento"] = factura.NumeroDocumento,
+                    ["Galones"] = galones,
+                    ["GalonesMaximo"] = galonesMaximo
                 }
             });
         }

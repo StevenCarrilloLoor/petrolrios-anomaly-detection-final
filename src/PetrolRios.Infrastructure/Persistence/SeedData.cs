@@ -162,6 +162,14 @@ public static class SeedData
             "Venta sin placa en monto mayor",
             "Genera alerta si una venta supera el monto umbral sin placa registrada (trazabilidad exigida por normativa de comercializacion)",
             "VentaSinPlacaMontoMinimo", 200.0);
+        AddIfMissing(TipoDetector.ComplianceViolation,
+            "Venta sin identificacion del cliente",
+            "Genera alerta si una venta supera el monto umbral sin cedula/RUC del cliente; el SRI (Resolucion NAC-DGERCGC13-00382) exige registrar la identificacion del comprador en facturas de combustible.",
+            "VentaSinIdentificacionMontoMinimo", 50.0);
+        AddIfMissing(TipoDetector.ComplianceViolation,
+            "Despacho de alto volumen sin placa",
+            "Genera alerta si un despacho sin placa registrada supera el umbral de galones; patron tipico de desvio de combustible que la ARCERNNR controla con cupos y trazabilidad por placa.",
+            "GalonesSinPlacaMaximo", 20.0);
 
         if (nuevas.Count > 0)
             await context.ReglasDeteccion.AddRangeAsync(nuevas);

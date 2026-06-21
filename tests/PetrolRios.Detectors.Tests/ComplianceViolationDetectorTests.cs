@@ -207,4 +207,73 @@ public class ComplianceViolationDetectorTests
         alert.Metadata.Should().ContainKey("Galones");
         alert.Metadata.Should().ContainKey("GalonesMaximo");
     }
+
+    // ─── Reglas nuevas (ARCERNNR/SRI) ───
+
+    [Fact]
+    public async Task DetectAsync_VentaMaterialSinCedulaRuc_GeneraAlerta()
+    {
+        // Factura con placa pero SIN cédula/RUC y monto > 50: el SRI exige la identificación.
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(ruc: "", placa: "ABC1234", totalNeto: 100)
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("el SRI lo exige"));
+    }
+
+    [Fact]
+    public async Task DetectAsync_VentaConCedula_NoGeneraAlertaDeIdentificacion()
+    {
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(ruc: "0102030405", placa: "ABC1234", totalNeto: 100)
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("el SRI lo exige")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DetectAsync_AltoVolumenSinPlaca_GeneraAlerta()
+    {
+        // Despacho de 30 galones sin placa (umbral por defecto 20): posible desvío.
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(placa: "", manguera: "01", totalNeto: 60)
+        };
+        var detalles = new List<DetalleFacturaDto>
+        {
+            TestHelpers.CreateDetalle(numero: 1, cantidad: 30, manguera: "01")
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas, detalles: detalles);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("galones sin placa"));
+    }
+
+    [Fact]
+    public async Task DetectAsync_VolumenBajoSinPlaca_NoGeneraAlertaDeVolumen()
+    {
+        // 10 galones sin placa: por debajo del umbral de 20, no alerta por volumen.
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(placa: "", manguera: "01", totalNeto: 30)
+        };
+        var detalles = new List<DetalleFacturaDto>
+        {
+            TestHelpers.CreateDetalle(numero: 1, cantidad: 10, manguera: "01")
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas, detalles: detalles);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("galones sin placa")).Should().BeEmpty();
+    }
 }
