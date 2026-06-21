@@ -26,4 +26,8 @@ public interface IAuthService
     // Recuperación de contraseña por correo
     Task SolicitarResetPasswordAsync(string email, CancellationToken ct = default);
     Task<bool> RestablecerPasswordAsync(string token, string nuevaPassword, CancellationToken ct = default);
+
+    // Desbloqueo de cuenta por correo (tras bloqueo por intentos fallidos)
+    Task SolicitarDesbloqueoAsync(string email, CancellationToken ct = default);
+    Task<bool> DesbloquearCuentaAsync(string token, CancellationToken ct = default);
 }

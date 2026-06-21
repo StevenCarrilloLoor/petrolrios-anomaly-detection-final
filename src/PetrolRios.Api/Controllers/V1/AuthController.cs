@@ -153,6 +153,31 @@ public sealed class AuthController : ControllerBase
             : BadRequest(new { ok = false, mensaje = "El enlace es inválido o expiró." });
     }
 
+    // ─── Desbloqueo de cuenta ───
+
+    /// <summary>Solicitar el desbloqueo de una cuenta bloqueada: envía un enlace al correo.</summary>
+    [HttpPost("solicitar-desbloqueo")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SolicitarDesbloqueo([FromBody] SolicitarDesbloqueoRequest request, CancellationToken ct)
+    {
+        await _authService.SolicitarDesbloqueoAsync(request.Email, ct);
+        // Respuesta neutra para no revelar si el correo existe o si está bloqueado.
+        return Ok(new { ok = true, mensaje = "Si la cuenta existe y está bloqueada, te enviamos un enlace para desbloquearla." });
+    }
+
+    /// <summary>Desbloquear la cuenta usando el token recibido por correo.</summary>
+    [HttpPost("desbloquear-cuenta")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DesbloquearCuenta([FromBody] DesbloquearCuentaRequest request, CancellationToken ct)
+    {
+        var ok = await _authService.DesbloquearCuentaAsync(request.Token, ct);
+        if (ok)
+            await this.RegistrarAuditoriaAsync(_logService, "Desbloqueo de cuenta (autoservicio)", "Usuario", ct: ct);
+        return ok
+            ? Ok(new { ok = true, mensaje = "Cuenta desbloqueada. Ya puedes iniciar sesión con tu contraseña." })
+            : BadRequest(new { ok = false, mensaje = "El enlace es inválido o expiró." });
+    }
+
     // ─── Verificación de correo ───
 
     /// <summary>Verifica el correo del usuario a partir del token del enlace recibido por email.</summary>

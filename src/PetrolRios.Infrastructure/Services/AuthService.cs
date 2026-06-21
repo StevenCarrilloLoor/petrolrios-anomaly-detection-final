@@ -15,6 +15,7 @@ public sealed class AuthService : IAuthService
     private readonly ITotpService _totpService;
     private readonly QrLoginService _qrLogin;
     private readonly PasswordResetService _passwordReset;
+    private readonly AccountUnlockService _accountUnlock;
     private readonly IEmailNotificacionService _email;
     private readonly IConfiguration _config;
 
@@ -25,6 +26,7 @@ public sealed class AuthService : IAuthService
         ITotpService totpService,
         QrLoginService qrLogin,
         PasswordResetService passwordReset,
+        AccountUnlockService accountUnlock,
         IEmailNotificacionService email,
         IConfiguration config)
     {
@@ -34,6 +36,7 @@ public sealed class AuthService : IAuthService
         _totpService = totpService;
         _qrLogin = qrLogin;
         _passwordReset = passwordReset;
+        _accountUnlock = accountUnlock;
         _email = email;
         _config = config;
     }
@@ -261,6 +264,46 @@ public sealed class AuthService : IAuthService
         usuario.UpdatePassword(BCrypt.Net.BCrypt.HashPassword(nuevaPassword));
         await _dbContext.SaveChangesAsync(ct);
         _passwordReset.Consumir(token);
+        return true;
+    }
+
+    // ─── Desbloqueo de cuenta por correo (tras bloqueo por intentos fallidos) ───
+
+    public async Task SolicitarDesbloqueoAsync(string email, CancellationToken ct = default)
+    {
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == email && u.Activo, ct);
+        if (usuario is null) return;          // respuesta neutra: no revelar si el correo existe
+        if (!usuario.EstaBloqueado()) return; // sin bloqueo activo no hay nada que desbloquear
+
+        var token = _accountUnlock.Crear(usuario.Id);
+        if (!_email.Habilitado) return;
+
+        var frontendUrl = (_config["App:FrontendUrl"] ?? "http://localhost:5173").TrimEnd('/');
+        var enlace = $"{frontendUrl}/desbloquear-cuenta?token={token}";
+        var cuerpo =
+            "<div style='font-family:Segoe UI,Arial,sans-serif;color:#0f172a'>" +
+            "<h2>Desbloquear cuenta — PetrolRíos</h2>" +
+            $"<p>Hola {usuario.NombreCompleto}, tu cuenta se bloqueó temporalmente por varios intentos de inicio de sesión fallidos.</p>" +
+            $"<p style='margin:24px 0'><a href='{enlace}' style='background:#2563eb;color:#fff;text-decoration:none;" +
+            "padding:12px 22px;border-radius:8px;font-weight:600'>Desbloquear mi cuenta</a></p>" +
+            $"<p style='font-size:12px;color:#64748b'>Si el botón no funciona, copia este enlace:<br>{enlace}</p>" +
+            "<p style='font-size:12px;color:#64748b'>El enlace caduca en 1 hora. Conservas tu contraseña: solo se levanta el bloqueo. " +
+            "Si no fuiste tú, ignora este correo; el bloqueo también se levanta solo al pasar el tiempo.</p></div>";
+
+        await _email.EnviarAsync("Desbloquear cuenta — PetrolRíos", cuerpo, new[] { usuario.Email }, ct);
+    }
+
+    public async Task<bool> DesbloquearCuentaAsync(string token, CancellationToken ct = default)
+    {
+        var usuarioId = _accountUnlock.Validar(token);
+        if (usuarioId is null) return false;
+
+        var usuario = await _dbContext.Usuarios.FirstOrDefaultAsync(u => u.Id == usuarioId && u.Activo, ct);
+        if (usuario is null) return false;
+
+        usuario.ResetearFallos(); // levanta el bloqueo y limpia el contador de fallos
+        await _dbContext.SaveChangesAsync(ct);
+        _accountUnlock.Consumir(token); // un solo uso
         return true;
     }
 

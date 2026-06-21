@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailNotificacionService, EmailNotificacionService>();
         services.AddSingleton<QrLoginService>(); // estado en memoria del login por QR
         services.AddSingleton<PasswordResetService>(); // tokens de recuperacion en memoria
+        services.AddSingleton<AccountUnlockService>(); // tokens de desbloqueo de cuenta en memoria
         services.AddSingleton<ISolicitudesEsquema, SolicitudesEsquema>(); // solicitudes de "cargar esquema" por estacion
 
         return services;

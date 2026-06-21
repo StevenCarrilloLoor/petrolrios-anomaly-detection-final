@@ -1006,3 +1006,48 @@ frontend), verificada en vivo en el navegador y commiteada por separado.
 - **Seguridad:** verificación de correo configurable + auto-verificación de altas + recuperación
   break-glass del admin.
 - **Capturas:** regenerar Reglas (pestañas), Fuentes de datos, Ajustes y el Monitor.
+
+## 39. Desbloqueo de cuenta por autoservicio desde el login
+
+**Motivación.** El sistema bloquea la cuenta 15 min tras 5 intentos fallidos (anti fuerza bruta).
+Antes, la única salida era esperar o restablecer la contraseña. Si el usuario **recuerda** su
+contraseña y solo fue víctima del bloqueo (propio o de un tercero tecleando mal), forzar un cambio
+de contraseña es fricción innecesaria. Se añade un desbloqueo dedicado, sin cambiar la contraseña.
+
+**Diseño (espejo de la recuperación de contraseña, sin tocar el esquema).**
+- `AccountUnlockService` (Infrastructure): tokens en memoria, de un solo uso, caducan en 1 h. Mismo
+  patrón que `PasswordResetService`; registrado como singleton en DI. **No** añade columnas ni
+  migraciones (la verificación EF sigue limpia).
+- `AuthService.SolicitarDesbloqueoAsync(email)`: respuesta neutra; **solo** envía correo si la
+  cuenta existe, está activa y `EstaBloqueado()`. El enlace apunta a
+  `/desbloquear-cuenta?token=…` (1 h de validez).
+- `AuthService.DesbloquearCuentaAsync(token)`: valida el token, llama a `Usuario.ResetearFallos()`
+  (levanta `LockoutEnd` y limpia `AccessFailedCount`), guarda y consume el token. Conserva la
+  contraseña. Queda registrado en logs de auditoría.
+- Endpoints `AllowAnonymous`: `POST /api/v1/auth/solicitar-desbloqueo` y
+  `POST /api/v1/auth/desbloquear-cuenta`.
+- Frontend: en el login, enlace **"¿Cuenta bloqueada?"** junto a "¿Olvidaste tu contraseña?"; abre
+  un formulario que pide el correo y envía el enlace. Página nueva `DesbloquearCuentaPage`
+  (ruta pública) que consume el token al abrirse y muestra éxito o error. `auth.service.ts` expone
+  `solicitarDesbloqueo` y `desbloquearCuenta`.
+
+**Seguridad.** El desbloqueo exige recibir el correo (control del buzón); por sí solo no da acceso
+(sigue hace falta la contraseña), así que no debilita la protección anti fuerza bruta frente a
+quien no controla el correo. Mensajes neutros para no revelar si un correo existe o está bloqueado.
+
+**Verificación.**
+- Build Release **sin advertencias ni errores**; `tsc -b && vite build` correcto; lint del frontend
+  limpio; EF **sin cambios de modelo pendientes**.
+- Pruebas: **201 en verde, 0 fallidas** (Domain 34, StationMonitor 2, Detectors 110, **API 55**).
+  7 pruebas nuevas en `AccountUnlockServiceTests`: el servicio de tokens (validar/expirar/un solo
+  uso/unicidad) y el cableado real de `AuthService` con EF InMemory (desbloquea una cuenta
+  bloqueada y consume el token; token inválido → `false`; el correo de desbloqueo se envía **solo**
+  si la cuenta está bloqueada).
+- Interfaz (Chrome): el login muestra el enlace "¿Cuenta bloqueada?", abre el formulario de correo
+  y la página `/desbloquear-cuenta` renderiza y maneja el token inválido. (El API de desarrollo en
+  ejecución debe reiniciarse para servir los endpoints nuevos: no recarga en caliente.)
+
+**Archivos:** `AccountUnlockService.cs` (nuevo), `AuthService.cs`, `IAuthService.cs`,
+`AuthController.cs`, `DependencyInjection.cs`, `DTOs/Auth/LoginResponse.cs`,
+`frontend/.../LoginPage.tsx`, `DesbloquearCuentaPage.tsx` (nuevo), `auth.service.ts`, `App.tsx`,
+`tests/PetrolRios.Api.Tests/AccountUnlockServiceTests.cs` (nuevo).

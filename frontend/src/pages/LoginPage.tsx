@@ -4,7 +4,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import QRCode from "qrcode";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService } from "@/services/auth.service";
-import { Shield, Activity, Bell, Search, QrCode, ArrowLeft, KeyRound } from "lucide-react";
+import { Shield, Activity, Bell, Search, QrCode, ArrowLeft, KeyRound, Unlock } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 
 // El login por QR requiere que el teléfono alcance al central por la red; sin un
@@ -24,6 +24,7 @@ export function LoginPage() {
   const [avisoReenvio, setAvisoReenvio] = useState<string | null>(null);
   const [modoTotp, setModoTotp] = useState(false);
   const [modoOlvide, setModoOlvide] = useState(false);
+  const [modoDesbloqueo, setModoDesbloqueo] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [modoQr, setModoQr] = useState(false);
   const [qrImg, setQrImg] = useState<string | null>(null);
@@ -148,6 +149,23 @@ export function LoginPage() {
     } catch {
       setAviso("Si la cuenta existe, te enviamos un enlace. Revisa tu correo.");
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function enviarDesbloqueo(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setAviso(null);
+    setLoading(true);
+    try {
+      await authService.solicitarDesbloqueo(email);
+    } catch {
+      /* respuesta neutra: mismo mensaje aunque falle */
+    } finally {
+      setAviso(
+        "Si la cuenta existe y está bloqueada, te enviamos un enlace para desbloquearla. Revisa tu correo.",
+      );
       setLoading(false);
     }
   }
@@ -292,6 +310,39 @@ export function LoginPage() {
                 <ArrowLeft size={14} /> Volver
               </button>
             </form>
+          ) : modoDesbloqueo ? (
+            <form onSubmit={enviarDesbloqueo} className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                ¿Tu cuenta se bloqueó por varios intentos fallidos? Ingresa tu correo y te
+                enviaremos un enlace para desbloquearla. Conservas tu contraseña.
+              </p>
+              {aviso && (
+                <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-600">{aviso}</div>
+              )}
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="usuario@petrolrios.com"
+                required
+                disabled={loading}
+                className="w-full rounded-md border border-border bg-background px-3 py-2.5 text-sm"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {loading && <Spinner size="sm" />} Enviar enlace de desbloqueo
+              </button>
+              <button
+                type="button"
+                onClick={() => { setModoDesbloqueo(false); setAviso(null); setError(null); }}
+                className="flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                <ArrowLeft size={14} /> Volver
+              </button>
+            </form>
           ) : modoTotp ? (
             <form onSubmit={entrarConTotp} className="space-y-4">
               <p className="text-sm text-muted-foreground">
@@ -403,7 +454,14 @@ export function LoginPage() {
 
             {!pide2fa && (
               <>
-                <div className="text-right">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => { setModoDesbloqueo(true); setError(null); setAviso(null); }}
+                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Unlock size={12} /> ¿Cuenta bloqueada?
+                  </button>
                   <button
                     type="button"
                     onClick={() => { setModoOlvide(true); setError(null); }}

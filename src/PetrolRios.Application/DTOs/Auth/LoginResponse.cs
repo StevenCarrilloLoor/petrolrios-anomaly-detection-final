@@ -24,6 +24,10 @@ public sealed record LoginTotpRequest(string Email, string CodigoTotp);
 public sealed record OlvidePasswordRequest(string Email);
 public sealed record RestablecerPasswordRequest(string Token, string NuevaPassword);
 
+// ─── Desbloqueo de cuenta (tras bloqueo por intentos fallidos) ───
+public sealed record SolicitarDesbloqueoRequest(string Email);
+public sealed record DesbloquearCuentaRequest(string Token);
+
 // ─── Login por QR (estilo Steam) ───
 public sealed record QrIniciarResponse(string Codigo, int ExpiraSegundos);
 public sealed record QrAprobarRequest(string Codigo);

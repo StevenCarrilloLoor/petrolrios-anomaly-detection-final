@@ -21,6 +21,7 @@ import { AjustesPage } from "@/pages/AjustesPage";
 import { AprobarQrPage } from "@/pages/AprobarQrPage";
 import { VerificarCorreoPage } from "@/pages/VerificarCorreoPage";
 import { RestablecerPasswordPage } from "@/pages/RestablecerPasswordPage";
+import { DesbloquearCuentaPage } from "@/pages/DesbloquearCuentaPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/verificar-correo" element={<VerificarCorreoPage />} />
               <Route path="/restablecer-password" element={<RestablecerPasswordPage />} />
+              <Route path="/desbloquear-cuenta" element={<DesbloquearCuentaPage />} />
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>

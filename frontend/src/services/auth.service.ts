@@ -49,4 +49,10 @@ export const authService = {
     api.post<{ ok: boolean; mensaje: string }>("/auth/olvide-password", { email }).then((r) => r.data),
   restablecerPassword: (token: string, nuevaPassword: string) =>
     api.post<{ ok: boolean; mensaje: string }>("/auth/restablecer-password", { token, nuevaPassword }).then((r) => r.data),
+
+  // Desbloqueo de cuenta (tras bloqueo por intentos fallidos)
+  solicitarDesbloqueo: (email: string) =>
+    api.post<{ ok: boolean; mensaje: string }>("/auth/solicitar-desbloqueo", { email }).then((r) => r.data),
+  desbloquearCuenta: (token: string) =>
+    api.post<{ ok: boolean; mensaje: string }>("/auth/desbloquear-cuenta", { token }).then((r) => r.data),
 };
