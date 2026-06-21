@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Domain.Enums;
 
@@ -11,9 +10,7 @@ public class PaymentFraudDetectorTests
 
     public PaymentFraudDetectorTests()
     {
-        _sut = new PaymentFraudDetector(
-            new RiskScoringEngine(),
-            NullLogger<PaymentFraudDetector>.Instance);
+        _sut = TestHelpers.CrearPaymentFraudDetector(new RiskScoringEngine());
     }
 
     [Fact]

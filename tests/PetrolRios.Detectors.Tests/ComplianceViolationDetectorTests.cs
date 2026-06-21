@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Domain.Enums;
 
@@ -11,9 +10,7 @@ public class ComplianceViolationDetectorTests
 
     public ComplianceViolationDetectorTests()
     {
-        _sut = new ComplianceViolationDetector(
-            new RiskScoringEngine(),
-            NullLogger<ComplianceViolationDetector>.Instance);
+        _sut = TestHelpers.CrearComplianceViolationDetector(new RiskScoringEngine());
     }
 
     [Fact]

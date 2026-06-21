@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Detectors.Rules.CashFraud;
+using PetrolRios.Detectors.Rules.ComplianceViolation;
 using PetrolRios.Detectors.Rules.InvoiceAnomaly;
+using PetrolRios.Detectors.Rules.PaymentFraud;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
@@ -92,6 +95,46 @@ internal static class TestHelpers
                 new DespachoNoFacturadoRule(scoring),
             },
             NullLogger<InvoiceAnomalyDetector>.Instance);
+
+    /// <summary>Construye el CashFraudDetector con sus reglas Strategy (las mismas que registra la DI).</summary>
+    public static CashFraudDetector CrearCashFraudDetector(RiskScoringEngine scoring) =>
+        new(
+            new IDetectionRule[]
+            {
+                new DiferenciaEfectivoRule(scoring),
+                new FaltantesRecurrentesRule(scoring),
+                new CreditoSinClienteRule(scoring),
+                new EfectivoCorporativoRule(scoring),
+                new TurnoSinCerrarRule(scoring),
+            },
+            NullLogger<CashFraudDetector>.Instance);
+
+    /// <summary>Construye el PaymentFraudDetector con sus reglas Strategy (las mismas que registra la DI).</summary>
+    public static PaymentFraudDetector CrearPaymentFraudDetector(RiskScoringEngine scoring) =>
+        new(
+            new IDetectionRule[]
+            {
+                new ReversionTardiaRule(scoring),
+                new CreditoSinAutorizacionRule(scoring),
+                new CreditoSinGaranteRule(scoring),
+                new TransaccionesDuplicadasRule(scoring),
+                new DespachosRapidosRule(scoring),
+            },
+            NullLogger<PaymentFraudDetector>.Instance);
+
+    /// <summary>Construye el ComplianceViolationDetector con sus reglas Strategy (las mismas que registra la DI).</summary>
+    public static ComplianceViolationDetector CrearComplianceViolationDetector(RiskScoringEngine scoring) =>
+        new(
+            new IDetectionRule[]
+            {
+                new PlacaGenericaRule(scoring),
+                new MultipleCombustibleRule(scoring),
+                new VentaSinPlacaRule(scoring),
+                new FueraHorarioRule(scoring),
+                new VentaSinIdentificacionRule(scoring),
+                new AltoVolumenSinPlacaRule(scoring),
+            },
+            NullLogger<ComplianceViolationDetector>.Instance);
 
     /// <summary>Crea una regla desactivada para probar el respeto al flag Activa.</summary>
     public static ReglaDeteccion CreateReglaInactiva(

@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Domain.Enums;
 
@@ -21,10 +20,10 @@ public class NuevasReglasDetectorTests
     public NuevasReglasDetectorTests()
     {
         var scoring = new RiskScoringEngine();
-        _cashFraud = new CashFraudDetector(scoring, NullLogger<CashFraudDetector>.Instance);
+        _cashFraud = TestHelpers.CrearCashFraudDetector(scoring);
         _invoiceAnomaly = TestHelpers.CrearInvoiceAnomalyDetector(scoring);
-        _paymentFraud = new PaymentFraudDetector(scoring, NullLogger<PaymentFraudDetector>.Instance);
-        _compliance = new ComplianceViolationDetector(scoring, NullLogger<ComplianceViolationDetector>.Instance);
+        _paymentFraud = TestHelpers.CrearPaymentFraudDetector(scoring);
+        _compliance = TestHelpers.CrearComplianceViolationDetector(scoring);
     }
 
     // ─── Cash Fraud: venta a crédito sin cliente identificado ───
