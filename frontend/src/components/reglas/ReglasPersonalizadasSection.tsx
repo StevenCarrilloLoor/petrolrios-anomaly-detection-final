@@ -6,6 +6,7 @@ import type {
   AgregacionRegla,
   ReglaPersonalizadaResponse,
   GuardarReglaPersonalizadaRequest,
+  BacktestReglaResponse,
 } from "@/types/reglaPersonalizada";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -21,6 +22,7 @@ import {
   SlidersHorizontal,
   CheckCircle2,
   AlertCircle,
+  FlaskConical,
 } from "lucide-react";
 
 const inputClass =
@@ -76,6 +78,7 @@ export function ReglasPersonalizadasSection() {
   const [editando, setEditando] = useState<number | null>(null); // null=cerrado, 0=nueva, >0=editar
   const [form, setForm] = useState<FormularioRegla | null>(null);
   const [errores, setErrores] = useState<string[]>([]);
+  const [backtest, setBacktest] = useState<BacktestReglaResponse | null>(null);
 
   const { data: catalogo } = useQuery({
     queryKey: ["reglas-personalizadas", "catalogo"],
@@ -129,6 +132,26 @@ export function ReglasPersonalizadasSection() {
     onSuccess: invalidar,
   });
 
+  // Backtest / vista previa: corre la regla borrador contra los últimos días sin guardarla.
+  const backtestMutation = useMutation({
+    mutationFn: (data: GuardarReglaPersonalizadaRequest) =>
+      reglasPersonalizadasService.backtest({ regla: data, dias: 7 }),
+    onSuccess: (res) => setBacktest(res),
+    onError: () =>
+      setBacktest({
+        valida: false,
+        errores: ["No se pudo ejecutar la prueba. Intente de nuevo."],
+        ventanaDias: 7,
+        registrosEvaluados: 0,
+        totalCoincidencias: 0,
+        bajo: 0,
+        medio: 0,
+        alto: 0,
+        critico: 0,
+        muestra: [],
+      }),
+  });
+
   function abrirNueva() {
     if (!catalogo) return;
     setForm(formularioVacio(catalogo.fuentes[0]?.nombre ?? "Factura"));
@@ -163,6 +186,28 @@ export function ReglasPersonalizadasSection() {
     setEditando(null);
     setForm(null);
     setErrores([]);
+    setBacktest(null);
+  }
+
+  /// Arma el payload de la regla a partir del formulario (lo comparten guardar y probar).
+  function datosRegla(f: FormularioRegla): GuardarReglaPersonalizadaRequest {
+    return {
+      nombre: f.nombre,
+      descripcion: f.descripcion,
+      fuenteDatos: f.fuenteDatos,
+      condiciones: f.modoAvanzado ? [] : f.condiciones,
+      agregacion: f.usarAgregacion ? f.agregacion : null,
+      expresionAvanzada: f.modoAvanzado ? f.expresion : null,
+      riesgoBase: f.riesgoBase,
+      ambito: f.ambito,
+      activa: true,
+    };
+  }
+
+  function probar() {
+    if (!form) return;
+    setBacktest(null);
+    backtestMutation.mutate(datosRegla(form));
   }
 
   function guardar() {
@@ -205,20 +250,7 @@ export function ReglasPersonalizadasSection() {
       return;
     }
 
-    guardarMutation.mutate({
-      id: editando,
-      data: {
-        nombre: form.nombre,
-        descripcion: form.descripcion,
-        fuenteDatos: form.fuenteDatos,
-        condiciones: form.modoAvanzado ? [] : form.condiciones,
-        agregacion: form.usarAgregacion ? form.agregacion : null,
-        expresionAvanzada: form.modoAvanzado ? form.expresion : null,
-        riesgoBase: form.riesgoBase,
-        ambito: form.ambito,
-        activa: true,
-      },
-    });
+    guardarMutation.mutate({ id: editando, data: datosRegla(form) });
   }
 
   const camposFuente = (fuente: string) =>
@@ -630,7 +662,7 @@ export function ReglasPersonalizadasSection() {
               </div>
             )}
 
-            <div className="mt-5 flex gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <button
                 onClick={guardar}
                 disabled={guardarMutation.isPending || !form.nombre.trim()}
@@ -640,12 +672,85 @@ export function ReglasPersonalizadasSection() {
                 {editando === 0 ? "Crear regla" : "Guardar cambios"}
               </button>
               <button
+                onClick={probar}
+                disabled={backtestMutation.isPending}
+                className="flex items-center gap-2 rounded-md border border-primary/40 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+                title="Prueba la regla contra los datos reales de los últimos 7 días, sin guardarla"
+              >
+                <FlaskConical size={14} />
+                {backtestMutation.isPending ? "Probando…" : "Probar regla"}
+              </button>
+              <button
                 onClick={cerrarFormulario}
                 className="flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm hover:bg-muted"
               >
                 <X size={14} /> Cancelar
               </button>
             </div>
+
+            {backtest && (
+              <div className="mt-4 rounded-md border border-border bg-muted/40 p-4">
+                {!backtest.valida ? (
+                  <div className="flex items-start gap-2 text-sm text-risk-critical">
+                    <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium">No se pudo probar la regla:</p>
+                      {backtest.errores.map((e, i) => (
+                        <p key={i}>• {e}</p>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm">
+                      En los últimos{" "}
+                      <span className="font-semibold">{backtest.ventanaDias} días</span> esta regla
+                      habría generado{" "}
+                      <span className="font-bold text-primary">{backtest.totalCoincidencias}</span>{" "}
+                      alerta(s) sobre {backtest.registrosEvaluados} registro(s) evaluado(s).
+                    </p>
+                    {backtest.totalCoincidencias > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs font-medium">
+                        <span className="rounded-full bg-risk-critical/15 px-2.5 py-0.5 text-risk-critical">
+                          Crítico {backtest.critico}
+                        </span>
+                        <span className="rounded-full bg-risk-high/15 px-2.5 py-0.5 text-risk-high">
+                          Alto {backtest.alto}
+                        </span>
+                        <span className="rounded-full bg-risk-medium/15 px-2.5 py-0.5 text-risk-medium">
+                          Medio {backtest.medio}
+                        </span>
+                        <span className="rounded-full bg-risk-low/15 px-2.5 py-0.5 text-risk-low">
+                          Bajo {backtest.bajo}
+                        </span>
+                      </div>
+                    )}
+                    {backtest.muestra.length > 0 && (
+                      <div className="mt-3 space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          Ejemplos de coincidencias:
+                        </p>
+                        {backtest.muestra.map((m, i) => (
+                          <p key={i} className="text-xs text-muted-foreground">
+                            <span className="font-mono font-semibold">
+                              {m.nivel} · {m.score}
+                            </span>{" "}
+                            — {m.descripcion}
+                            {m.estacion ? ` · ${m.estacion}` : ""}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {backtest.totalCoincidencias === 0 && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        No coincidió con datos recientes: puede que el umbral sea muy estricto o que
+                        no haya datos de esa fuente en la ventana de prueba.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 

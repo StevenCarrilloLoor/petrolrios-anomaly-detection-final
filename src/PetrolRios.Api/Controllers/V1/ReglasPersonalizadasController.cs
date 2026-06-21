@@ -26,11 +26,14 @@ public sealed class ReglasPersonalizadasController : ControllerBase
 
     private readonly PetrolRiosDbContext _dbContext;
     private readonly ILogService _logService;
+    private readonly IReglaBacktestService _backtestService;
 
-    public ReglasPersonalizadasController(PetrolRiosDbContext dbContext, ILogService logService)
+    public ReglasPersonalizadasController(
+        PetrolRiosDbContext dbContext, ILogService logService, IReglaBacktestService backtestService)
     {
         _dbContext = dbContext;
         _logService = logService;
+        _backtestService = backtestService;
     }
 
     /// <summary>
@@ -181,6 +184,19 @@ public sealed class ReglasPersonalizadasController : ControllerBase
     {
         var errores = EvaluadorExpresion.Validar(request.Expresion ?? "", request.FuenteDatos ?? "");
         return Ok(new ValidarExpresionResponse(errores.Count == 0, errores));
+    }
+
+    /// <summary>
+    /// Backtest / vista previa: corre la regla borrador contra los datos reales de los últimos N
+    /// días (sin guardarla ni generar alertas) y devuelve cuántas alertas habría producido, su
+    /// desglose por nivel y una muestra. Usa el mismo motor que el ciclo de detección.
+    /// </summary>
+    [HttpPost("backtest")]
+    [ProducesResponseType(typeof(BacktestReglaResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Backtest([FromBody] BacktestReglaRequest request, CancellationToken ct)
+    {
+        var resultado = await _backtestService.EjecutarAsync(request, ct);
+        return Ok(resultado);
     }
 
     /// <summary>Listar todas las reglas personalizadas.</summary>

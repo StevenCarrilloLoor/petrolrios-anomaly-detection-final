@@ -4,6 +4,8 @@ import type {
   GuardarReglaPersonalizadaRequest,
   CatalogoReglasResponse,
   ValidarExpresionResponse,
+  BacktestReglaRequest,
+  BacktestReglaResponse,
 } from "@/types/reglaPersonalizada";
 
 export const reglasPersonalizadasService = {
@@ -36,4 +38,9 @@ export const reglasPersonalizadasService = {
       .then((r) => r.data),
 
   delete: (id: number) => api.delete(`/reglas-personalizadas/${id}`),
+
+  backtest: (data: BacktestReglaRequest) =>
+    api
+      .post<BacktestReglaResponse>("/reglas-personalizadas/backtest", data)
+      .then((r) => r.data),
 };

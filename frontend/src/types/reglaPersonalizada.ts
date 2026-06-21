@@ -42,6 +42,32 @@ export interface ValidarExpresionResponse {
   errores: string[];
 }
 
+export interface BacktestReglaRequest {
+  regla: GuardarReglaPersonalizadaRequest;
+  dias: number;
+}
+
+export interface BacktestCoincidencia {
+  nivel: string;
+  score: number;
+  descripcion: string;
+  empleado: string | null;
+  estacion: string | null;
+}
+
+export interface BacktestReglaResponse {
+  valida: boolean;
+  errores: string[];
+  ventanaDias: number;
+  registrosEvaluados: number;
+  totalCoincidencias: number;
+  bajo: number;
+  medio: number;
+  alto: number;
+  critico: number;
+  muestra: BacktestCoincidencia[];
+}
+
 export interface CampoCatalogo {
   nombre: string;
   etiqueta: string;

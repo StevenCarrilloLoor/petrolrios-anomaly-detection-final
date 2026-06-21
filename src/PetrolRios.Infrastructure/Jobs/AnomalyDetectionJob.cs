@@ -166,13 +166,13 @@ public sealed class AnomalyDetectionJob
             .Select(g => g.First())
             .ToList();
 
-        var facturas = DeserializeStagingByType<Application.DTOs.Firebird.FacturaDto>(staging, "Factura");
-        var detalles = DeserializeStagingByType<Application.DTOs.Firebird.DetalleFacturaDto>(staging, "DetalleFactura");
-        var cierres = DeserializeStagingByType<Application.DTOs.Firebird.CierreTurnoDto>(staging, "CierreTurno");
-        var depositos = DeserializeStagingByType<Application.DTOs.Firebird.DepositoTurnoDto>(staging, "DepositoTurno");
-        var anulaciones = DeserializeStagingByType<Application.DTOs.Firebird.AnulacionDto>(staging, "Anulacion");
-        var creditos = DeserializeStagingByType<Application.DTOs.Firebird.CreditoDto>(staging, "Credito");
-        var tarjetas = DeserializeStagingByType<Application.DTOs.Firebird.TarjetaTurnoDto>(staging, "TarjetaTurno");
+        var facturas = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.FacturaDto>(staging, "Factura");
+        var detalles = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.DetalleFacturaDto>(staging, "DetalleFactura");
+        var cierres = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.CierreTurnoDto>(staging, "CierreTurno");
+        var depositos = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.DepositoTurnoDto>(staging, "DepositoTurno");
+        var anulaciones = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.AnulacionDto>(staging, "Anulacion");
+        var creditos = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.CreditoDto>(staging, "Credito");
+        var tarjetas = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.TarjetaTurnoDto>(staging, "TarjetaTurno");
 
         // Historial de alertas por empleado (últimos 30 días)
         // Se materializa primero y se agrupa en memoria para compatibilidad con todos los providers
@@ -200,7 +200,7 @@ public sealed class AnomalyDetectionJob
             .ToDictionary(
                 g => g.Key,
                 g => (IReadOnlyList<IDictionary<string, object>>)g
-                    .Select(s => DeserializarDiccionario(s.DataJson))
+                    .Select(s => StagingJson.DeserializarDiccionario(s.DataJson))
                     .Where(d => d is not null)
                     .Cast<IDictionary<string, object>>()
                     .ToList());
@@ -229,55 +229,6 @@ public sealed class AnomalyDetectionJob
             HoraApertura = estacion.HoraApertura,
             HoraCierre = estacion.HoraCierre
         };
-    }
-
-    /// <summary>Convierte el JSON de una fila de fuente configurable en un diccionario campo→valor.</summary>
-    private static IDictionary<string, object>? DeserializarDiccionario(string json)
-    {
-        try
-        {
-            var crudo = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
-            if (crudo is null) return null;
-            var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (clave, valor) in crudo)
-                dict[clave] = ConvertirJsonElement(valor);
-            return dict;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static object ConvertirJsonElement(JsonElement e) => e.ValueKind switch
-    {
-        JsonValueKind.Number => e.GetDouble(),
-        JsonValueKind.String => e.GetString() ?? "",
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        JsonValueKind.Null => "",
-        _ => e.ToString()
-    };
-
-    private static IReadOnlyList<T> DeserializeStagingByType<T>(
-        IEnumerable<TransaccionStaging> staging, string tipoTransaccion)
-    {
-        return staging
-            .Where(s => s.TipoTransaccion == tipoTransaccion)
-            .Select(s =>
-            {
-                try
-                {
-                    return JsonSerializer.Deserialize<T>(s.DataJson);
-                }
-                catch
-                {
-                    return default;
-                }
-            })
-            .Where(item => item is not null)
-            .Cast<T>()
-            .ToList();
     }
 
     // Cache de destinatarios de correo por ciclo (supervisores y administradores activos).

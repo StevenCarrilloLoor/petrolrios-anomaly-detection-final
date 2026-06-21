@@ -61,3 +61,46 @@ public sealed record FuenteCatalogo(
     IReadOnlyList<CampoCatalogo> Campos);
 
 public sealed record CampoCatalogo(string Nombre, string Etiqueta, string Tipo);
+
+/// <summary>
+/// Solicitud de backtest (vista previa): prueba una regla <b>borrador</b> contra los datos reales
+/// de los últimos <see cref="Dias"/> días, sin guardarla, para ver cuántas alertas habría generado.
+/// </summary>
+public sealed record BacktestReglaRequest
+{
+    public required GuardarReglaPersonalizadaRequest Regla { get; init; }
+
+    /// <summary>Ventana de evaluación en días (1–90). Por defecto 7.</summary>
+    public int Dias { get; init; } = 7;
+}
+
+/// <summary>
+/// Resultado del backtest: cuántas coincidencias habría generado la regla, su desglose por nivel
+/// de riesgo y una muestra. Si la regla borrador es inválida, <see cref="Valida"/> es false y
+/// <see cref="Errores"/> explica por qué (no se ejecuta nada).
+/// </summary>
+public sealed record BacktestReglaResponse
+{
+    public bool Valida { get; init; }
+    public IReadOnlyList<string> Errores { get; init; } = [];
+
+    public int VentanaDias { get; init; }
+
+    /// <summary>Cantidad de registros de la fuente evaluados en la ventana.</summary>
+    public int RegistrosEvaluados { get; init; }
+
+    public int TotalCoincidencias { get; init; }
+
+    // Desglose por nivel de riesgo de las coincidencias.
+    public int Bajo { get; init; }
+    public int Medio { get; init; }
+    public int Alto { get; init; }
+    public int Critico { get; init; }
+
+    /// <summary>Muestra de coincidencias (las de mayor score) para la vista previa.</summary>
+    public IReadOnlyList<BacktestCoincidencia> Muestra { get; init; } = [];
+}
+
+/// <summary>Una coincidencia de muestra del backtest.</summary>
+public sealed record BacktestCoincidencia(
+    string Nivel, double Score, string Descripcion, string? Empleado, string? Estacion);
