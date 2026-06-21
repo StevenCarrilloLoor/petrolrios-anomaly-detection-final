@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Domain.Enums;
 
@@ -11,9 +10,8 @@ public class InvoiceAnomalyDetectorTests
 
     public InvoiceAnomalyDetectorTests()
     {
-        _sut = new InvoiceAnomalyDetector(
-            new RiskScoringEngine(),
-            NullLogger<InvoiceAnomalyDetector>.Instance);
+        // El detector ahora orquesta reglas Strategy inyectadas (las mismas que registra la DI).
+        _sut = TestHelpers.CrearInvoiceAnomalyDetector(new RiskScoringEngine());
     }
 
     [Fact]

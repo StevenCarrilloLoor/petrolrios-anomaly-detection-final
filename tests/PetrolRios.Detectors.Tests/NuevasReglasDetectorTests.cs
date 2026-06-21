@@ -22,7 +22,7 @@ public class NuevasReglasDetectorTests
     {
         var scoring = new RiskScoringEngine();
         _cashFraud = new CashFraudDetector(scoring, NullLogger<CashFraudDetector>.Instance);
-        _invoiceAnomaly = new InvoiceAnomalyDetector(scoring, NullLogger<InvoiceAnomalyDetector>.Instance);
+        _invoiceAnomaly = TestHelpers.CrearInvoiceAnomalyDetector(scoring);
         _paymentFraud = new PaymentFraudDetector(scoring, NullLogger<PaymentFraudDetector>.Instance);
         _compliance = new ComplianceViolationDetector(scoring, NullLogger<ComplianceViolationDetector>.Instance);
     }

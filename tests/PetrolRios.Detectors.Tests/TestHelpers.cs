@@ -1,5 +1,7 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Detectors.Rules.InvoiceAnomaly;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
@@ -71,6 +73,25 @@ internal static class TestHelpers
         ReglaDeteccion.Create(TipoDetector.ComplianceViolation, "R11a", "D11a", "VentaSinPlacaMontoMinimo", 200.0),
         ReglaDeteccion.Create(TipoDetector.ComplianceViolation, "R12", "D12", "FueraHorarioHabilitado", 1.0)
     ];
+
+    /// <summary>
+    /// Construye el InvoiceAnomalyDetector con sus reglas Strategy (las mismas que registra la DI).
+    /// El detector ya no contiene la lógica: orquesta estas reglas.
+    /// </summary>
+    public static InvoiceAnomalyDetector CrearInvoiceAnomalyDetector(RiskScoringEngine scoring) =>
+        new(
+            new IDetectionRule[]
+            {
+                new TasaAnulacionesRule(scoring),
+                new PrecioFueraListaRule(scoring),
+                new CamposObligatoriosRule(scoring),
+                new DescuentoExcesivoRule(scoring),
+                new TotalInconsistenteRule(scoring),
+                new FechaFueraDeRangoRule(scoring),
+                new AnulacionRecurrenteRule(scoring),
+                new DespachoNoFacturadoRule(scoring),
+            },
+            NullLogger<InvoiceAnomalyDetector>.Instance);
 
     /// <summary>Crea una regla desactivada para probar el respeto al flag Activa.</summary>
     public static ReglaDeteccion CreateReglaInactiva(
