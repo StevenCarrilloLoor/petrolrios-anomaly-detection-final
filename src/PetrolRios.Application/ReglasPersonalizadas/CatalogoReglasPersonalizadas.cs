@@ -195,6 +195,20 @@ public static class CatalogoReglasPersonalizadas
         if (condiciones.Count == 0 && agregacion is null)
             errores.Add("La regla necesita al menos una condición o una agregación.");
 
+        // Validación independiente de la fuente: aplica también a las fuentes configurables
+        // (tablas arbitrarias del agente), que NO entran al bloque 'conocida'. Sin esto se
+        // colaban condiciones malformadas como "CAMPO >" (sin valor) que el motor no evalúa.
+        foreach (var condicion in condiciones)
+        {
+            if (string.IsNullOrWhiteSpace(condicion.Campo))
+                errores.Add("Hay una condición sin un campo seleccionado.");
+
+            var requiereValor = condicion.Operador is not ("vacio" or "noVacio");
+            if (requiereValor && string.IsNullOrWhiteSpace(condicion.Valor))
+                errores.Add(
+                    $"La condición sobre '{condicion.Campo}' necesita un valor con el operador '{condicion.Operador}'.");
+        }
+
         if (conocida)
         {
             foreach (var condicion in condiciones)

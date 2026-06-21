@@ -76,8 +76,14 @@ export function FuentesDatosSection() {
     onError: () => setAvisoEsquema("No se pudo solicitar el esquema."),
   });
 
-  const invalidar = () =>
+  const invalidar = () => {
     void queryClient.invalidateQueries({ queryKey: ["fuentes-datos"] });
+    // Registrar/editar/eliminar una fuente cambia el catálogo de fuentes del builder
+    // de reglas; sin esto el dropdown queda obsoleto hasta recargar la página.
+    void queryClient.invalidateQueries({
+      queryKey: ["reglas-personalizadas", "catalogo"],
+    });
+  };
 
   const crearMutation = useMutation({
     mutationFn: fuentesDatosService.create,

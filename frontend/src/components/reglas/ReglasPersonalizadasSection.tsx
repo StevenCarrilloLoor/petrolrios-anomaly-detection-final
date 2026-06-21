@@ -167,6 +167,44 @@ export function ReglasPersonalizadasSection() {
 
   function guardar() {
     if (!form || editando === null) return;
+
+    // Validación previa: evita persistir reglas malformadas (p. ej. una condición
+    // "CAMPO >" sin valor, que el motor de detección no puede evaluar).
+    const erroresValidacion: string[] = [];
+    if (!form.nombre.trim()) {
+      erroresValidacion.push("El nombre es obligatorio.");
+    }
+    if (form.modoAvanzado) {
+      if (!form.expresion.trim()) {
+        erroresValidacion.push("La expresión avanzada no puede estar vacía.");
+      }
+    } else {
+      const requiereValor = (op: string) => op !== "vacio" && op !== "noVacio";
+      form.condiciones.forEach((c, i) => {
+        if (requiereValor(c.operador) && !String(c.valor).trim()) {
+          erroresValidacion.push(
+            `La condición ${i + 1} (${c.campo || "campo sin elegir"}) necesita un valor.`,
+          );
+        }
+        if (!c.campo) {
+          erroresValidacion.push(`La condición ${i + 1} no tiene un campo elegido.`);
+        }
+      });
+      if (form.condiciones.length === 0 && !form.usarAgregacion) {
+        erroresValidacion.push(
+          "Agregue al menos una condición o active una agregación con umbral.",
+        );
+      }
+    }
+    if (form.usarAgregacion && !form.agregacion.agruparPor.trim()) {
+      erroresValidacion.push("Elija el campo por el cual agrupar en la agregación.");
+    }
+
+    if (erroresValidacion.length > 0) {
+      setErrores(erroresValidacion);
+      return;
+    }
+
     guardarMutation.mutate({
       id: editando,
       data: {
