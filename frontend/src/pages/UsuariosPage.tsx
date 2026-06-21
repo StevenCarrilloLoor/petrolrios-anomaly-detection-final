@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usuariosService } from "@/services/usuarios.service";
 import { estacionesService } from "@/services/estaciones.service";
 import { Spinner } from "@/components/ui/Spinner";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { UserPlus, Edit, Trash2 } from "lucide-react";
 import type { UsuarioResponse } from "@/types/usuario";
 
@@ -14,6 +15,7 @@ const ROLES = [
 
 export function UsuariosPage() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const [showCreate, setShowCreate] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -39,8 +41,14 @@ export function UsuariosPage() {
     },
   });
 
-  function eliminar(id: number, nombre: string) {
-    if (window.confirm(`¿Desactivar al usuario "${nombre}"? No podrá iniciar sesión.`)) {
+  async function eliminar(id: number, nombre: string) {
+    if (
+      await confirmar({
+        titulo: "Desactivar usuario",
+        mensaje: `¿Desactivar al usuario "${nombre}"? No podrá iniciar sesión.`,
+        textoConfirmar: "Desactivar",
+      })
+    ) {
       setMensaje(null);
       deleteMutation.mutate(id);
     }

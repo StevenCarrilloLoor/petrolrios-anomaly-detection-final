@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { LoginPage } from "@/pages/LoginPage";
@@ -39,6 +40,7 @@ function App() {
       <AuthProvider>
         <SettingsProvider>
           <NotificationProvider>
+            <ConfirmProvider>
             <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
@@ -88,6 +90,7 @@ function App() {
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
             </BrowserRouter>
+            </ConfirmProvider>
           </NotificationProvider>
         </SettingsProvider>
       </AuthProvider>

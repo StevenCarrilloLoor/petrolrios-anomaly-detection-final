@@ -9,6 +9,7 @@ import { esquemaService } from "@/services/esquema.service";
 import { estacionesService } from "@/services/estaciones.service";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   Database,
   Plus,
@@ -45,6 +46,7 @@ const formularioVacio: Formulario = {
 
 export function FuentesDatosSection() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const { user } = useAuth();
   const esAdmin = user?.rol === "Administrador";
 
@@ -326,9 +328,13 @@ export function FuentesDatosSection() {
                         <Pencil size={14} />
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (
-                            confirm(`¿Eliminar la fuente "${f.nombre}" (${f.tabla})?`)
+                            await confirmar({
+                              titulo: "Eliminar fuente",
+                              mensaje: `¿Eliminar la fuente "${f.nombre}" (${f.tabla})? Esta acción no se puede deshacer.`,
+                              textoConfirmar: "Eliminar",
+                            })
                           )
                             eliminarMutation.mutate(f.id);
                         }}

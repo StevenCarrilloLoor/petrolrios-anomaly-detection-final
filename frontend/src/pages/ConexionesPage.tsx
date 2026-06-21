@@ -5,6 +5,7 @@ import { estacionesService } from "@/services/estaciones.service";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { ConexionEstacionResponse } from "@/types/monitoreo";
 import {
   Server,
@@ -42,6 +43,7 @@ function hayVersionMasNueva(disponible?: string, instalada?: string | null): boo
 
 export function ConexionesPage() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const { user } = useAuth();
   const puedeGestionar = user?.rol === "Supervisor" || user?.rol === "Administrador";
   const puedeEliminar = user?.rol === "Administrador";
@@ -465,11 +467,13 @@ export function ConexionesPage() {
                           </button>
                           {puedeEliminar && (
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 if (
-                                  confirm(
-                                    `¿Eliminar la estación ${c.codigo} (${c.nombre})?\n\nSi tiene historial de alertas se desactivará en lugar de eliminarse.`,
-                                  )
+                                  await confirmar({
+                                    titulo: "Eliminar estación",
+                                    mensaje: `¿Eliminar la estación ${c.codigo} (${c.nombre})? Si tiene historial de alertas se desactivará en lugar de eliminarse.`,
+                                    textoConfirmar: "Eliminar",
+                                  })
                                 )
                                   eliminarMutation.mutate(c.estacionId);
                               }}

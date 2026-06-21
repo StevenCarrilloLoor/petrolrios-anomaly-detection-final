@@ -10,6 +10,7 @@ import type {
 } from "@/types/reglaPersonalizada";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   Plus,
   Trash2,
@@ -75,6 +76,7 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
 
 export function ReglasPersonalizadasSection() {
   const queryClient = useQueryClient();
+  const confirmar = useConfirm();
   const [editando, setEditando] = useState<number | null>(null); // null=cerrado, 0=nueva, >0=editar
   const [form, setForm] = useState<FormularioRegla | null>(null);
   const [errores, setErrores] = useState<string[]>([]);
@@ -806,8 +808,14 @@ export function ReglasPersonalizadasSection() {
                   <Pencil size={14} />
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm(`¿Eliminar la regla "${regla.nombre}"?`))
+                  onClick={async () => {
+                    if (
+                      await confirmar({
+                        titulo: "Eliminar regla",
+                        mensaje: `¿Eliminar la regla "${regla.nombre}"? Esta acción no se puede deshacer.`,
+                        textoConfirmar: "Eliminar",
+                      })
+                    )
                       eliminarMutation.mutate(regla.id);
                   }}
                   className="rounded-md border border-border p-2 text-muted-foreground hover:border-risk-critical hover:text-risk-critical"
