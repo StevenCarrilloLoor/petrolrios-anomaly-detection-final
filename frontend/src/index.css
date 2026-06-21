@@ -37,6 +37,38 @@
   }
 }
 
+/* Tema forzado por el usuario (pantalla de Ajustes). Sin estas clases la interfaz
+   sigue el esquema del sistema (@media prefers-color-scheme). Al ir sin capa de
+   cascada, estas reglas ganan tanto al :root claro por defecto como al override
+   oscuro del @media, así que el usuario puede fijar claro u oscuro en cualquier SO. */
+html.theme-oscuro {
+  --color-background: #0a0a0a;
+  --color-foreground: #fafafa;
+  --color-muted: #262626;
+  --color-muted-foreground: #a3a3a3;
+  --color-border: #262626;
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-accent: #262626;
+  --color-accent-foreground: #fafafa;
+}
+
+html.theme-claro {
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #737373;
+  --color-border: #e5e5e5;
+  --color-primary: #1d4ed8;
+  --color-primary-foreground: #ffffff;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-accent: #f5f5f5;
+  --color-accent-foreground: #0a0a0a;
+}
+
 @keyframes slide-in-right {
   from {
     transform: translateX(100%);

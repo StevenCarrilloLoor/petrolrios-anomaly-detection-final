@@ -13,6 +13,7 @@ import {
   BarChart3,
   Radio,
   Wrench,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +87,7 @@ const navSections: NavSection[] = [
     title: "Mi cuenta",
     items: [
       { to: "/seguridad", label: "Seguridad (2FA)", icon: <ShieldCheck size={20} /> },
+      { to: "/ajustes", label: "Ajustes", icon: <SlidersHorizontal size={20} /> },
     ],
   },
 ];

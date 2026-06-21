@@ -13,6 +13,34 @@ import { subscribeSignalREvent } from "@/services/signalr";
 import type { AlertaResponse } from "@/types/alert";
 import { ToastContainer, type Toast } from "./ToastContainer";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAjustes } from "@/contexts/SettingsContext";
+
+/** Tono breve generado con Web Audio (sin archivo de audio) para alertas críticas. */
+function reproducirBeepCritico(): void {
+  try {
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+    osc.start(t);
+    osc.stop(t + 0.45);
+    osc.onended = () => void ctx.close();
+  } catch {
+    /* audio no disponible en este navegador/contexto */
+  }
+}
 
 interface NotificationContextType {
   alertCount: number;
@@ -38,6 +66,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [alertCount, setAlertCount] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const recibidas = useRef(new Set<string>());
+  const { ajustes } = useAjustes();
+  // Se lee por ref para no re-suscribir SignalR cada vez que cambian las preferencias.
+  const ajustesRef = useRef(ajustes);
+  useEffect(() => {
+    ajustesRef.current = ajustes;
+  }, [ajustes]);
 
   const addToast = useCallback((toast: Omit<Toast, "id">) => {
     const id = crypto.randomUUID();
@@ -74,11 +108,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const handleNuevaAlerta = (alerta: AlertaResponse) => {
       if (yaRecibida(alerta)) return;
       setAlertCount((prev) => prev + 1);
-      addToast({
-        title: `Nueva alerta: ${alerta.tipoDetector}`,
-        message: alerta.descripcion,
-        level: alerta.nivelRiesgo,
-      });
+      if (ajustesRef.current.sonidoAlertas && alerta.nivelRiesgo === "Critico") {
+        reproducirBeepCritico();
+      }
+      if (ajustesRef.current.mostrarToasts) {
+        addToast({
+          title: `Nueva alerta: ${alerta.tipoDetector}`,
+          message: alerta.descripcion,
+          level: alerta.nivelRiesgo,
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ["alertas"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
@@ -88,11 +127,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     // bandeja/dashboard. Solo refresca la pestaña "Problemas de estación".
     const handleProblemaEstacion = (alerta: AlertaResponse) => {
       if (yaRecibida(alerta)) return;
-      addToast({
-        title: "Nuevo problema de estación",
-        message: alerta.descripcion,
-        level: alerta.nivelRiesgo,
-      });
+      if (ajustesRef.current.mostrarToasts) {
+        addToast({
+          title: "Nuevo problema de estación",
+          message: alerta.descripcion,
+          level: alerta.nivelRiesgo,
+        });
+      }
       void queryClient.invalidateQueries({ queryKey: ["problemas-estacion"] });
       void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
     };

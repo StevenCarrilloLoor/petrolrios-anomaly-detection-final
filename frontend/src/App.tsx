@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -16,6 +17,7 @@ import { ReportesPage } from "@/pages/ReportesPage";
 import { UsuariosPage } from "@/pages/UsuariosPage";
 import { LogsPage } from "@/pages/LogsPage";
 import { SeguridadPage } from "@/pages/SeguridadPage";
+import { AjustesPage } from "@/pages/AjustesPage";
 import { AprobarQrPage } from "@/pages/AprobarQrPage";
 import { VerificarCorreoPage } from "@/pages/VerificarCorreoPage";
 import { RestablecerPasswordPage } from "@/pages/RestablecerPasswordPage";
@@ -34,8 +36,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <NotificationProvider>
-          <BrowserRouter>
+        <SettingsProvider>
+          <NotificationProvider>
+            <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/verificar-correo" element={<VerificarCorreoPage />} />
@@ -49,6 +52,7 @@ function App() {
                   <Route path="/alertas/:id" element={<DetalleAlertaPage />} />
                   <Route path="/conexiones" element={<ConexionesPage />} />
                   <Route path="/seguridad" element={<SeguridadPage />} />
+                  <Route path="/ajustes" element={<AjustesPage />} />
                   <Route path="/aprobar-qr" element={<AprobarQrPage />} />
                 </Route>
               </Route>
@@ -81,8 +85,9 @@ function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
-          </BrowserRouter>
-        </NotificationProvider>
+            </BrowserRouter>
+          </NotificationProvider>
+        </SettingsProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
