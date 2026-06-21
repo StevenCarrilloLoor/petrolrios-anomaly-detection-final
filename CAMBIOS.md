@@ -1051,3 +1051,105 @@ quien no controla el correo. Mensajes neutros para no revelar si un correo exist
 `AuthController.cs`, `DependencyInjection.cs`, `DTOs/Auth/LoginResponse.cs`,
 `frontend/.../LoginPage.tsx`, `DesbloquearCuentaPage.tsx` (nuevo), `auth.service.ts`, `App.tsx`,
 `tests/PetrolRios.Api.Tests/AccountUnlockServiceTests.cs` (nuevo).
+
+## 40. Arquitectura de los detectores: una clase por regla (Strategy + auto-registro)
+
+**Motivación.** La tesis declara el **Strategy Pattern** para los detectores, pero cada uno de los
+4 detectores era un monolito con toda su lógica de reglas en línea. Eso contradecía el patrón
+declarado y hacía que agregar una regla obligara a editar un archivo grande y delicado. Se
+refactorizó para que **cada regla sea su propia estrategia**.
+
+**Diseño.**
+- `IDetectionRule` / `DetectionRuleBase`: contrato de una regla individual (a qué detector
+  pertenece, su parámetro/umbral configurable, su ámbito por defecto y su método `Evaluar`).
+- `RuleBasedDetector` (base abstracta): orquestador delgado. Recibe por **inyección de
+  dependencias** todas las `IDetectionRule`, filtra las de su `Type`, **respeta el flag `Activa`**
+  de cada `ReglaDeteccion` y acumula las anomalías. Cada detector concreto queda en ~10 líneas
+  (constructor + `Type`).
+- **Auto-registro por reflexión:** la capa de DI escanea el ensamblado y registra cada
+  `IDetectionRule` automáticamente. **Agregar una regla = agregar un archivo** (una clase nueva);
+  no hay que tocar el detector, ni la DI, ni un `switch`. Escalable y modular.
+- 25 reglas repartidas en `Rules/<Detector>/` (8 Invoice, 6 Compliance, 5 Cash + helper, 5 Payment).
+
+**Vínculo con la tesis.** Materializa el patrón Strategy declarado en el diseño y refuerza los
+atributos de **mantenibilidad y escalabilidad** del sistema (OE de calidad). El comportamiento de
+detección es idéntico al previo: es una refactorización estructural, no funcional.
+
+**Verificación.** Build Release **0 advertencias / 0 errores**; **119 pruebas de Detectors en
+verde**; interfaz de Reglas sin cambios para el usuario (mismas 25 reglas, mismos umbrales).
+
+**Archivos:** `RuleBasedDetector.cs` (nuevo), `Rules/DetectionRuleBase.cs`,
+`Rules/<Detector>/*.cs` (25 clases, una por regla), `DependencyInjection.cs` (auto-registro),
+los 4 detectores reducidos a orquestadores. *(commits `25a9e30`, `b37d216`)*
+
+## 41. Motor de reglas personalizadas 2.0
+
+La pantalla de **Reglas personalizadas** (que permite a Supervisor/Admin definir reglas sin tocar
+código — CU de configuración del motor) se llevó a un nivel de producto. Cuatro mejoras + una de
+robustez:
+
+**41.1 Vista previa / backtest antes de guardar (dry-run).** Inspirado en motores de reglas reales
+(estilo *Stripe Radar*): antes de guardar una regla se la prueba contra los **últimos N días** de
+datos de staging y se ve cuántas transacciones habría marcado y con qué nivel de riesgo, **sin
+persistir nada**. Reusa el `CustomRuleDetector` real (mismo resultado que en producción), lee
+staging en **solo lectura** por ventana de fecha. Endpoint `POST /api/v1/reglas-personalizadas/backtest`;
+panel de resultados en la UI (registros evaluados, coincidencias por nivel Bajo/Medio/Alto/Crítico
+y muestra de ejemplos). Evita publicar reglas ruidosas o inertes.
+
+**41.2 Combinador lógico Y/O en el modo básico.** Las condiciones del modo básico podían combinarse
+solo de forma implícita. Ahora el usuario elige **"Cumplir TODAS (Y)"** o **"CUALQUIERA (O)"**.
+Se persiste como JSON `{"combinador","condiciones"}`, **retrocompatible** con el array plano legado
+(se interpreta como "Y"). *Verificado en vivo por backtest:* con **Y** y dos condiciones (una casi
+imposible) → 0/24 coincidencias; con **O** y las mismas condiciones → 16/24. El round-trip
+serializar→persistir→leer→evaluar es correcto.
+
+**41.3 Funciones nuevas del DSL avanzado.** El modo avanzado (mini-lenguaje de expresiones seguro,
+sin `eval`, con tokenizer/parser/AST propios) ganó funciones: `min`, `max`, `piso`, `techo`,
+`modulo` (división segura), `raiz`, `potencia`, `en(x, …)` (pertenencia a lista), `siVacio`
+(coalescencia), `redondear`, `mayusculas`, `termina`. Da expresividad sin sacrificar la seguridad
+de no ejecutar código arbitrario.
+
+**41.4 Galería de plantillas de arranque.** 5 plantillas pre-armadas (un clic las carga en el
+formulario) para que el usuario parta de un ejemplo en vez de una hoja en blanco.
+
+**41.5 (robustez) Modal de confirmación con estilo** en lugar del `confirm()` nativo del navegador.
+Además de verse acorde al producto, elimina un cuelgue del hilo de render que el `confirm()`
+bloqueante provocaba al borrar reglas.
+
+**Vínculo con la tesis.** Refuerza los casos de uso de **configuración de reglas/umbrales** del
+Supervisor y el Administrador y el principio de un **motor de detección configurable** sin
+redepliegue.
+
+**Verificación.** Build Release 0/0; `tsc -b && vite build` limpio; **119 pruebas de Detectors**
+(3 nuevas: combinador "O", funciones matemáticas, `en`/`siVacio`); E2E del backtest con 4 casos
+(coincidencia, sin coincidencia, regla inválida → error de validación, expresión avanzada).
+*(commits `9746bd0`, `33392d2`, `da3c34f`, `e763c8f`)*
+
+**Archivos:** `ReglaBacktestService.cs` (nuevo), `Jobs/StagingJson.cs` (nuevo, compartido),
+`ReglasPersonalizadas/Expresiones/*` (AST + evaluador), `CatalogoReglasPersonalizadas.cs`,
+`CustomRuleDetector.cs`, `ReglasPersonalizadasController.cs`, DTOs de backtest,
+`ui/ConfirmDialog.tsx` (nuevo), `reglas/ReglasPersonalizadasSection.tsx`, tipos y servicio del
+frontend.
+
+## 42. Evidencia de cobertura de pruebas (OE5 ≥ 80%)
+
+Tras la refactorización a 25 reglas se **midió** la cobertura real del ensamblado crítico, no solo
+se contó pruebas. Herramienta: `coverlet` + `reportgenerator` (`scripts/coverage.ps1`).
+
+**Resultado — `PetrolRios.Detectors`:**
+
+| Métrica | Valor |
+|---|---|
+| Cobertura de **líneas** | **96.3%** (1169 / 1213) |
+| Cobertura de ramas | 84.9% (339 / 399) |
+| Cobertura de métodos | 88.9% (145 / 163) |
+| Clases medidas | 33 |
+| Pruebas | 119, todas en verde |
+
+Los 4 detectores y el orquestador quedan al **100%**; cada una de las 25 reglas individuales entre
+**91% y 100%**. **Supera con holgura el umbral del 80% exigido por OE5.** Reproducible en cualquier
+momento con `scripts/coverage.ps1` (o `dotnet test … --collect:"XPlat Code Coverage"`); el reporte
+HTML por clase queda en `coverage-report/` (ignorado por git como artefacto de build).
+
+**Vínculo con la tesis.** Es la evidencia directa del **OE5** ("cobertura de pruebas unitarias > 80%
+en el módulo de detección").
