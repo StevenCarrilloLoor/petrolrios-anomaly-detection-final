@@ -18,6 +18,7 @@ export interface ReglaPersonalizadaResponse {
   descripcion: string;
   fuenteDatos: string;
   condiciones: CondicionRegla[];
+  combinadorCondiciones: "Y" | "O";
   agregacion: AgregacionRegla | null;
   expresionAvanzada: string | null;
   riesgoBase: number;
@@ -30,6 +31,7 @@ export interface GuardarReglaPersonalizadaRequest {
   descripcion: string;
   fuenteDatos: string;
   condiciones: CondicionRegla[];
+  combinadorCondiciones: "Y" | "O";
   agregacion: AgregacionRegla | null;
   expresionAvanzada: string | null;
   riesgoBase: number;

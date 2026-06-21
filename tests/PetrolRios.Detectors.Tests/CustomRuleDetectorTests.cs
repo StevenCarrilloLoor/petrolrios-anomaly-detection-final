@@ -71,6 +71,37 @@ public class CustomRuleDetectorTests
     }
 
     [Fact]
+    public async Task DetectAsync_CombinadorO_BastaUnaCondicion_VsY_RequiereTodas()
+    {
+        // Dos condiciones: una falla (>1000) y otra se cumple (pago en efectivo).
+        var condiciones = new List<CondicionRegla>
+        {
+            new("TotalNeto", ">", "1000"),
+            new("CodigoPago", "=", "EF"),
+        };
+
+        // Con combinador "O" basta una → genera alerta.
+        var reglaO = ReglaPersonalizada.Create(
+            "Regla O", "prueba", "Factura",
+            CatalogoReglasPersonalizadas.SerializarCondiciones("O", condiciones), null, 50);
+        reglaO.Activa = true;
+        var ctxO = TestHelpers.CreateContext(
+            facturas: [TestHelpers.CreateFactura(totalNeto: 500, codigoPago: "EF")],
+            reglasPersonalizadas: [reglaO]);
+        (await _sut.DetectAsync(ctxO, CancellationToken.None)).Should().HaveCount(1);
+
+        // Con combinador "Y" deben cumplirse todas → la de >1000 falla → sin alerta.
+        var reglaY = ReglaPersonalizada.Create(
+            "Regla Y", "prueba", "Factura",
+            CatalogoReglasPersonalizadas.SerializarCondiciones("Y", condiciones), null, 50);
+        reglaY.Activa = true;
+        var ctxY = TestHelpers.CreateContext(
+            facturas: [TestHelpers.CreateFactura(totalNeto: 500, codigoPago: "EF")],
+            reglasPersonalizadas: [reglaY]);
+        (await _sut.DetectAsync(ctxY, CancellationToken.None)).Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task DetectAsync_CondicionNumericaCumplida_GeneraAlertaPorRegistro()
     {
         // Regla: facturas con TotalNeto > 300

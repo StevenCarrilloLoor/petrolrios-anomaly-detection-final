@@ -1,9 +1,16 @@
+using System.Text.Json;
 using PetrolRios.Application.DTOs.Firebird;
 
 namespace PetrolRios.Application.ReglasPersonalizadas;
 
-/// <summary>Condición de filtrado de una regla personalizada (se combinan con AND).</summary>
+/// <summary>Condición de filtrado de una regla personalizada.</summary>
 public sealed record CondicionRegla(string Campo, string Operador, string Valor);
+
+/// <summary>
+/// Conjunto de condiciones con su combinador lógico: "Y" = deben cumplirse todas (AND),
+/// "O" = basta con que se cumpla cualquiera (OR).
+/// </summary>
+public sealed record CondicionesConfig(string Combinador, List<CondicionRegla> Condiciones);
 
 /// <summary>Agregación opcional: agrupa los registros filtrados y compara el agregado con un umbral.</summary>
 public sealed record AgregacionRegla(
@@ -29,6 +36,38 @@ public static class CatalogoReglasPersonalizadas
     public static readonly string[] OperadoresNumero = [">", ">=", "<", "<=", "=", "!="];
     public static readonly string[] OperadoresTexto = ["=", "!=", "contiene", "noContiene", "vacio", "noVacio"];
     public static readonly string[] Funciones = ["Conteo", "Suma", "Promedio"];
+
+    private static readonly JsonSerializerOptions JsonCondiciones = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>Normaliza el combinador: acepta solo "O" (OR); cualquier otro valor es "Y" (AND).</summary>
+    public static string NormalizarCombinador(string? combinador) =>
+        string.Equals(combinador?.Trim(), "O", StringComparison.OrdinalIgnoreCase) ? "O" : "Y";
+
+    /// <summary>Serializa las condiciones junto a su combinador (formato con envoltura).</summary>
+    public static string SerializarCondiciones(string? combinador, IReadOnlyList<CondicionRegla> condiciones) =>
+        JsonSerializer.Serialize(new CondicionesConfig(NormalizarCombinador(combinador), condiciones.ToList()));
+
+    /// <summary>
+    /// Lee las condiciones desde su JSON. Tolera el formato antiguo (arreglo plano = combinador "Y")
+    /// y el nuevo ({"combinador","condiciones"}). Nunca lanza: ante un JSON inválido devuelve vacío.
+    /// </summary>
+    public static CondicionesConfig LeerCondiciones(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new CondicionesConfig("Y", []);
+        try
+        {
+            if (json.TrimStart().StartsWith('['))
+                return new CondicionesConfig("Y",
+                    JsonSerializer.Deserialize<List<CondicionRegla>>(json, JsonCondiciones) ?? []);
+
+            var cfg = JsonSerializer.Deserialize<CondicionesConfig>(json, JsonCondiciones);
+            return new CondicionesConfig(NormalizarCombinador(cfg?.Combinador), cfg?.Condiciones ?? []);
+        }
+        catch
+        {
+            return new CondicionesConfig("Y", []);
+        }
+    }
 
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<CampoInfo>> Fuentes =
         new Dictionary<string, IReadOnlyList<CampoInfo>>

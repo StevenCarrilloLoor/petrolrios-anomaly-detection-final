@@ -9,6 +9,10 @@ public sealed record ReglaPersonalizadaResponse
     public string Descripcion { get; init; } = string.Empty;
     public string FuenteDatos { get; init; } = string.Empty;
     public IReadOnlyList<CondicionRegla> Condiciones { get; init; } = [];
+
+    /// <summary>Combinador lógico de las condiciones: "Y" (todas) u "O" (cualquiera).</summary>
+    public string CombinadorCondiciones { get; init; } = "Y";
+
     public AgregacionRegla? Agregacion { get; init; }
 
     /// <summary>Expresión del modo avanzado (null en modo básico).</summary>
@@ -28,6 +32,10 @@ public sealed record GuardarReglaPersonalizadaRequest
     public string Descripcion { get; init; } = string.Empty;
     public required string FuenteDatos { get; init; }
     public List<CondicionRegla> Condiciones { get; init; } = [];
+
+    /// <summary>Combinador lógico de las condiciones: "Y" (todas, por defecto) u "O" (cualquiera).</summary>
+    public string CombinadorCondiciones { get; init; } = "Y";
+
     public AgregacionRegla? Agregacion { get; init; }
 
     /// <summary>Si viene no vacía, la regla es de modo avanzado (expresión lógica).</summary>

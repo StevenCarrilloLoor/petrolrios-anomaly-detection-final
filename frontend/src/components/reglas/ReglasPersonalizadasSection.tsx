@@ -55,6 +55,7 @@ interface FormularioRegla {
   modoAvanzado: boolean;
   expresion: string;
   condiciones: CondicionRegla[];
+  combinador: "Y" | "O";
   usarAgregacion: boolean;
   agregacion: AgregacionRegla;
   riesgoBase: number;
@@ -68,6 +69,7 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
   modoAvanzado: false,
   expresion: "",
   condiciones: [],
+  combinador: "Y",
   usarAgregacion: false,
   agregacion: { agruparPor: "", funcion: "Conteo", campo: null, operador: ">", umbral: 1 },
   riesgoBase: 50,
@@ -180,6 +182,7 @@ export function ReglasPersonalizadasSection() {
         descripcion: regla.descripcion,
         fuenteDatos: regla.fuenteDatos,
         condiciones: regla.condiciones,
+        combinadorCondiciones: regla.combinadorCondiciones,
         agregacion: regla.agregacion,
         expresionAvanzada: regla.expresionAvanzada,
         riesgoBase: regla.riesgoBase,
@@ -230,6 +233,7 @@ export function ReglasPersonalizadasSection() {
       modoAvanzado: p.modoAvanzado,
       expresion: p.expresion ?? "",
       condiciones: p.condiciones ? [...p.condiciones] : [],
+      combinador: "Y",
       usarAgregacion: false,
       agregacion: { agruparPor: "", funcion: "Conteo", campo: null, operador: ">", umbral: 1 },
       riesgoBase: p.riesgoBase,
@@ -248,6 +252,7 @@ export function ReglasPersonalizadasSection() {
       modoAvanzado: !!regla.expresionAvanzada,
       expresion: regla.expresionAvanzada ?? "",
       condiciones: [...regla.condiciones],
+      combinador: regla.combinadorCondiciones ?? "Y",
       usarAgregacion: regla.agregacion !== null,
       agregacion: regla.agregacion ?? {
         agruparPor: "",
@@ -277,6 +282,7 @@ export function ReglasPersonalizadasSection() {
       descripcion: f.descripcion,
       fuenteDatos: f.fuenteDatos,
       condiciones: f.modoAvanzado ? [] : f.condiciones,
+      combinadorCondiciones: f.combinador,
       agregacion: f.usarAgregacion ? f.agregacion : null,
       expresionAvanzada: f.modoAvanzado ? f.expresion : null,
       riesgoBase: f.riesgoBase,
@@ -505,10 +511,38 @@ export function ReglasPersonalizadasSection() {
             {/* MODO BÁSICO: condiciones visuales */}
             {!form.modoAvanzado && (
             <div className="mt-5">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Condiciones (todas deben cumplirse)
-                </span>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Condiciones
+                  </span>
+                  {form.condiciones.length > 1 && (
+                    <div className="flex overflow-hidden rounded-md border border-border text-[10px] font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, combinador: "Y" })}
+                        className={`px-2 py-0.5 ${
+                          form.combinador === "Y"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        Cumplir TODAS (Y)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, combinador: "O" })}
+                        className={`px-2 py-0.5 ${
+                          form.combinador === "O"
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        Cumplir CUALQUIERA (O)
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() =>
                     setForm({
@@ -546,7 +580,7 @@ export function ReglasPersonalizadasSection() {
                   return (
                     <div key={idx} className="flex flex-wrap items-center gap-2">
                       <span className="w-10 text-right font-mono text-[10px] text-muted-foreground">
-                        {idx === 0 ? "SI" : "Y"}
+                        {idx === 0 ? "SI" : form.combinador === "O" ? "O" : "Y"}
                       </span>
                       <select
                         value={condicion.campo}

@@ -45,7 +45,7 @@ public sealed class ReglaBacktestService : IReglaBacktestService
             string.IsNullOrWhiteSpace(r.Nombre) ? "(prueba)" : r.Nombre.Trim(),
             r.Descripcion?.Trim() ?? "",
             r.FuenteDatos,
-            JsonSerializer.Serialize(r.Condiciones),
+            CatalogoReglasPersonalizadas.SerializarCondiciones(r.CombinadorCondiciones, r.Condiciones),
             r.Agregacion is null ? null : JsonSerializer.Serialize(r.Agregacion),
             r.RiesgoBase,
             r.Ambito);

@@ -228,7 +228,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             nombre,
             request.Descripcion.Trim(),
             request.FuenteDatos,
-            JsonSerializer.Serialize(request.Condiciones),
+            CatalogoReglasPersonalizadas.SerializarCondiciones(request.CombinadorCondiciones, request.Condiciones),
             request.Agregacion is null ? null : JsonSerializer.Serialize(request.Agregacion),
             request.RiesgoBase,
             request.Ambito);
@@ -265,7 +265,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.Nombre = nombre;
         regla.Descripcion = request.Descripcion.Trim();
         regla.FuenteDatos = request.FuenteDatos;
-        regla.CondicionesJson = JsonSerializer.Serialize(request.Condiciones);
+        regla.CondicionesJson = CatalogoReglasPersonalizadas.SerializarCondiciones(request.CombinadorCondiciones, request.Condiciones);
         regla.AgregacionJson = request.Agregacion is null ? null : JsonSerializer.Serialize(request.Agregacion);
         regla.ExpresionAvanzada = string.IsNullOrWhiteSpace(request.ExpresionAvanzada)
             ? null : request.ExpresionAvanzada.Trim();
@@ -336,19 +336,24 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         return errores;
     }
 
-    private static ReglaPersonalizadaResponse MapToResponse(ReglaPersonalizada regla) => new()
+    private static ReglaPersonalizadaResponse MapToResponse(ReglaPersonalizada regla)
     {
-        Id = regla.Id,
-        Nombre = regla.Nombre,
-        Descripcion = regla.Descripcion,
-        FuenteDatos = regla.FuenteDatos,
-        Condiciones = JsonSerializer.Deserialize<List<CondicionRegla>>(regla.CondicionesJson, JsonOpts) ?? [],
-        Agregacion = string.IsNullOrWhiteSpace(regla.AgregacionJson)
-            ? null
-            : JsonSerializer.Deserialize<AgregacionRegla>(regla.AgregacionJson, JsonOpts),
-        ExpresionAvanzada = regla.ExpresionAvanzada,
-        RiesgoBase = regla.RiesgoBase,
-        Ambito = regla.Ambito,
-        Activa = regla.Activa
-    };
+        var cfg = CatalogoReglasPersonalizadas.LeerCondiciones(regla.CondicionesJson);
+        return new()
+        {
+            Id = regla.Id,
+            Nombre = regla.Nombre,
+            Descripcion = regla.Descripcion,
+            FuenteDatos = regla.FuenteDatos,
+            Condiciones = cfg.Condiciones,
+            CombinadorCondiciones = cfg.Combinador,
+            Agregacion = string.IsNullOrWhiteSpace(regla.AgregacionJson)
+                ? null
+                : JsonSerializer.Deserialize<AgregacionRegla>(regla.AgregacionJson, JsonOpts),
+            ExpresionAvanzada = regla.ExpresionAvanzada,
+            RiesgoBase = regla.RiesgoBase,
+            Ambito = regla.Ambito,
+            Activa = regla.Activa
+        };
+    }
 }

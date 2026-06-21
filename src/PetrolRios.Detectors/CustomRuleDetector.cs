@@ -57,7 +57,8 @@ public sealed class CustomRuleDetector : IAnomalyDetector
 
     private void EvaluarRegla(DetectionContext context, ReglaPersonalizada regla, List<DetectedAnomaly> anomalies)
     {
-        var condiciones = JsonSerializer.Deserialize<List<CondicionRegla>>(regla.CondicionesJson, JsonOpts) ?? [];
+        var configCondiciones = CatalogoReglasPersonalizadas.LeerCondiciones(regla.CondicionesJson);
+        var condiciones = configCondiciones.Condiciones;
         var agregacion = string.IsNullOrWhiteSpace(regla.AgregacionJson)
             ? null
             : JsonSerializer.Deserialize<AgregacionRegla>(regla.AgregacionJson, JsonOpts);
@@ -76,10 +77,15 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         }
         else
         {
-            // Modo básico: condiciones simples combinadas con AND
-            filtrados = registros
-                .Where(r => condiciones.All(c => EvaluarCondicion(regla.FuenteDatos, r, c)))
-                .ToList();
+            // Modo básico: condiciones combinadas con el combinador elegido (Y = todas, O = cualquiera).
+            // Sin condiciones (p. ej. solo agregación) pasan todos los registros.
+            filtrados = condiciones.Count == 0
+                ? registros
+                : registros
+                    .Where(r => configCondiciones.Combinador == "O"
+                        ? condiciones.Any(c => EvaluarCondicion(regla.FuenteDatos, r, c))
+                        : condiciones.All(c => EvaluarCondicion(regla.FuenteDatos, r, c)))
+                    .ToList();
         }
 
         if (filtrados.Count == 0) return;
