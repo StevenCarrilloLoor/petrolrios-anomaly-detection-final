@@ -20,9 +20,9 @@ public sealed class DashboardService : IDashboardService
     }
 
     /// <summary>
-    /// Alertas del carril de auditoría (fraude). El dashboard del central es la vista de los
-    /// auditores: los problemas operativos de estación NO se cuentan aquí (tienen su propia
-    /// pestaña "Problemas de estación"), para no inflar las métricas de fraude.
+    /// Alertas del carril de auditoría (anomalías a revisar). El dashboard del central es la vista
+    /// de los auditores: los problemas operativos de estación NO se cuentan aquí (tienen su propia
+    /// pestaña "Problemas de estación"), para no inflar las métricas de auditoría.
     /// </summary>
     private IQueryable<Alerta> AlertasAuditoria =>
         _dbContext.Set<Alerta>().Where(a => a.Ambito == AmbitoAlerta.Auditoria);

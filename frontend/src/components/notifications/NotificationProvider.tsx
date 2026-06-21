@@ -103,8 +103,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return false;
     };
 
-    // Carril de AUDITORÍA (fraude): sube el contador del auditor y refresca la bandeja
-    // de alertas y el dashboard. Son las que un auditor debe revisar.
+    // Carril de AUDITORÍA (posible irregularidad): sube el contador del auditor y refresca la
+    // bandeja de alertas y el dashboard. Son las anomalías que un auditor debe revisar.
     const handleNuevaAlerta = (alerta: AlertaResponse) => {
       if (yaRecibida(alerta)) return;
       setAlertCount((prev) => prev + 1);

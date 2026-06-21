@@ -173,7 +173,7 @@ export function ReglasPage() {
                 <Building2 size={13} className="text-amber-500" /> Operativa = avisa a la estación
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck size={13} className="text-primary" /> Auditoría = fraude (central)
+                <ShieldCheck size={13} className="text-primary" /> Auditoría = a revisar en el central
               </span>
             </div>
           </div>

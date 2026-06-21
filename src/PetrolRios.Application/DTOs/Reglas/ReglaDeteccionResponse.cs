@@ -12,7 +12,7 @@ public sealed record ReglaDeteccionResponse
 
     /// <summary>
     /// Carril al que pertenece la regla: "Operativa" (problema de estación → administrador de
-    /// la estación) o "Auditoria" (fraude → central). Es editable desde el panel de Reglas y los
+    /// la estación) o "Auditoria" (posible irregularidad → central). Es editable desde el panel y los
     /// detectores lo respetan al generar las alertas.
     /// </summary>
     public string Ambito { get; init; } = "Auditoria";

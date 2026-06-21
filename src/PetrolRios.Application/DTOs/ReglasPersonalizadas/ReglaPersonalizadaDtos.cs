@@ -35,7 +35,7 @@ public sealed record GuardarReglaPersonalizadaRequest
 
     public double RiesgoBase { get; init; } = 50;
 
-    /// <summary>"Operativa" (problema de estación) o "Auditoria" (fraude). Por defecto Auditoría.</summary>
+    /// <summary>"Operativa" (problema de estación) o "Auditoria" (posible irregularidad). Por defecto Auditoría.</summary>
     public string Ambito { get; init; } = "Auditoria";
 
     public bool Activa { get; init; } = true;

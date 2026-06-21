@@ -191,7 +191,7 @@ public static class SeedData
         foreach (var r in ambitoInvalido) r.Ambito = AmbitoAlerta.Auditoria;
 
         // Carril correcto en bases ya sembradas (la columna Ambito no existía antes): estos tres son
-        // problemas operativos de estación (errores honestos), no fraude.
+        // problemas operativos de estación (errores honestos), no anomalías de auditoría.
         var clavesOperativas = new[]
         {
             "TurnoSinCerrarHorasUmbral", "DespachoNoFacturadoHabilitado", "CamposObligatoriosHabilitado"

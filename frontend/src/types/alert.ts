@@ -86,11 +86,13 @@ export const ESTADO_ALERTA_OPTIONS: EstadoAlerta[] = [
   "Cerrada",
 ];
 
+// Etiquetas visibles de los detectores. El sistema detecta ANOMALÍAS (candidatas a revisión),
+// no fraude probado, así que evitamos esa palabra en lo que ve el usuario.
 export const TIPO_DETECTOR_LABELS: Record<TipoDetector, string> = {
-  CashFraud: "Fraude de Efectivo",
+  CashFraud: "Anomalía de Efectivo",
   InvoiceAnomaly: "Anomalía de Factura",
-  PaymentFraud: "Fraude de Pago",
-  ComplianceViolation: "Violación Normativa",
+  PaymentFraud: "Anomalía de Pago",
+  ComplianceViolation: "Anomalía de Cumplimiento",
   Personalizada: "Regla Personalizada",
 };
 

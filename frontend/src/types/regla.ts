@@ -6,7 +6,7 @@ export interface ReglaDeteccionResponse {
   parametroNombre: string;
   valorUmbral: number;
   activa: boolean;
-  /** Carril: "Operativa" (problema de estación) o "Auditoria" (fraude). */
+  /** Carril: "Operativa" (problema de estación) o "Auditoria" (posible irregularidad). */
   ambito: "Operativa" | "Auditoria";
 }
 
