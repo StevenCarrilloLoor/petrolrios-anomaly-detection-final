@@ -11,6 +11,7 @@ import { ProblemasEstacionPage } from "@/pages/ProblemasEstacionPage";
 import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
 import { ConexionesPage } from "@/pages/ConexionesPage";
 import { ReglasPage } from "@/pages/ReglasPage";
+import { FuentesDatosPage } from "@/pages/FuentesDatosPage";
 import { ReportesPage } from "@/pages/ReportesPage";
 import { UsuariosPage } from "@/pages/UsuariosPage";
 import { LogsPage } from "@/pages/LogsPage";
@@ -61,6 +62,7 @@ function App() {
               >
                 <Route element={<AppLayout />}>
                   <Route path="/reglas" element={<ReglasPage />} />
+                  <Route path="/fuentes-datos" element={<FuentesDatosPage />} />
                   <Route path="/reportes" element={<ReportesPage />} />
                 </Route>
               </Route>
