@@ -1,5 +1,6 @@
 import { Database } from "lucide-react";
 import { FuentesDatosSection } from "@/components/reglas/FuentesDatosSection";
+import { TablasEstandarSection } from "@/components/reglas/TablasEstandarSection";
 
 /**
  * Página dedicada al catálogo de fuentes de datos (tablas extra de Firebird).
@@ -26,6 +27,7 @@ export function FuentesDatosPage() {
       </div>
 
       <FuentesDatosSection />
+      <TablasEstandarSection />
     </div>
   );
 }

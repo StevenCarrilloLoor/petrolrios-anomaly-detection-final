@@ -12,6 +12,10 @@ public sealed class AgentState
     private readonly ConcurrentQueue<EventoAgente> _eventos = new();
     private readonly object _fuentesLock = new();
     private IReadOnlyList<FuenteCentralEstadoPanel> _fuentesCentrales = [];
+    // Totales ACUMULADOS por fuente (desde el arranque del agente). El estado que llega cada
+    // ciclo trae solo el delta del ciclo; aquí lo sumamos para que el panel no muestre 0 entre
+    // ciclos. Se accede siempre bajo _fuentesLock.
+    private readonly Dictionary<int, (long Leidas, long Enviadas)> _acumuladoPorFuente = new();
     private const int MaxEventos = 60;
 
     /// <summary>Si es false, el agente NO sincroniza automáticamente (modo manual).</summary>
@@ -73,6 +77,12 @@ public sealed class AgentState
             _fuentesCentrales = fuentes.Select(f =>
             {
                 porId.TryGetValue(f.Id, out var estado);
+                // Sumar el delta de este ciclo al total histórico de la fuente.
+                _acumuladoPorFuente.TryGetValue(f.Id, out var prev);
+                var leidas = prev.Leidas + (estado?.FilasLeidas ?? 0);
+                var enviadas = prev.Enviadas + (estado?.FilasEnviadas ?? 0);
+                _acumuladoPorFuente[f.Id] = (leidas, enviadas);
+
                 return new FuenteCentralEstadoPanel(
                     f.Id,
                     f.Nombre,
@@ -82,8 +92,8 @@ public sealed class AgentState
                     estado?.Estado ?? "Recibida",
                     estado?.TablaExiste,
                     estado?.ColumnaWatermarkValida,
-                    estado?.FilasLeidas ?? 0,
-                    estado?.FilasEnviadas ?? 0,
+                    leidas,
+                    enviadas,
                     estado?.UltimoError,
                     DateTime.UtcNow);
             }).ToList();
@@ -102,7 +112,7 @@ public sealed record FuenteCentralEstadoPanel(
     string Estado,
     bool? TablaExiste,
     bool? ColumnaWatermarkValida,
-    int FilasLeidas,
-    int FilasEnviadas,
+    long FilasLeidas,
+    long FilasEnviadas,
     string? UltimoError,
     DateTime Actualizado);

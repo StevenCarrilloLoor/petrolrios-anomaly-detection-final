@@ -168,10 +168,32 @@ internal static class PanelHtml
       <h3>Fuentes dinámicas recibidas del sistema central</h3>
       <p style="color:var(--muted);font-size:12px;margin:0 0 10px">
         Doble verificación local: muestra las tablas que este agente recibió del catálogo
-        central y el resultado real del último ciclo de extracción y envío.
+        central y su actividad. Leídas y Enviadas son acumuladas desde el arranque del agente.
       </p>
       <div id="fuentes-centrales" style="overflow-x:auto">
         <span style="color:var(--muted);font-size:12px">Esperando el primer ciclo…</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <h3>Tablas estándar del modelo</h3>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 10px">
+        Se extraen siempre en cada ciclo (solo lectura), sin configurarse. Alimentan los cuatro
+        detectores integrados.
+      </p>
+      <div style="overflow-x:auto">
+        <table class="source-table">
+          <thead><tr><th>Tabla</th><th>Contenido</th><th>Cursor incremental</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">DCTO</td><td>Facturas / documentos (ventas, créditos, placas, pago)</td><td class="mono">FEC_DCTO</td></tr>
+            <tr><td class="mono">DESP</td><td>Despachos (galones, mangueras, facturación)</td><td class="mono">FIN_DESP</td></tr>
+            <tr><td class="mono">TURN</td><td>Turnos (apertura/cierre, faltantes, vendedor)</td><td class="mono">FFI_TURN</td></tr>
+            <tr><td class="mono">TURN_DEPO</td><td>Depósitos de turno (efectivo)</td><td class="mono">FFI_TURN</td></tr>
+            <tr><td class="mono">ANUL</td><td>Anulaciones de comprobantes</td><td class="mono">FECHAANULACION</td></tr>
+            <tr><td class="mono">CRED_CABE</td><td>Créditos (garante, autorización)</td><td class="mono">FEC_CABE</td></tr>
+            <tr><td class="mono">TURN_TARJ</td><td>Tarjetas por turno</td><td class="mono">FFI_TURN</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
