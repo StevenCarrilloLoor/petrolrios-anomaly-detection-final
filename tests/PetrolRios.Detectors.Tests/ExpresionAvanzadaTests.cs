@@ -71,6 +71,41 @@ public class ExpresionAvanzadaTests
     }
 
     [Fact]
+    public void Funciones_Matematicas()
+    {
+        var c = new Dictionary<string, object> { ["A"] = 10.0, ["B"] = 3.0 };
+        Eval("min(A, B) == 3", c).Should().BeTrue();
+        Eval("max(A, B) == 10", c).Should().BeTrue();
+        Eval("modulo(A, B) == 1", c).Should().BeTrue();
+        Eval("modulo(A, 0) == 0", c).Should().BeTrue(); // división por cero segura
+        Eval("piso(2.9) == 2", c).Should().BeTrue();
+        Eval("techo(2.1) == 3", c).Should().BeTrue();
+        Eval("raiz(9) == 3", c).Should().BeTrue();
+        Eval("potencia(2, 3) == 8", c).Should().BeTrue();
+        Eval("redondear(2.6) == 3", c).Should().BeTrue();
+        Eval("redondear(12.34, 1) == 12.3", c).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Funcion_En_ListaDePertenencia()
+    {
+        var texto = new Dictionary<string, object> { ["CodigoPago"] = "EFE" };
+        Eval("en(CodigoPago, 'EF', 'EFE', 'CONT')", texto).Should().BeTrue();
+        Eval("en(CodigoPago, 'TC', 'CR')", texto).Should().BeFalse();
+
+        var num = new Dictionary<string, object> { ["NumeroTurno"] = 3.0 };
+        Eval("en(NumeroTurno, 1, 2, 3)", num).Should().BeTrue();
+        Eval("en(NumeroTurno, 4, 5)", num).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Funcion_SiVacio_Coalescencia()
+    {
+        Eval("siVacio(Placa, 'SIN') == 'SIN'", new() { ["Placa"] = "" }).Should().BeTrue();
+        Eval("siVacio(Placa, 'SIN') == 'ABC123'", new() { ["Placa"] = "ABC123" }).Should().BeTrue();
+    }
+
+    [Fact]
     public void Negacion()
     {
         var campos = new Dictionary<string, object> { ["CodigoPago"] = "TC" };

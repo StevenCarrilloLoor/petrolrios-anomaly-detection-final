@@ -74,6 +74,66 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
   ambito: "Auditoria",
 });
 
+interface Plantilla {
+  nombre: string;
+  descripcion: string;
+  fuente: string;
+  modoAvanzado: boolean;
+  expresion?: string;
+  condiciones?: CondicionRegla[];
+  riesgoBase: number;
+  ambito: "Operativa" | "Auditoria";
+}
+
+/** Plantillas de arranque rápido. La de "forma de pago inusual" usa la función de listas en(). */
+const PLANTILLAS: Plantilla[] = [
+  {
+    nombre: "Efectivo de alto monto",
+    descripcion: "Factura pagada en efectivo por más de $500.",
+    fuente: "Factura",
+    modoAvanzado: true,
+    expresion: "CodigoPago == 'EF' && TotalNeto > 500",
+    riesgoBase: 55,
+    ambito: "Auditoria",
+  },
+  {
+    nombre: "Venta sin identificación",
+    descripcion: "Factura sin placa ni cédula/RUC del cliente.",
+    fuente: "Factura",
+    modoAvanzado: true,
+    expresion: "vacio(Placa) && vacio(RucCliente)",
+    riesgoBase: 45,
+    ambito: "Auditoria",
+  },
+  {
+    nombre: "Descuento agresivo",
+    descripcion: "Descuento mayor al 15% del subtotal.",
+    fuente: "Factura",
+    modoAvanzado: true,
+    expresion: "Subtotal > 0 && Descuento / Subtotal > 0.15",
+    riesgoBase: 50,
+    ambito: "Auditoria",
+  },
+  {
+    nombre: "Forma de pago inusual",
+    descripcion: "Forma de pago fuera de las habituales (EF/EFE/TC/CR).",
+    fuente: "Factura",
+    modoAvanzado: true,
+    expresion: "!en(CodigoPago, 'EF', 'EFE', 'TC', 'CR')",
+    riesgoBase: 40,
+    ambito: "Auditoria",
+  },
+  {
+    nombre: "Faltante de caja",
+    descripcion: "Cierre de turno con faltante mayor a $50.",
+    fuente: "CierreTurno",
+    modoAvanzado: false,
+    condiciones: [{ campo: "Faltante", operador: ">", valor: "50" }],
+    riesgoBase: 60,
+    ambito: "Auditoria",
+  },
+];
+
 export function ReglasPersonalizadasSection() {
   const queryClient = useQueryClient();
   const confirmar = useConfirm();
@@ -159,6 +219,25 @@ export function ReglasPersonalizadasSection() {
     setForm(formularioVacio(catalogo.fuentes[0]?.nombre ?? "Factura"));
     setEditando(0);
     setErrores([]);
+    setBacktest(null);
+  }
+
+  function abrirPlantilla(p: Plantilla) {
+    setForm({
+      nombre: p.nombre,
+      descripcion: p.descripcion,
+      fuenteDatos: p.fuente,
+      modoAvanzado: p.modoAvanzado,
+      expresion: p.expresion ?? "",
+      condiciones: p.condiciones ? [...p.condiciones] : [],
+      usarAgregacion: false,
+      agregacion: { agruparPor: "", funcion: "Conteo", campo: null, operador: ">", umbral: 1 },
+      riesgoBase: p.riesgoBase,
+      ambito: p.ambito,
+    });
+    setEditando(0);
+    setErrores([]);
+    setBacktest(null);
   }
 
   function abrirEdicion(regla: ReglaPersonalizadaResponse) {
@@ -285,6 +364,27 @@ export function ReglasPersonalizadasSection() {
         }
       />
       <CardContent className="p-0">
+        {/* Plantillas rápidas (solo cuando no hay un formulario abierto) */}
+        {!form && catalogo && (
+          <div className="border-b border-border px-6 py-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Plantillas rápidas — un clic para empezar con una regla pre-armada
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {PLANTILLAS.map((p) => (
+                <button
+                  key={p.nombre}
+                  onClick={() => abrirPlantilla(p)}
+                  title={p.descripcion}
+                  className="rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground hover:border-primary hover:text-primary"
+                >
+                  {p.nombre}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Builder */}
         {form && catalogo && (
           <div className="border-b border-border bg-muted/30 px-6 py-5">
@@ -998,10 +1098,21 @@ function EditorExpresion({
               "vacio()",
               "contiene(,)",
               "empieza(,)",
+              "termina(,)",
+              "siVacio(,)",
+              "en(,)",
               "abs()",
               "longitud()",
               "minusculas()",
+              "mayusculas()",
               "redondear()",
+              "min(,)",
+              "max(,)",
+              "piso()",
+              "techo()",
+              "modulo(,)",
+              "raiz()",
+              "potencia(,)",
             ].map((fn) => (
               <button
                 key={fn}

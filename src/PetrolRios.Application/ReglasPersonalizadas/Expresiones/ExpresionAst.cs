@@ -124,10 +124,10 @@ internal sealed class NodoFuncion(string nombre, List<Nodo> args) : Nodo
     public override Valor Evaluar(IContextoEvaluacion ctx)
     {
         Valor Arg(int i) => _args[i].Evaluar(ctx);
+        var n = _args.Count;
         return nombre.ToLowerInvariant() switch
         {
-            "abs" => Valor.DeNumero(Math.Abs(Arg(0).ComoNumero())),
-            "redondear" => Valor.DeNumero(Math.Round(Arg(0).ComoNumero())),
+            // ── Texto ──
             "minusculas" => Valor.DeTexto(Arg(0).ComoTexto().ToLowerInvariant()),
             "mayusculas" => Valor.DeTexto(Arg(0).ComoTexto().ToUpperInvariant()),
             "longitud" => Valor.DeNumero(Arg(0).ComoTexto().Trim().Length),
@@ -135,7 +135,44 @@ internal sealed class NodoFuncion(string nombre, List<Nodo> args) : Nodo
             "contiene" => Valor.DeBool(Arg(0).ComoTexto().Contains(Arg(1).ComoTexto(), StringComparison.OrdinalIgnoreCase)),
             "empieza" => Valor.DeBool(Arg(0).ComoTexto().StartsWith(Arg(1).ComoTexto(), StringComparison.OrdinalIgnoreCase)),
             "termina" => Valor.DeBool(Arg(0).ComoTexto().EndsWith(Arg(1).ComoTexto(), StringComparison.OrdinalIgnoreCase)),
+            // siVacio(a, b): devuelve b si a está vacío; si no, a (coalescencia de nulos/vacíos).
+            "sivacio" => string.IsNullOrWhiteSpace(Arg(0).ComoTexto())
+                ? (n >= 2 ? Arg(1) : Valor.DeTexto(""))
+                : Arg(0),
+            // ── Matemáticas ──
+            "abs" => Valor.DeNumero(Math.Abs(Arg(0).ComoNumero())),
+            // redondear(x) o redondear(x, decimales)
+            "redondear" => Valor.DeNumero(n >= 2
+                ? Math.Round(Arg(0).ComoNumero(), (int)Arg(1).ComoNumero())
+                : Math.Round(Arg(0).ComoNumero())),
+            "piso" => Valor.DeNumero(Math.Floor(Arg(0).ComoNumero())),
+            "techo" => Valor.DeNumero(Math.Ceiling(Arg(0).ComoNumero())),
+            "min" => Valor.DeNumero(Math.Min(Arg(0).ComoNumero(), Arg(1).ComoNumero())),
+            "max" => Valor.DeNumero(Math.Max(Arg(0).ComoNumero(), Arg(1).ComoNumero())),
+            "modulo" => Valor.DeNumero(Modulo(Arg(0).ComoNumero(), Arg(1).ComoNumero())),
+            "raiz" => Valor.DeNumero(Math.Sqrt(Math.Max(0, Arg(0).ComoNumero()))),
+            "potencia" => Valor.DeNumero(Math.Pow(Arg(0).ComoNumero(), Arg(1).ComoNumero())),
+            // ── Listas ──
+            // en(valor, op1, op2, …): true si el valor coincide con alguna opción (números o texto).
+            "en" => Valor.DeBool(EvaluarEn(ctx)),
             _ => throw new ExpresionException($"Función desconocida: '{nombre}'")
         };
     }
+
+    private bool EvaluarEn(IContextoEvaluacion ctx)
+    {
+        if (_args.Count < 2)
+            throw new ExpresionException("en(valor, opcion1, opcion2, …) requiere un valor y al menos una opción.");
+        var valor = _args[0].Evaluar(ctx);
+        for (var i = 1; i < _args.Count; i++)
+            if (Iguales(valor, _args[i].Evaluar(ctx))) return true;
+        return false;
+    }
+
+    private static bool Iguales(Valor a, Valor b) =>
+        a.EsTexto || b.EsTexto
+            ? string.Equals(a.ComoTexto(), b.ComoTexto(), StringComparison.OrdinalIgnoreCase)
+            : Math.Abs(a.ComoNumero() - b.ComoNumero()) < 0.0001;
+
+    private static double Modulo(double a, double b) => b == 0 ? 0 : a % b;
 }
