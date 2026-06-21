@@ -53,13 +53,24 @@ public sealed class UsuarioService : IUsuarioService
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         var usuario = Usuario.Create(request.Email, request.NombreCompleto, passwordHash, request.RolId);
         usuario.AsignarEstacion(request.EstacionId);
-        var token = usuario.GenerarTokenVerificacion();
+
+        // El Administrador da de alta y avala las cuentas (sistema interno), así que el correo queda
+        // verificado de una vez y el usuario puede iniciar sesión sin fricción. Solo si la
+        // organización exige verificación (Seguridad:RequerirVerificacionEmail=true) se genera el
+        // token y se envía el enlace de confirmación.
+        var requiereVerificacion = _config.GetValue("Seguridad:RequerirVerificacionEmail", false);
+        string? token = null;
+        if (requiereVerificacion)
+            token = usuario.GenerarTokenVerificacion();
+        else
+            usuario.MarcarEmailVerificado();
 
         await _dbContext.Usuarios.AddAsync(usuario, ct);
         await _dbContext.SaveChangesAsync(ct);
 
-        // Enviar el correo de verificación (si el SMTP está configurado).
-        await EnviarCorreoVerificacionAsync(usuario, token, ct);
+        // Si se exige verificación, enviar el correo con el enlace de confirmación.
+        if (requiereVerificacion && token is not null)
+            await EnviarCorreoVerificacionAsync(usuario, token, ct);
 
         // Recargar con rol
         await _dbContext.Entry(usuario).Reference(u => u.Rol).LoadAsync(ct);

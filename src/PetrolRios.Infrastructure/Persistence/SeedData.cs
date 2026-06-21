@@ -31,8 +31,46 @@ public static class SeedData
         await EnsureReglasNuevasAsync(context);
         await EnsureUsuariosDemoAsync(context);
         await EnsureAgentUsersStationAssignmentAsync(context);
+        await EnsureCuentasAccesoAsync(context, config);
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Garantiza que las cuentas puedan iniciar sesión, evitando bloqueos accidentales:
+    ///  - Si NO se exige verificación por correo (caso por defecto), marca como verificadas las
+    ///    cuentas activas que quedaron sin verificar (p. ej. creadas antes de este cambio), para
+    ///    que no queden bloqueadas ni aparezcan como "no verificadas".
+    ///  - Asegura que el Administrador esté activo y sin bloqueo por intentos fallidos.
+    ///  - Recuperación "break-glass": si <c>Seguridad:AdminPasswordInicial</c> tiene valor,
+    ///    restablece la contraseña del Administrador a ese valor y obliga a cambiarla, por si se
+    ///    perdió el acceso. Con el valor vacío (por defecto) no toca la contraseña existente.
+    /// </summary>
+    private static async Task EnsureCuentasAccesoAsync(PetrolRiosDbContext context, IConfiguration config)
+    {
+        var requiereVerificacion = config.GetValue("Seguridad:RequerirVerificacionEmail", false);
+        if (!requiereVerificacion)
+        {
+            var sinVerificar = await context.Usuarios
+                .Where(u => u.Activo && !u.EmailVerificado)
+                .ToListAsync();
+            foreach (var usuario in sinVerificar)
+                usuario.MarcarEmailVerificado();
+        }
+
+        var admin = await context.Usuarios.FirstOrDefaultAsync(u => u.Email == "admin@petrolrios.com");
+        if (admin is null) return;
+
+        admin.Activo = true;
+        admin.ResetearFallos(); // un bloqueo por intentos no debe dejar afuera al Administrador
+
+        var passwordRecuperacion = config["Seguridad:AdminPasswordInicial"];
+        if (!string.IsNullOrWhiteSpace(passwordRecuperacion))
+        {
+            admin.UpdatePassword(BCrypt.Net.BCrypt.HashPassword(passwordRecuperacion));
+            admin.DebeCambiarPassword = true;
+            admin.MarcarEmailVerificado();
+        }
     }
 
     /// <summary>

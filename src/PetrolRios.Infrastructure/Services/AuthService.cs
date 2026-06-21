@@ -38,6 +38,16 @@ public sealed class AuthService : IAuthService
         _config = config;
     }
 
+    /// <summary>
+    /// ¿El inicio de sesión exige el correo verificado? Configurable mediante
+    /// <c>Seguridad:RequerirVerificacionEmail</c>; DESACTIVADO por defecto. Es un sistema interno
+    /// con altas avaladas por el Administrador, por lo que la verificación por correo solo añade
+    /// fricción (e incluso es imposible desde un móvil si el enlace apunta a la red local). Las
+    /// cuentas creadas por el Admin quedan verificadas en el alta.
+    /// </summary>
+    private bool RequiereVerificacionEmail =>
+        _config.GetValue("Seguridad:RequerirVerificacionEmail", false);
+
     public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
         var usuario = await _dbContext.Usuarios
@@ -59,9 +69,10 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedAccessException("Credenciales inválidas.");
         }
 
-        // Verificación de correo obligatoria: no se permite iniciar sesión hasta
-        // confirmar el correo con el enlace recibido.
-        if (!usuario.EmailVerificado)
+        // Verificación de correo: solo bloquea si la organización la exige explícitamente
+        // (Seguridad:RequerirVerificacionEmail). Por defecto NO bloquea — ver nota en
+        // RequiereVerificacionEmail. Las cuentas creadas por el Admin quedan verificadas.
+        if (RequiereVerificacionEmail && !usuario.EmailVerificado)
             throw new UnauthorizedAccessException(
                 "Debes verificar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.");
 
@@ -168,8 +179,8 @@ public sealed class AuthService : IAuthService
         if (usuario is null)
             return new QrEstadoResponse("noexiste");
 
-        // Misma regla que el login normal: el correo debe estar verificado.
-        if (!usuario.EmailVerificado)
+        // Misma regla que el login normal: si la verificación está exigida, el correo debe estarlo.
+        if (RequiereVerificacionEmail && !usuario.EmailVerificado)
         {
             _qrLogin.Consumir(codigo);
             return new QrEstadoResponse("noverificado");
@@ -191,7 +202,7 @@ public sealed class AuthService : IAuthService
 
         if (usuario.EstaBloqueado())
             throw new UnauthorizedAccessException("La cuenta está bloqueada temporalmente. Intente más tarde.");
-        if (!usuario.EmailVerificado)
+        if (RequiereVerificacionEmail && !usuario.EmailVerificado)
             throw new UnauthorizedAccessException("Debes verificar tu correo electrónico antes de iniciar sesión.");
         if (!usuario.TotpHabilitado || string.IsNullOrWhiteSpace(usuario.TotpSecret))
             throw new UnauthorizedAccessException("Esta cuenta no tiene activado el autenticador (2FA).");

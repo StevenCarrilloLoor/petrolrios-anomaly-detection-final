@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using PetrolRios.Application.DTOs.Auth;
+using PetrolRios.Application.DTOs.Usuarios;
 
 namespace PetrolRios.Api.Tests;
 
@@ -106,6 +107,43 @@ public sealed class AuthIntegrationTests
         var body = await response.Content.ReadFromJsonAsync<LoginResponse>();
         body.Should().NotBeNull();
         body!.Token.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [DockerAvailableFact]
+    public async Task CreatedUser_IsAutoVerified_AndCanLoginImmediately()
+    {
+        // Arrange — el Administrador da de alta una cuenta nueva
+        var adminToken = await LoginAndGetTokenAsync();
+        var email = $"nuevo_{Guid.NewGuid():N}@petrolrios.com";
+        const string password = "Prueba123!";
+
+        var crear = new HttpRequestMessage(HttpMethod.Post, "/api/v1/usuarios")
+        {
+            Content = JsonContent.Create(new
+            {
+                Email = email,
+                NombreCompleto = "Usuario de Prueba",
+                Password = password,
+                RolId = 1 // Auditor (primer rol sembrado)
+            })
+        };
+        crear.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", adminToken);
+
+        // Act — crear la cuenta y luego iniciar sesión de inmediato (sin verificar el correo)
+        var crearResp = await _client.SendAsync(crear);
+        crearResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var creado = await crearResp.Content.ReadFromJsonAsync<UsuarioResponse>();
+
+        var loginResp = await _client.PostAsJsonAsync(
+            "/api/v1/auth/login", new { Email = email, Password = password });
+
+        // Assert — la cuenta queda verificada en el alta y puede entrar sin fricción
+        creado.Should().NotBeNull();
+        creado!.EmailVerificado.Should().BeTrue();
+        loginResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var login = await loginResp.Content.ReadFromJsonAsync<LoginResponse>();
+        login!.Token.Should().NotBeNullOrWhiteSpace();
+        login.Usuario.Email.Should().Be(email);
     }
 
     private async Task<string> LoginAndGetTokenAsync()
