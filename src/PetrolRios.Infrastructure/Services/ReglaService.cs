@@ -49,6 +49,9 @@ public sealed class ReglaService : IReglaService
             regla.ValorUmbral = request.ValorUmbral.Value;
         if (request.Activa.HasValue)
             regla.Activa = request.Activa.Value;
+        if (!string.IsNullOrWhiteSpace(request.Ambito)
+            && Enum.TryParse<AmbitoAlerta>(request.Ambito, true, out var ambito))
+            regla.Ambito = ambito;
 
         await _unitOfWork.SaveChangesAsync(ct);
         return MapToResponse(regla);
@@ -63,17 +66,6 @@ public sealed class ReglaService : IReglaService
         await _unitOfWork.SaveChangesAsync(ct);
     }
 
-    /// <summary>
-    /// Parámetros cuyas alertas van al carril Operativa (problema de estación, no fraude).
-    /// El ámbito está fijado por la lógica del detector; aquí lo reflejamos para la UI.
-    /// </summary>
-    private static readonly HashSet<string> ParametrosOperativos = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "TurnoSinCerrarHorasUmbral",     // Turno que sigue abierto: el operador no lo cerró
-        "DespachoNoFacturadoHabilitado", // Combustible despachado que no se facturó
-        "FueraHorarioHabilitado"         // Operación fuera del horario configurado de la estación
-    };
-
     private static ReglaDeteccionResponse MapToResponse(ReglaDeteccion r) => new()
     {
         Id = r.Id,
@@ -83,6 +75,6 @@ public sealed class ReglaService : IReglaService
         ParametroNombre = r.ParametroNombre,
         ValorUmbral = r.ValorUmbral,
         Activa = r.Activa,
-        Ambito = ParametrosOperativos.Contains(r.ParametroNombre) ? "Operativa" : "Auditoria"
+        Ambito = r.Ambito.ToString()
     };
 }

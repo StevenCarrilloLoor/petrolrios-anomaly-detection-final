@@ -107,6 +107,7 @@ public sealed class CashFraudDetector : IAnomalyDetector
                 anomalies.Add(new DetectedAnomaly
                 {
                     TipoDetector = TipoDetector.CashFraud,
+                    Ambito = GetAmbito(context.Reglas, "DiferenciaEfectivoUmbral", AmbitoAlerta.Auditoria),
                     Descripcion = $"Diferencia de efectivo ${diferencia:F2} en turno {turno.NumeroTurno} " +
                                   $"(umbral: ${umbral:F2}). Vendedor: {turno.CodigoVendedor.Trim()}",
                     Score = score,
@@ -154,6 +155,7 @@ public sealed class CashFraudDetector : IAnomalyDetector
                 anomalies.Add(new DetectedAnomaly
                 {
                     TipoDetector = TipoDetector.CashFraud,
+                    Ambito = GetAmbito(context.Reglas, "FaltantesRecurrentesMaximo", AmbitoAlerta.Auditoria),
                     Descripcion = $"Patrón de gineteo: empleado {empleado} con {totalFaltantes} faltantes " +
                                   $"(máximo permitido: {maxFaltantes}) en los últimos {diasFaltantes} días",
                     Score = score,
@@ -200,6 +202,7 @@ public sealed class CashFraudDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.CashFraud,
+                Ambito = GetAmbito(context.Reglas, "CreditoSinClienteHabilitado", AmbitoAlerta.Auditoria),
                 Descripcion = $"Venta a crédito de ${factura.TotalNeto:F2} sin cliente identificado " +
                               $"(posible venta en efectivo registrada como crédito). Doc: {factura.NumeroDocumento}",
                 Score = score,
@@ -255,6 +258,7 @@ public sealed class CashFraudDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.CashFraud,
+                Ambito = GetAmbito(context.Reglas, "EfectivoCorporativoPorcentajeUmbral", AmbitoAlerta.Auditoria),
                 Descripcion = $"Proporción atípica de efectivo: vendedor {grupo.Key} con " +
                               $"{porcentajeEfectivo:F1}% de ventas corporativas en efectivo " +
                               $"({enEfectivo.Count}/{transacciones.Count}, umbral: {umbralPorcentaje:F0}%). " +
@@ -298,7 +302,7 @@ public sealed class CashFraudDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.CashFraud,
-                Ambito = AmbitoAlerta.Operativa,
+                Ambito = GetAmbito(context.Reglas, "TurnoSinCerrarHorasUmbral", AmbitoAlerta.Operativa),
                 Descripcion = $"Turno {turno.NumeroTurno} sin cerrar: abierto hace {horasAbierto:F0} h " +
                               $"(umbral: {umbralHoras:F0} h). Vendedor: {turno.CodigoVendedor.Trim()}. " +
                               $"Revisar y cerrar el turno.",
@@ -333,4 +337,9 @@ public sealed class CashFraudDetector : IAnomalyDetector
         reglas.FirstOrDefault(r => r.ParametroNombre == parametro) is { } regla
             ? (regla.Activa ? regla.ValorUmbral : null)
             : defaultValue;
+
+    /// <summary>Carril configurado para la regla; si no existe en BD, usa el fallback del detector.</summary>
+    private static AmbitoAlerta GetAmbito(
+        IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, AmbitoAlerta fallback) =>
+        reglas.FirstOrDefault(r => r.ParametroNombre == parametro)?.Ambito ?? fallback;
 }

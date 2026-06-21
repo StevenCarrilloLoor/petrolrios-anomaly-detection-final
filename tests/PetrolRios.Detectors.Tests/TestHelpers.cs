@@ -57,7 +57,7 @@ internal static class TestHelpers
         // Invoice Anomaly
         ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R4", "D4", "AnulacionesPorcentajeUmbral", 5.0),
         ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R5", "D5", "PrecioFueraListaHabilitado", 1.0),
-        ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R6", "D6", "CamposObligatoriosHabilitado", 1.0),
+        ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R6", "D6", "CamposObligatoriosHabilitado", 1.0, AmbitoAlerta.Operativa),
         ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R6a", "D6a", "DescuentoPorcentajeMaximo", 10.0),
         ReglaDeteccion.Create(TipoDetector.InvoiceAnomaly, "R6b", "D6b", "TotalInconsistenteHabilitado", 1.0),
         // Payment Fraud

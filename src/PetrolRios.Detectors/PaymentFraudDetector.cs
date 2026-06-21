@@ -102,6 +102,7 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
                 anomalies.Add(new DetectedAnomaly
                 {
                     TipoDetector = TipoDetector.PaymentFraud,
+                    Ambito = GetAmbito(context.Reglas, "ReversionTarjetaMinutosUmbral", AmbitoAlerta.Auditoria),
                     Descripcion = $"Reversión de tarjeta tardía: {diferenciaMinutos:F0} minutos después " +
                                   $"de la venta (umbral: {umbralMinutos} min). Monto: ${montoReversion:F2}",
                     Score = score,
@@ -141,6 +142,7 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.PaymentFraud,
+                Ambito = GetAmbito(context.Reglas, "CreditoSinAutorizacionHabilitado", AmbitoAlerta.Auditoria),
                 Descripcion = $"Crédito de ${credito.TotalCredito:F2} otorgado sin código de autorización " +
                               $"(comprobante: {credito.NumeroComprobante}). Socio: {credito.CodigoSocio.Trim()}",
                 Score = score,
@@ -178,6 +180,7 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.PaymentFraud,
+                Ambito = GetAmbito(context.Reglas, "CreditoSinGaranteHabilitado", AmbitoAlerta.Auditoria),
                 Descripcion = $"Crédito de ${credito.TotalCredito:F2} otorgado SIN garante al socio " +
                               $"{credito.CodigoSocio.Trim()} (riesgo de autorización indebida). " +
                               $"Crédito {credito.NumeroCabecera}",
@@ -230,6 +233,7 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
                     anomalies.Add(new DetectedAnomaly
                     {
                         TipoDetector = TipoDetector.PaymentFraud,
+                        Ambito = GetAmbito(context.Reglas, "DuplicadaMinutosUmbral", AmbitoAlerta.Auditoria),
                         Descripcion = $"Transacciones duplicadas: tarjeta {grupo.Key.CodigoBanco.Trim()} " +
                                       $"con monto ${monto:F2}, diferencia {diferenciaMinutos:F0} min " +
                                       $"(umbral: {umbralMinutos} min)",
@@ -307,6 +311,7 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
         anomalies.Add(new DetectedAnomaly
         {
             TipoDetector = TipoDetector.PaymentFraud,
+            Ambito = GetAmbito(context.Reglas, "DespachosRapidosMinutosUmbral", AmbitoAlerta.Auditoria),
             Descripcion = $"Despachos rápidos sucesivos: cliente {cliente} con {racha.Count} " +
                           $"transacciones en {duracionMinutos:F0} minutos (gaps < {umbralMinutos} min). " +
                           $"Monto total: ${montoTotal:F2}",
@@ -337,4 +342,9 @@ public sealed class PaymentFraudDetector : IAnomalyDetector
         reglas.FirstOrDefault(r => r.ParametroNombre == parametro) is { } regla
             ? (regla.Activa ? regla.ValorUmbral : null)
             : defaultValue;
+
+    /// <summary>Carril configurado para la regla; si no existe en BD, usa el fallback del detector.</summary>
+    private static AmbitoAlerta GetAmbito(
+        IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, AmbitoAlerta fallback) =>
+        reglas.FirstOrDefault(r => r.ParametroNombre == parametro)?.Ambito ?? fallback;
 }

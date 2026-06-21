@@ -108,6 +108,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
+                Ambito = GetAmbito(context.Reglas, "AnulacionesPorcentajeUmbral", AmbitoAlerta.Auditoria),
                 Descripcion = $"Tasa de anulaciones excesiva: {tasaGlobal:F1}% " +
                               $"({totalAnulaciones}/{totalFacturas}) supera umbral de {umbralPorcentaje}%",
                 Score = score,
@@ -149,6 +150,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
                 anomalies.Add(new DetectedAnomaly
                 {
                     TipoDetector = TipoDetector.InvoiceAnomaly,
+                    Ambito = GetAmbito(context.Reglas, "AnulacionesPorcentajeUmbral", AmbitoAlerta.Auditoria),
                     Descripcion = $"Vendedor {vendedor} con tasa de anulaciones elevada: " +
                                   $"{tasaVendedor:F1}% ({cantidadFacturas} facturas)",
                     Score = score,
@@ -196,6 +198,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
                 anomalies.Add(new DetectedAnomaly
                 {
                     TipoDetector = TipoDetector.InvoiceAnomaly,
+                    Ambito = GetAmbito(context.Reglas, "PrecioFueraListaHabilitado", AmbitoAlerta.Auditoria),
                     Descripcion = $"Precio fuera de lista: producto {producto} cobrado a " +
                                   $"${detalle.ValorUnitario:F2} (autorizado: ${precioBase:F2})",
                     Score = score,
@@ -234,8 +237,9 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
-                // Error operativo (el cajero olvidó capturar placa/cédula): va al carril de la estación.
-                Ambito = Domain.Enums.AmbitoAlerta.Operativa,
+                // Error operativo (el cajero olvidó capturar placa/cédula): por defecto va al carril
+                // de la estación, pero el carril es configurable desde el panel de Reglas.
+                Ambito = GetAmbito(context.Reglas, "CamposObligatoriosHabilitado", AmbitoAlerta.Operativa),
                 Descripcion = $"Campos obligatorios vacíos en documento {factura.NumeroDocumento}: " +
                               string.Join(", ", camposFaltantes),
                 Score = score,
@@ -278,6 +282,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
+                Ambito = GetAmbito(context.Reglas, "DescuentoPorcentajeMaximo", AmbitoAlerta.Auditoria),
                 Descripcion = $"Descuento excesivo: {porcentajeDescuento:F1}% sobre subtotal " +
                               $"(máximo permitido: {porcentajeMaximo:F0}%). " +
                               $"Doc: {factura.NumeroDocumento}, descuento ${factura.Descuento:F2}",
@@ -326,6 +331,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
+                Ambito = GetAmbito(context.Reglas, "TotalInconsistenteHabilitado", AmbitoAlerta.Auditoria),
                 Descripcion = $"Total inconsistente en documento {factura.NumeroDocumento}: " +
                               $"registrado ${factura.TotalNeto:F2}, esperado ${totalEsperado:F2} " +
                               $"(diferencia ${diferencia:F2})",
@@ -373,6 +379,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
+                Ambito = GetAmbito(context.Reglas, "FechaFuturaToleranciaHoras", AmbitoAlerta.Auditoria),
                 Descripcion = $"Documento {factura.NumeroDocumento} fechado en el futuro: " +
                               $"{factura.FechaDocumento:yyyy-MM-dd HH:mm} " +
                               $"({horasAdelante:F0} h adelante del procesamiento). Posible manipulación de fecha.",
@@ -404,6 +411,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
+                Ambito = GetAmbito(context.Reglas, "FechaFuturaToleranciaHoras", AmbitoAlerta.Auditoria),
                 Descripcion = $"Crédito {credito.NumeroCabecera} fechado en el futuro: " +
                               $"{credito.FechaCabecera:yyyy-MM-dd HH:mm} " +
                               $"({horasAdelante:F0} h adelante). Posible manipulación de fecha.",
@@ -452,6 +460,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
+                Ambito = GetAmbito(context.Reglas, "AnulacionRecurrenteDiasMinimo", AmbitoAlerta.Auditoria),
                 Descripcion = $"Anulaciones recurrentes en {grupo.Key.Est}-{grupo.Key.Pto}: " +
                               $"{totalAnulaciones} anulaciones en {diasDistintos} días distintos " +
                               $"(umbral: {diasMinimo}). Posible patrón de cancelar y reingresar (kiting).",
@@ -494,7 +503,7 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
-                Ambito = Domain.Enums.AmbitoAlerta.Operativa,
+                Ambito = GetAmbito(context.Reglas, "DespachoNoFacturadoHabilitado", AmbitoAlerta.Operativa),
                 Descripcion = $"Despacho {despacho.NumeroDespacho} NO facturado: " +
                               $"{despacho.Cantidad:F2} gal de {despacho.NombreProducto.Trim()} " +
                               $"por ${despacho.VolumenTotal:F2}. Revisar (combustible servido sin cobrar).",
@@ -523,4 +532,9 @@ public sealed class InvoiceAnomalyDetector : IAnomalyDetector
         reglas.FirstOrDefault(r => r.ParametroNombre == parametro) is { } regla
             ? (regla.Activa ? regla.ValorUmbral : null)
             : defaultValue;
+
+    /// <summary>Carril configurado para la regla; si no existe en BD, usa el fallback del detector.</summary>
+    private static AmbitoAlerta GetAmbito(
+        IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, AmbitoAlerta fallback) =>
+        reglas.FirstOrDefault(r => r.ParametroNombre == parametro)?.Ambito ?? fallback;
 }

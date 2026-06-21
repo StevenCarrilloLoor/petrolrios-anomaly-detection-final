@@ -111,10 +111,11 @@ public static class SeedData
 
         var nuevas = new List<ReglaDeteccion>();
 
-        void AddIfMissing(TipoDetector tipo, string nombre, string descripcion, string parametro, double umbral)
+        void AddIfMissing(TipoDetector tipo, string nombre, string descripcion, string parametro, double umbral,
+            AmbitoAlerta ambito = AmbitoAlerta.Auditoria)
         {
             if (!existentes.Contains(parametro))
-                nuevas.Add(ReglaDeteccion.Create(tipo, nombre, descripcion, parametro, umbral));
+                nuevas.Add(ReglaDeteccion.Create(tipo, nombre, descripcion, parametro, umbral, ambito));
         }
 
         AddIfMissing(TipoDetector.CashFraud,
@@ -128,7 +129,7 @@ public static class SeedData
         AddIfMissing(TipoDetector.CashFraud,
             "Turno sin cerrar",
             "Genera una alerta operativa (para el administrador de la estacion) si un turno sigue abierto desde hace mas horas que el umbral. Umbral = horas.",
-            "TurnoSinCerrarHorasUmbral", 18.0);
+            "TurnoSinCerrarHorasUmbral", 18.0, AmbitoAlerta.Operativa);
         AddIfMissing(TipoDetector.InvoiceAnomaly,
             "Descuento excesivo fuera de politica",
             "Genera alerta si el descuento aplicado excede el porcentaje maximo permitido por la politica comercial",
@@ -144,7 +145,7 @@ public static class SeedData
         AddIfMissing(TipoDetector.InvoiceAnomaly,
             "Despacho no facturado",
             "Genera una alerta operativa si un despacho (DESP) con galones servidos no esta marcado como facturado (FAC_DESP); combustible que salio sin cobrarse.",
-            "DespachoNoFacturadoHabilitado", 1.0);
+            "DespachoNoFacturadoHabilitado", 1.0, AmbitoAlerta.Operativa);
         AddIfMissing(TipoDetector.InvoiceAnomaly,
             "Anulaciones recurrentes (kiting)",
             "Genera alerta si un mismo punto de emision tiene anulaciones en varios dias distintos (umbral = dias minimos); posible patron de cancelar y reingresar para rodar la deuda o mover el periodo.",
@@ -173,6 +174,31 @@ public static class SeedData
             fueraHorario.Activa = false;
             fueraHorario.ValorUmbral = 0.0;
         }
+
+        // La columna Ambito no existía antes; las filas anteriores a la migración pudieron quedar
+        // sin un valor de enum válido (0). Se normalizan a Auditoría antes de marcar las Operativa.
+        var ambitoInvalido = await context.ReglasDeteccion
+            .Where(r => r.Ambito != AmbitoAlerta.Operativa && r.Ambito != AmbitoAlerta.Auditoria)
+            .ToListAsync();
+        foreach (var r in ambitoInvalido) r.Ambito = AmbitoAlerta.Auditoria;
+
+        // Carril correcto en bases ya sembradas (la columna Ambito no existía antes): estos tres son
+        // problemas operativos de estación (errores honestos), no fraude.
+        var clavesOperativas = new[]
+        {
+            "TurnoSinCerrarHorasUmbral", "DespachoNoFacturadoHabilitado", "CamposObligatoriosHabilitado"
+        };
+        var aOperativa = await context.ReglasDeteccion
+            .Where(r => clavesOperativas.Contains(r.ParametroNombre) && r.Ambito != AmbitoAlerta.Operativa)
+            .ToListAsync();
+        foreach (var r in aOperativa) r.Ambito = AmbitoAlerta.Operativa;
+
+        // Recalibrar la tasa de anulaciones del 5% al 3% (la tesis indica que lo normal es <2%),
+        // solo si la regla sigue en el valor por defecto anterior (no piso ajustes manuales).
+        var anulaciones = await context.ReglasDeteccion
+            .FirstOrDefaultAsync(r => r.ParametroNombre == "AnulacionesPorcentajeUmbral");
+        if (anulaciones is not null && Math.Abs(anulaciones.ValorUmbral - 5.0) < 0.001)
+            anulaciones.ValorUmbral = 3.0;
     }
 
     /// <summary>
@@ -318,9 +344,9 @@ public static class SeedData
             ReglaDeteccion.Create(
                 TipoDetector.InvoiceAnomaly,
                 "Tasa de anulaciones excesivas",
-                "Genera alerta si el porcentaje de anulaciones del empleado supera el umbral de sus transacciones diarias",
+                "Genera alerta si el porcentaje de anulaciones supera el umbral de las transacciones diarias (la tesis indica que lo normal es <2%)",
                 "AnulacionesPorcentajeUmbral",
-                5.0),
+                3.0),
             ReglaDeteccion.Create(
                 TipoDetector.InvoiceAnomaly,
                 "Precio fuera de lista",

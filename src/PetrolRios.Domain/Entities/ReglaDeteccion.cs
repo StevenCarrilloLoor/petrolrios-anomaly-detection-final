@@ -11,18 +11,27 @@ public class ReglaDeteccion : BaseEntity
     public double ValorUmbral { get; set; }
     public bool Activa { get; set; } = true;
 
+    /// <summary>
+    /// Carril de las alertas que genera esta regla: <see cref="AmbitoAlerta.Operativa"/>
+    /// (problema de estación → avisa al administrador) o <see cref="AmbitoAlerta.Auditoria"/>
+    /// (fraude → central). Editable desde el panel de Reglas.
+    /// </summary>
+    public AmbitoAlerta Ambito { get; set; } = AmbitoAlerta.Auditoria;
+
     public static ReglaDeteccion Create(
         TipoDetector tipoDetector,
         string nombre,
         string descripcion,
         string parametroNombre,
-        double valorUmbral) =>
+        double valorUmbral,
+        AmbitoAlerta ambito = AmbitoAlerta.Auditoria) =>
         new()
         {
             TipoDetector = tipoDetector,
             Nombre = nombre,
             Descripcion = descripcion,
             ParametroNombre = parametroNombre,
-            ValorUmbral = valorUmbral
+            ValorUmbral = valorUmbral,
+            Ambito = ambito
         };
 }

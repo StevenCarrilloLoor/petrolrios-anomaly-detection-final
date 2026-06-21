@@ -12,8 +12,8 @@ public sealed record ReglaDeteccionResponse
 
     /// <summary>
     /// Carril al que pertenece la regla: "Operativa" (problema de estación → administrador de
-    /// la estación) o "Auditoria" (fraude → central). Se deriva del parámetro, ya que el ámbito
-    /// está fijado por la lógica del detector.
+    /// la estación) o "Auditoria" (fraude → central). Es editable desde el panel de Reglas y los
+    /// detectores lo respetan al generar las alertas.
     /// </summary>
     public string Ambito { get; init; } = "Auditoria";
 }
@@ -27,4 +27,5 @@ public sealed record CrearReglaRequest(
 
 public sealed record ActualizarReglaRequest(
     double? ValorUmbral,
-    bool? Activa);
+    bool? Activa,
+    string? Ambito = null);

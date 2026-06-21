@@ -88,6 +88,7 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
                 anomalies.Add(new DetectedAnomaly
                 {
                     TipoDetector = TipoDetector.ComplianceViolation,
+                    Ambito = GetAmbito(context.Reglas, "PlacaGenericaGalonesMaximo", AmbitoAlerta.Auditoria),
                     Descripcion = $"Placa genérica {PlacaGenerica} con {galones:F2} galones " +
                                   $"(máximo regulatorio: {galonesMaximo} gal). Doc: {factura.NumeroDocumento}",
                     Score = score,
@@ -149,6 +150,7 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.ComplianceViolation,
+                Ambito = GetAmbito(context.Reglas, "MultipleCombustibleHabilitado", AmbitoAlerta.Auditoria),
                 Descripcion = $"Vehículo {grupo.Key.Placa} con múltiples combustibles " +
                               $"({string.Join(", ", productosDelDia)}) el {grupo.Key.Dia:yyyy-MM-dd}",
                 Score = score,
@@ -190,6 +192,7 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.ComplianceViolation,
+                Ambito = GetAmbito(context.Reglas, "VentaSinPlacaMontoMinimo", AmbitoAlerta.Auditoria),
                 Descripcion = $"Venta de ${factura.TotalNeto:F2} sin placa registrada " +
                               $"(monto mínimo que exige placa: ${montoMinimo:F2}). " +
                               $"Doc: {factura.NumeroDocumento}",
@@ -237,6 +240,7 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.ComplianceViolation,
+                Ambito = GetAmbito(context.Reglas, "FueraHorarioHabilitado", AmbitoAlerta.Auditoria),
                 Descripcion = $"Transacción fuera de horario: {horaTransaccion:HH:mm} " +
                               $"(horario permitido: {context.HoraApertura:HH:mm}-{context.HoraCierre:HH:mm}). " +
                               $"Doc: {factura.NumeroDocumento}",
@@ -265,4 +269,9 @@ public sealed class ComplianceViolationDetector : IAnomalyDetector
         reglas.FirstOrDefault(r => r.ParametroNombre == parametro) is { } regla
             ? (regla.Activa ? regla.ValorUmbral : null)
             : defaultValue;
+
+    /// <summary>Carril configurado para la regla; si no existe en BD, usa el fallback del detector.</summary>
+    private static AmbitoAlerta GetAmbito(
+        IReadOnlyList<Domain.Entities.ReglaDeteccion> reglas, string parametro, AmbitoAlerta fallback) =>
+        reglas.FirstOrDefault(r => r.ParametroNombre == parametro)?.Ambito ?? fallback;
 }

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PetrolRios.Application.DTOs.Firebird;
+using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
 namespace PetrolRios.Detectors.Tests;
@@ -37,6 +38,26 @@ public class CashFraudDetectorTests
         // Assert
         result.Should().HaveCountGreaterThanOrEqualTo(1);
         result.Should().Contain(a => a.Descripcion.Contains("Diferencia de efectivo"));
+    }
+
+    [Fact]
+    public async Task DetectAsync_ReglaConfiguradaOperativa_LaAlertaUsaEseCarril()
+    {
+        // El carril es editable: si la regla de diferencia de efectivo se marca como Operativa,
+        // la alerta generada debe salir en ese carril y no en Auditoría por defecto.
+        var reglaOperativa = ReglaDeteccion.Create(
+            TipoDetector.CashFraud, "Diferencia", "d", "DiferenciaEfectivoUmbral", 50.0, AmbitoAlerta.Operativa);
+
+        var context = TestHelpers.CreateContext(
+            reglas: [reglaOperativa],
+            cierresTurno: [TestHelpers.CreateCierreTurno(faltante: 100)],
+            facturas: [TestHelpers.CreateFactura(codigoPago: "EF", totalNeto: 500)],
+            depositosTurno: [TestHelpers.CreateDeposito(total: 400)]);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        var dif = result.First(a => a.Descripcion.Contains("Diferencia de efectivo"));
+        dif.Ambito.Should().Be(AmbitoAlerta.Operativa);
     }
 
     [Fact]
