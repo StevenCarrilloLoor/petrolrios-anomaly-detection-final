@@ -77,6 +77,53 @@ interfaz lo avisa (esa variable manda sobre el archivo).
 Admite cualquier destino: otra PC de la red, el servidor de la empresa o una base gestionada en
 la nube (AWS RDS, Neon, Supabase…), ajustando host/puerto/SSL o pegando la cadena completa.
 
+## 3.1 Correo, contraseña del admin y qué vive en la base vs en cada máquina
+
+Distinción clave al mover el sistema a otra máquina:
+
+- **Lo que vive en la BASE** (se comparte entre todas las instancias del central): usuarios y
+  **la contraseña del Administrador**, reglas, alertas, estaciones, staging. Si la máquina nueva
+  apunta a una base que **ya tiene datos**, todo eso ya está ahí y se entra con las mismas
+  credenciales — no se reinicia nada.
+- **Lo que vive en cada máquina/instancia** (configuración, fuera de la base): la **conexión a la
+  base**, la **clave JWT** y la **configuración del correo (SMTP)**. Esto se pone en cada
+  despliegue (en `.env` con Docker, o en `appsettings.Secrets.json` en nativo).
+
+### Contraseña del Administrador
+
+Vive en la base. En una base **nueva/vacía**, el primer arranque crea `admin@petrolrios.com` con
+contraseña **`Admin123!`** y **obliga a cambiarla** en el primer ingreso. En una base que **ya
+existe**, conserva la contraseña que ya tenía. Para forzar una inicial o recuperar el acceso, use
+`ADMIN_PASSWORD_INICIAL` en `.env` (se aplica y obliga a cambiarla; déjelo vacío en operación
+normal para que no se reaplique en cada arranque).
+
+### Correo (SMTP) — funcionalidad clave
+
+El envío de correos (avisos de alerta, recuperación de contraseña, verificación y desbloqueo de
+cuenta) usa SMTP y **no se guarda en la base**: se configura por máquina. En su equipo actual está
+en `src/PetrolRios.Api/appsettings.Secrets.json` (fuera de git). Para la máquina nueva, ponga **las
+mismas credenciales** en el `.env` (ya están en `.env.example`):
+
+```
+EMAIL_HABILITADO=true
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PUERTO=587
+EMAIL_SSL=true
+EMAIL_USUARIO=su_correo@gmail.com
+EMAIL_PASSWORD=su_app_password
+EMAIL_REMITENTE=alertas@petrolrios.com
+```
+
+`EMAIL_PASSWORD` es la **contraseña de aplicación** del correo (no la normal de la cuenta). Con
+Docker esas variables ya están cableadas en los compose; el correo queda activo al levantar.
+(Alternativa sin Docker: copie su `appsettings.Secrets.json` a la máquina nueva.)
+
+### ¿Dónde está el "setup"?
+
+No hay un asistente gráfico (ese era el paso opcional pendiente). El "setup" hoy es: **(1)**
+preparar el `.env` (conexión, JWT, correo, admin) y **(2)** levantar — el primer arranque **aplica
+las migraciones y siembra los datos base solo**. No hay pasos manuales de base de datos.
+
 ## 4. Topología de red (LAN e internet)
 
 - **Misma red local (LAN):** las instancias del central apuntan a la base por su IP local.

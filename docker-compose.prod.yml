@@ -40,6 +40,16 @@ services:
       # Sin TLS dentro del contenedor (termínelo en un reverse proxy si lo expone a internet).
       Seguridad__ForzarHttps: "false"
       Cors__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
+      # Contraseña inicial del admin (solo aplica en base nueva; déjelo vacío en operación normal).
+      Seguridad__AdminPasswordInicial: ${ADMIN_PASSWORD_INICIAL:-}
+      # Correo (SMTP) — para que lleguen avisos, recuperación y verificación de cuenta.
+      Notificaciones__Email__Habilitado: ${EMAIL_HABILITADO:-false}
+      Notificaciones__Email__Host: ${EMAIL_HOST:-}
+      Notificaciones__Email__Puerto: ${EMAIL_PUERTO:-587}
+      Notificaciones__Email__UsarSsl: ${EMAIL_SSL:-true}
+      Notificaciones__Email__Usuario: ${EMAIL_USUARIO:-}
+      Notificaciones__Email__Password: ${EMAIL_PASSWORD:-}
+      Notificaciones__Email__Remitente: ${EMAIL_REMITENTE:-alertas@petrolrios.com}
     ports:
       - "${CENTRAL_PORT:-8080}:8080"
 
