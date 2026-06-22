@@ -40,6 +40,8 @@ services:
       # Sin TLS dentro del contenedor (termínelo en un reverse proxy si lo expone a internet).
       Seguridad__ForzarHttps: "false"
       Cors__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
+      # URL base para los enlaces dentro de los correos (recuperación, verificación, desbloqueo).
+      App__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
       # Contraseña inicial del admin (solo aplica en base nueva; déjelo vacío en operación normal).
       Seguridad__AdminPasswordInicial: ${ADMIN_PASSWORD_INICIAL:-}
       # Correo (SMTP) — para que lleguen avisos, recuperación y verificación de cuenta.
