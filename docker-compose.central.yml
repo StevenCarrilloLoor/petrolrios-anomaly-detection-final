@@ -1,0 +1,23 @@
+# SOLO EL CENTRAL: una instancia del sistema central que se conecta a una base que vive en
+# OTRO lugar (otra máquina de la red, un servidor de la empresa o la nube). Cualquier SO con Docker.
+#   1) copie .env.example a .env y defina DB_CONNECTION (cadena a la base central) y JWT_SECRET
+#   2) docker compose -f docker-compose.central.yml up -d --build
+# La conexión también puede ajustarse luego desde Ajustes → Conexión a la base (sin tocar código).
+
+services:
+  central:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: petrolrios-central:latest
+    container_name: petrolrios-central
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Cadena de conexión completa a la base central (donde sea que viva).
+      ConnectionStrings__PostgreSQL: ${DB_CONNECTION:?Defina DB_CONNECTION (cadena Npgsql a la base central) en .env}
+      Jwt__SecretKey: ${JWT_SECRET:?Defina JWT_SECRET (>=32 caracteres) en .env}
+      Seguridad__ForzarHttps: "false"
+      Cors__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
+    ports:
+      - "${CENTRAL_PORT:-8080}:8080"

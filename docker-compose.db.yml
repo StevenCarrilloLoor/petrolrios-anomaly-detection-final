@@ -1,0 +1,28 @@
+# SOLO LA BASE: PostgreSQL central "en un solo lugar". Córralo en la máquina que hará de
+# servidor de base de datos (cualquier SO con Docker). Las instancias del sistema central
+# —en esta u otras máquinas— se conectan por la IP de este host al puerto expuesto.
+#   1) copie .env.example a .env y ponga POSTGRES_PASSWORD
+#   2) docker compose -f docker-compose.db.yml up -d
+# Seguridad: no exponga este puerto directamente a internet; use red local o VPN/ZeroTier.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: petrolrios-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-petrolrios}
+      POSTGRES_USER: ${POSTGRES_USER:-petrolrios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-petrolrios}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

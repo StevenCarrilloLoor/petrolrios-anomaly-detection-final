@@ -1,0 +1,47 @@
+# TODO-EN-UNO: base PostgreSQL + sistema central en una sola máquina (cualquier SO con Docker).
+# La forma más rápida de "llego, instalo y queda listo".
+#   1) copie .env.example a .env y ponga POSTGRES_PASSWORD y JWT_SECRET
+#   2) docker compose -f docker-compose.prod.yml up -d --build
+# Para repartir la base en otra máquina, use docker-compose.db.yml allí y
+# docker-compose.central.yml aquí (apuntando la conexión a esa base).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: petrolrios-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-petrolrios}
+      POSTGRES_USER: ${POSTGRES_USER:-petrolrios}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD en .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-petrolrios}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  central:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: petrolrios-central:latest
+    container_name: petrolrios-central
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # La base vive en el servicio 'postgres' de esta misma red de Docker.
+      ConnectionStrings__PostgreSQL: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-petrolrios};Username=${POSTGRES_USER:-petrolrios};Password=${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD};SSL Mode=Disable"
+      Jwt__SecretKey: ${JWT_SECRET:?Defina JWT_SECRET (>=32 caracteres) en .env}
+      # Sin TLS dentro del contenedor (termínelo en un reverse proxy si lo expone a internet).
+      Seguridad__ForzarHttps: "false"
+      Cors__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
+    ports:
+      - "${CENTRAL_PORT:-8080}:8080"
+
+volumes:
+  pgdata:

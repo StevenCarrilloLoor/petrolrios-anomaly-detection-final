@@ -1,0 +1,21 @@
+# Contexto de build mínimo: solo lo que el Dockerfile necesita (src/, frontend/, Directory.Build.props).
+**/bin/
+**/obj/
+**/node_modules/
+frontend/dist/
+.git/
+.vs/
+.vscode/
+.idea/
+tests/
+docs/
+ejecutables/
+_arranque/
+coverage-results/
+coverage-report/
+**/*.log
+**/config/connection.json
+**/appsettings.Development.json
+**/appsettings.Secrets.json
+.env
+_*.bat
