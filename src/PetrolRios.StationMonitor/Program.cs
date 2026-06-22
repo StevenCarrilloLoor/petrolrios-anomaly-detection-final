@@ -33,6 +33,12 @@ try
         sp.GetRequiredService<ILogger<CentralApiClient>>()));
     builder.Services.AddSingleton<ProblemPollingWorker>();
     builder.Services.AddHostedService(sp => sp.GetRequiredService<ProblemPollingWorker>());
+
+    // Auto-actualización del monitor (mismo mecanismo del agente: manifiesto + checksum + reinicio).
+    builder.Services.AddHttpClient("actualizaciones");
+    builder.Services.AddSingleton<UpdateService>();
+    builder.Services.AddHostedService<MonitorUpdateWorker>();
+
     builder.Services.AddWindowsService(options =>
     {
         options.ServiceName = "PetrolRios Station Monitor";
@@ -117,6 +123,21 @@ try
     {
         var resultado = await worker.RefrescarAhoraAsync(ct);
         return Results.Json(new { ok = resultado.Ok, mensaje = resultado.Mensaje });
+    });
+
+    // Versión instalada del monitor.
+    app.MapGet("/api/version", () => Results.Json(new { instalada = VersionMonitor.Actual }));
+
+    // Forzar la actualización del software del monitor (también se aplica sola cada 6 h).
+    app.MapPost("/api/actualizar-software", async (UpdateService update, CancellationToken ct) =>
+    {
+        var manifiesto = await update.ConsultarAsync(ct);
+        if (manifiesto is null || string.IsNullOrWhiteSpace(manifiesto.Url))
+            return Results.Json(new { ok = false, mensaje = "No hay una actualización publicada." });
+        if (!UpdateService.EsMasNueva(manifiesto.Version, VersionMonitor.Actual))
+            return Results.Json(new { ok = false, mensaje = $"Ya tienes la última versión ({VersionMonitor.Actual})." });
+        var (ok, mensaje) = await update.AplicarAsync(manifiesto, ct);
+        return Results.Json(new { ok, mensaje });
     });
 
     app.MapPost("/api/probar", async (
