@@ -1,9 +1,10 @@
 # ============================================================================
-#  PetrolRios - Instalacion guiada del sistema central
-#  No edites esto: ejecuta INSTALAR.bat (doble clic).
+#  PetrolRios - Instalacion guiada del sistema central (Windows)
+#  No edites esto: ejecuta instalar-windows.bat (doble clic).
 # ============================================================================
 $ErrorActionPreference = 'Stop'
-Set-Location -Path $PSScriptRoot
+$raiz = Split-Path $PSScriptRoot -Parent   # raiz del proyecto (donde estan los compose)
+Set-Location -Path $raiz
 
 function Linea($txt, $color = 'Gray') { Write-Host $txt -ForegroundColor $color }
 function Get-LanIp {
@@ -13,7 +14,6 @@ function Get-LanIp {
         Select-Object -First 1 -ExpandProperty IPv4Address |
         Select-Object -First 1 -ExpandProperty IPAddress
     if ([string]::IsNullOrWhiteSpace($ip)) {
-        # Respaldo: primera IPv4 que no sea loopback, APIPA ni rangos de Docker/WSL.
         $ip = Get-NetIPAddress -AddressFamily IPv4 |
             Where-Object {
                 $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
@@ -47,7 +47,7 @@ if ($LASTEXITCODE -ne 0) {
 Linea " [OK] Docker detectado y corriendo.`n" Green
 
 # 2) Configuracion (.env)
-$envPath = Join-Path $PSScriptRoot '.env'
+$envPath = Join-Path $raiz '.env'
 if (Test-Path $envPath) {
     Linea " Ya existe un .env: se conserva tal cual." Yellow
     Linea " Para reconfigurar desde cero, borralo y vuelve a ejecutar.`n" Yellow
@@ -77,7 +77,6 @@ EMAIL_USUARIO=$emailUser
 EMAIL_PASSWORD=$emailPwd
 EMAIL_REMITENTE=$emailUser
 "@
-    # UTF-8 sin BOM (docker compose no tolera BOM al inicio del .env)
     [System.IO.File]::WriteAllText($envPath, $contenido)
     Linea "`n [OK] Configuracion guardada en .env  (IP detectada: $lanip)`n" Green
 }
