@@ -7,9 +7,20 @@ Set-Location -Path $PSScriptRoot
 
 function Linea($txt, $color = 'Gray') { Write-Host $txt -ForegroundColor $color }
 function Get-LanIp {
-    $ip = Get-NetIPAddress -AddressFamily IPv4 |
-        Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+    # Preferir el adaptador con gateway por defecto = la red real (no el puente de Docker/WSL).
+    $ip = Get-NetIPConfiguration |
+        Where-Object { $null -ne $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' } |
+        Select-Object -First 1 -ExpandProperty IPv4Address |
         Select-Object -First 1 -ExpandProperty IPAddress
+    if ([string]::IsNullOrWhiteSpace($ip)) {
+        # Respaldo: primera IPv4 que no sea loopback, APIPA ni rangos de Docker/WSL.
+        $ip = Get-NetIPAddress -AddressFamily IPv4 |
+            Where-Object {
+                $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and
+                $_.IPAddress -notlike '172.1[6-9].*' -and $_.IPAddress -notlike '172.2*' -and $_.IPAddress -notlike '172.3*'
+            } |
+            Select-Object -First 1 -ExpandProperty IPAddress
+    }
     if ([string]::IsNullOrWhiteSpace($ip)) { 'localhost' } else { $ip }
 }
 function New-Secret([int]$n) {
