@@ -52,7 +52,7 @@ Eres mi compañero de ingeniería en mi **proyecto de tesis** PetrolRíos. Traba
   salen **vacías** y rompen el arranque por desajuste modelo↔esquema). El nombre del archivo de
   migración lleva timestamp nuevo: úsalo exacto al hacer `git add`.
 - **Reinicia todo el sistema** con `ejecutables/1-INICIO/INICIAR_TODO.bat` (Docker, PostgreSQL,
-  Firebird, API, agente, monitor, frontend). Para solo el API: `_arranque/reiniciar_api.bat`.
+  Firebird, API, agente, monitor, frontend). Para solo el API: `ejecutables/3-DIAGNOSTICO/reiniciar_api.bat`.
 - **Commits con mi identidad:**
   `git -c user.name="StevenCarrilloLoor" -c user.email="stevencarrilloloor@gmail.com" commit`.
   Haz `git add` **por ruta, solo de tus archivos**. **NUNCA** toques mis cambios sin commitear.

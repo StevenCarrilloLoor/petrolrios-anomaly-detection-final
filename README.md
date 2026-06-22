@@ -1,283 +1,280 @@
-# PetrolRios — Sistema de Deteccion de Anomalias Transaccionales
+# PetrolRíos — Sistema de Detección de Anomalías Transaccionales
 
-> Proyecto de tesis de Ingenieria de Software — Universidad de Las Americas (UDLA)
+> Proyecto de tesis de Ingeniería de Software — Universidad de Las Américas (UDLA)
 
-Sistema web que detecta anomalias transaccionales en ~13,000-15,000 transacciones diarias
-provenientes de 10 estaciones de servicio de PetrolRios S.A. Ejecuta 4 detectores especializados
-cada 5 minutos y notifica alertas en tiempo real.
+Sistema web que detecta **anomalías transaccionales** (fraude y errores operativos) en
+~13.000–15.000 transacciones diarias provenientes de 10 estaciones de servicio de PetrolRíos S.A.,
+cada una con su base **Firebird (Contaplus) en solo lectura**. Un motor de **5 detectores** corre
+cada pocos minutos, clasifica cada hallazgo con un **score de riesgo 0–100** y notifica las alertas
+**en tiempo real**, separándolas en dos carriles: **Auditoría** (fraude) y **Operativa** (errores de
+estación).
 
-## Arquitectura (modelo push — Alternativa B de tesis)
+> ℹ️ El **código es la fuente de verdad** del proyecto y va por delante del documento de tesis
+> (`docs/tesis.md`), que es una versión preliminar. Este README refleja el estado real del sistema.
+
+## Las tres aplicaciones
+
+| Aplicación | Qué es | Dónde corre | Puerto (dev) |
+|---|---|---|---|
+| **Central** | API ASP.NET Core 9 + frontend React. Recibe la ingesta, corre los detectores (Hangfire), guarda las alertas y sirve la aplicación web. La API **sirve también el frontend compilado** (un solo ejecutable/contenedor en producción). | Un servidor (cualquier SO). | API `5170`, web `5173` (en producción todo por `8080`) |
+| **Station Agent** | Worker que lee el Firebird local **en solo lectura**, extrae por marca de agua y **empuja** los datos al central (modelo push, store-and-forward). Tiene panel local de configuración y diagnóstico. | En cada estación (la PC con `CONTAC.FDB`). | `5180` |
+| **Station Monitor** | Visor local de **solo lectura** que muestra al personal de la estación únicamente **sus** problemas operativos. No toca Firebird ni envía nada. | En cada estación. | `5190` |
+
+## Arquitectura (modelo push — Alternativa B de la tesis)
 
 ```mermaid
 graph TB
-    subgraph "Estaciones de servicio (x10)"
-        AG1[Station Agent EST-001]
-        AG2[Station Agent EST-002]
-        AGN[Station Agent EST-010]
-        FB1[Firebird EST-001]
-        FB2[Firebird EST-002]
-        FBN[Firebird EST-010]
+    subgraph EST["Estaciones de servicio (x10)"]
+        FB[(Firebird CONTAC.FDB<br/>solo lectura)]
+        AG[Station Agent<br/>extrae + push :5180]
+        MON[Station Monitor<br/>solo lectura :5190]
+        FB -->|SELECT ReadOnly| AG
     end
 
-    subgraph "Servidor Central — ASP.NET Core 9"
-        ING[Ingesta API]
-        HF[Hangfire Job]
-        D1[CashFraud Detector]
-        D2[InvoiceAnomaly Detector]
-        D3[PaymentFraud Detector]
-        D4[ComplianceViolation Detector]
-        SE[Scoring Engine]
-        API[REST API + JWT]
-        SR[SignalR Hub]
+    subgraph CENTRAL["Servidor Central — ASP.NET Core 9"]
+        ING[Ingesta API<br/>idempotente + heartbeat]
+        HF[Hangfire Job<br/>watermark por estación]
+        D1[CashFraud]
+        D2[InvoiceAnomaly]
+        D3[PaymentFraud]
+        D4[ComplianceViolation]
+        D5[CustomRule<br/>reglas del usuario]
+        SE[Motor de Scoring 0–100]
+        SR[SignalR Hub /hubs/alerts]
+        API[REST API + JWT/RBAC]
+        SPA[Frontend React servido por la API]
     end
 
     PG[(PostgreSQL 16)]
-    FE[Frontend React 18]
 
-    FB1 -->|Solo lectura| AG1
-    FB2 -->|Solo lectura| AG2
-    FBN -->|Solo lectura| AGN
-    AG1 & AG2 & AGN -->|POST /api/v1/ingesta| ING
+    AG -->|POST /api/v1/ingesta + JWT| ING
     ING --> PG
-    HF --> D1 & D2 & D3 & D4
-    D1 & D2 & D3 & D4 --> SE
-    SE --> PG
-    SE --> SR
+    HF --> D1 & D2 & D3 & D4 & D5
+    D1 & D2 & D3 & D4 & D5 --> SE
+    SE -->|alertas| PG
+    SE -->|pg_notify| PG
+    PG -->|LISTEN/NOTIFY| SR
+    SR -->|Auditoría| API
+    SR -.->|Operativa| MON
+    API --> SPA
     API --> PG
-    FE -->|HTTP + WS| API
-    FE -->|WebSocket| SR
 ```
 
-> **Modelo push con store-and-forward:** Cada estacion tiene un `.NET Worker Service` (Station Agent)
-> que extrae transacciones de su Firebird local y las envia al servidor central via REST. Si el
-> servidor no esta disponible, el agente almacena los lotes como JSON local y los reintenta en el
-> siguiente ciclo.
+**Push con store-and-forward:** cada estación extrae sus transacciones y las envía al central por
+REST. Si el central no responde, el agente guarda los lotes en disco y los reintenta. La ingesta es
+**idempotente** (huella SHA-256 por contenido + índice único), así que un reenvío no duplica datos
+ni alertas.
 
-## Stack tecnologico
+**Tiempo real entre instancias sin Redis:** cuando el job genera una alerta, publica un
+`pg_notify` en PostgreSQL; **cada instancia** del central escucha ese canal (`LISTEN/NOTIFY`) y la
+reenvía por SignalR a sus propios clientes. Así, con varias instancias del central conectadas a la
+**misma** base, todos los usuarios ven las alertas al instante **sin recargar la página**.
 
-| Capa | Tecnologia |
-|------|-----------|
-| Backend | ASP.NET Core 9.0, C# 13, EF Core 9, Dapper |
-| Jobs | Hangfire con PostgreSQL storage |
-| Tiempo real | SignalR (WebSockets) |
-| Autenticacion | JWT + Refresh Tokens, RBAC (3 roles) |
-| Frontend | React 18, TypeScript 5, Vite, TailwindCSS |
-| Data fetching | TanStack Query, Axios, Zod |
-| Graficos | Recharts |
-| BD central | PostgreSQL 16 |
-| Agentes | PetrolRios.StationAgent (.NET Worker Service, 1 por estacion) |
-| Fuentes | 10 x Firebird (solo lectura, accedidas por agentes locales) |
-| Testing | xUnit, FluentAssertions, Moq, Testcontainers |
+## Dos carriles de alerta
 
-## Prerrequisitos
+Cada regla declara su **ámbito** (`AmbitoAlerta`, editable por regla):
 
-- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
-- [Node.js 20+](https://nodejs.org/) (LTS recomendado)
-- [Docker](https://www.docker.com/) y Docker Compose
-- Git
+- **Auditoría** — fraude. Va a la bandeja de Alertas del central (auditores/supervisores).
+- **Operativa** — error honesto de la estación (turno sin cerrar, despacho no facturado, campos
+  faltantes…). **No** ensucia la bandeja de auditoría: aparece en "Problemas de estación" del
+  central y en el **Monitor** local, y se avisa por correo al contacto de la estación.
 
-## Inicio rapido
+## Stack tecnológico
 
-### 1. Clonar el repositorio
+| Capa | Tecnología |
+|---|---|
+| Backend | ASP.NET Core 9.0, C# 13, EF Core 9 (Code-First + migraciones), Dapper |
+| Jobs batch | Hangfire (almacenamiento en PostgreSQL) |
+| Tiempo real | SignalR (WebSockets) + PostgreSQL `LISTEN/NOTIFY` (fan-out multi-instancia) |
+| Seguridad | JWT + refresh tokens, RBAC, 2FA (TOTP/QR), verificación de correo, BCrypt |
+| Reportes | QuestPDF (PDF) + ClosedXML (Excel) |
+| Frontend | React 18, TypeScript 5 (strict), Vite, TailwindCSS, shadcn/ui |
+| Datos (frontend) | TanStack Query, Axios, Zod, `@microsoft/signalr`, Recharts |
+| BD central | PostgreSQL 16 (local en dev; AWS RDS u otra en producción) |
+| Fuentes | 10 × Firebird (Contaplus `CONTAC.FDB`), **solo lectura** vía `FirebirdSql.Data.FirebirdClient` |
+| Pruebas | xUnit, FluentAssertions, Moq, Testcontainers (PostgreSQL real en integración) |
+| Despliegue | Docker (multi-stage), ejecutables self-contained, Inno Setup |
+
+## Detectores y motor de reglas
+
+5 detectores con **Strategy Pattern**. Tras refactorizar, **cada regla es su propia clase**
+(`IDetectionRule`) y se **auto-registra por reflexión**: agregar una regla = agregar un archivo, sin
+tocar el detector ni la DI. Hay **25 reglas** sembradas (editables desde la interfaz: umbral inline,
+activar/desactivar, y carril Operativa/Auditoría por regla).
+
+| Detector | Ejemplos de reglas |
+|---|---|
+| **CashFraudDetector** | Faltante de efectivo > umbral por turno; patrón gineteo (≥3 faltantes/30 días); proporción atípica de efectivo corporativo; turno sin cerrar (operativa). |
+| **InvoiceAnomalyDetector** | Tasa de anulaciones atípica; descuento fuera de política; total inconsistente; campos obligatorios vacíos (operativa); fecha fuera de rango/backdating; despacho no facturado (operativa); anulaciones recurrentes (kiting). |
+| **PaymentFraudDetector** | Reversión de tarjeta tardía; crédito sin autorización/garante; transacciones duplicadas; despachos rápidos sucesivos. |
+| **ComplianceViolationDetector** | Placa genérica `ZZZ999949` con galones > máximo (ARCERNNR); mismo vehículo con diésel y extra el mismo día; venta sin placa en monto mayor; operación fuera de horario (opt-in, apagada por operar 24/7). |
+| **CustomRuleDetector** | **Reglas que crea el propio usuario** sin tocar código. |
+
+**Motor de reglas personalizadas (sin redepliegue):** el Supervisor/Admin crea reglas desde la UI
+sobre cualquier fuente (incluidas tablas Firebird registradas dinámicamente), en **modo básico**
+(condiciones combinadas con **Y/O** + agregaciones Conteo/Suma/Promedio) o **modo avanzado** (un
+mini-lenguaje de expresiones seguro, sin `eval`, con funciones matemáticas y de texto). Incluye
+**vista previa / backtest** contra datos reales antes de guardar y una galería de plantillas. Todo
+se valida contra un catálogo (lista blanca anti-inyección).
+
+**Scoring:** `Score = Riesgo_Base × Multiplicadores`, normalizado a 0–100 → **Bajo** 0–25, **Medio**
+26–50, **Alto** 51–75, **Crítico** 76–100.
+
+**Ciclo de detección:** Hangfire corre el job **cada minuto** en desarrollo (configurable; 5–10 min
+en producción). Recorre estación por estación usando una **marca de agua** (watermark) por estación
+y por fuente, con tolerancia a fallos: si una estación falla, las demás continúan.
+
+## Seguridad
+
+JWT con refresh tokens y **RBAC** de 3 roles (Auditor, Supervisor, Administrador) más **cuentas de
+estación** aisladas (un claim firmado `estacion_id` limita al Monitor/Agente a su propia estación).
+Doble factor por **TOTP/QR**, verificación de correo configurable, **autodesbloqueo** de cuenta y
+bloqueo anti fuerza bruta, hashing BCrypt y **logs de auditoría** (quién, qué e IP) en todas las
+escrituras. Los secretos (SMTP, JWT, conexión) **nunca** se suben al repositorio.
+
+## Conexión a la base de datos: flexible y editable (sin tocar código)
+
+La cadena de conexión se resuelve por prioridad: **variables de entorno**
+(`ConnectionStrings__PostgreSQL` o `PETROLRIOS_DB`) › **`config/connection.json`** (guardado desde la
+app, git-ignorado) › `appsettings`. El Administrador la edita y **prueba** desde
+**Ajustes → Conexión a la base**, y en el **primer arranque** sin base alcanzable aparece un
+**asistente de configuración inicial** en el navegador. La base vive en **un solo lugar**; todas las
+instancias del central se conectan a la misma.
+
+## Inicio rápido (desarrollo)
+
+**Lo más fácil (Windows):** doble clic en `ejecutables/1-INICIO/INICIAR_TODO.bat` — arranca Docker,
+PostgreSQL, Firebird, la API, el frontend, el agente y el monitor, y abre el navegador.
+Ver `ejecutables/LEEME.md` para el detalle de cada script.
+
+**Manual:**
 
 ```bash
-git clone <url-del-repo>
-cd petrolrios-anomaly-detection
-```
-
-### 2. Levantar PostgreSQL
-
-```bash
+# 1) PostgreSQL
 docker compose up -d
+
+# 2) Backend (API en http://localhost:5170 — Swagger en /swagger, Hangfire en /hangfire)
+dotnet restore && dotnet build
+dotnet run --project src/PetrolRios.Api
+
+# 3) Frontend (http://localhost:5173)
+cd frontend && npm install && npm run dev
+
+# 4) Station Agent (panel en http://localhost:5180) — opcional
+dotnet run --project src/PetrolRios.StationAgent
+
+# 5) Station Monitor (http://localhost:5190) — opcional
+dotnet run --project src/PetrolRios.StationMonitor
 ```
 
-Esto inicia PostgreSQL 16 en el puerto 5432 con las credenciales configuradas en `docker-compose.yml`.
+Al primer arranque se ejecutan las migraciones y el seed idempotente:
 
-### 3. Backend
+- Administrador: **admin@petrolrios.com** / **Admin123!** (obliga a cambiarla)
+- Auditor demo: `auditor@petrolrios.com` / `Auditor123!` · Supervisor demo: `supervisor@petrolrios.com` / `Supervisor123!`
+- Cuentas de estación: `agent-est-001@petrolrios.com` … `agent-est-010@petrolrios.com`
+- 25 reglas de detección con umbrales por defecto
 
-```bash
-dotnet restore
-dotnet build
-cd src/PetrolRios.Api
-dotnet run
-```
+**Prerrequisitos:** [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0),
+[Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) y Git.
 
-El API arranca en `http://localhost:5000`.
-- Swagger UI: `http://localhost:5000/swagger`
-- Hangfire Dashboard: `http://localhost:5000/hangfire`
+## Producción y despliegue
 
-Al iniciar por primera vez, se ejecutan las migraciones y se insertan datos semilla:
-- Usuario admin: `admin@petrolrios.com` / `Admin123!`
-- 10 usuarios agente: `agent-est-001@petrolrios.com` ... `agent-est-010@petrolrios.com` / `Agent123!`
-- 10 estaciones de servicio
-- 12 reglas de deteccion con umbrales por defecto
+Todo (central, agente, monitor y la base) corre en **Windows, Linux y macOS**. La guía paso a paso,
+a prueba de errores, está en **`INSTALACION/GUIA.md`**, con instaladores para los 3 sistemas:
 
-### 4. Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Accede a `http://localhost:5173`. Inicia sesion con las credenciales del admin.
-
-### 5. Station Agent (por estacion)
-
-Cada estacion ejecuta un Worker Service que envia transacciones al servidor central.
-
-```bash
-cd src/PetrolRios.StationAgent
-dotnet run
-```
-
-Configurar en `appsettings.json` del agente:
-
-| Parametro | Descripcion | Ejemplo |
-|-----------|------------|---------|
-| `Agent:CodigoEstacion` | Codigo de la estacion | `EST-001` |
-| `Agent:ServerUrl` | URL del servidor central | `http://localhost:5000` |
-| `Agent:IntervaloSegundos` | Frecuencia de extraccion | `300` |
-| `Agent:FirebirdConnectionString` | Conexion a Firebird local (solo lectura) | `User=SYSDBA;Password=masterkey;...` |
-| `Agent:Email` | Credencial JWT del agente | `agent-est-001@petrolrios.com` |
-| `Agent:Password` | Password del agente | `Agent123!` |
-
-El agente implementa **store-and-forward**: si el servidor no responde, los lotes se guardan como JSON
-en `Agent:LocalStorePath` y se reintentan en el siguiente ciclo.
-
-## Variables de entorno
-
-La configuracion de desarrollo esta en `src/PetrolRios.Api/appsettings.Development.json`.
-Para produccion, usa variables de entorno o `appsettings.Production.json` (no comiteado).
-
-| Variable | Descripcion | Ejemplo |
-|----------|------------|---------|
-| `ConnectionStrings__PostgreSQL` | Connection string PostgreSQL | `Host=localhost;Database=petrolrios;...` |
-| `Jwt__SecretKey` | Clave secreta JWT (min. 32 caracteres) | `MiClaveSecretaSuperSegura32Chars!` |
-| `Jwt__Issuer` | Emisor del token JWT | `PetrolRios.Api` |
-| `Jwt__Audience` | Audiencia del token JWT | `PetrolRios.Frontend` |
-| `Cors__FrontendUrl` | URL del frontend | `http://localhost:5173` |
-| `Hangfire__CronExpression` | Frecuencia del job de deteccion | `*/5 * * * *` |
+- **Central:** `docker compose -f docker-compose.prod.yml up -d --build` (todo en uno), o
+  `docker-compose.db.yml` (solo la base) + `docker-compose.central.yml` (central apuntando a una base
+  externa). La API sirve la SPA; un solo contenedor entrega toda la aplicación.
+- **Estaciones (sin VPN):** el agente y el monitor **llaman hacia afuera** a la URL pública del
+  central (túnel/cloud/port-forward); la base **nunca** se expone. Se instalan como servicio (Windows
+  `sc`, Linux `systemd`, macOS `launchd`) para arrancar solos tras un corte de luz.
+- **Actualización remota:** el central se actualiza desde tu PC con
+  `INSTALACION/actualizar-central.ps1` (o `.sh`) — sube a GitHub y por SSH hace `git pull` + rebuild.
+  Los agentes y monitores se **auto-actualizan** desde un manifiesto (versión + URL + SHA-256).
 
 ## Estructura del proyecto
 
 ```
 PetrolRios.sln
 ├── src/
-│   ├── PetrolRios.Domain/            Entidades, enums, interfaces de dominio
-│   ├── PetrolRios.Application/       Casos de uso, DTOs, interfaces de repositorios
-│   ├── PetrolRios.Infrastructure/    EF Core, repositorios, Firebird, Hangfire, SignalR
-│   ├── PetrolRios.Api/               Controllers, JWT, middlewares, ingesta, Program.cs
-│   ├── PetrolRios.Detectors/         4 detectores + motor de scoring
-│   └── PetrolRios.StationAgent/      Worker Service para estaciones (push model)
+│   ├── PetrolRios.Domain/          Entidades, enums, interfaces de dominio (sin dependencias)
+│   ├── PetrolRios.Application/      Casos de uso, DTOs, interfaces, RealTime (IAlertaBroadcaster)
+│   ├── PetrolRios.Infrastructure/   EF Core, repositorios, Dapper, Firebird, Hangfire,
+│   │                                SignalR, LISTEN/NOTIFY, ConexionStore
+│   ├── PetrolRios.Detectors/        5 detectores + Rules/<Detector>/ (25 reglas) + scoring
+│   │                                + motor de reglas personalizadas (expresiones, backtest)
+│   ├── PetrolRios.Api/              Controllers, JWT, middlewares, ingesta, Setup (wizard), Program.cs
+│   ├── PetrolRios.StationAgent/     Worker + panel local (lee Firebird, push al central)
+│   └── PetrolRios.StationMonitor/   Visor local de solo lectura por estación
 ├── tests/
-│   ├── PetrolRios.Domain.Tests/      Tests de entidades de dominio
-│   ├── PetrolRios.Detectors.Tests/   Tests unitarios de detectores (>80% cobertura)
-│   └── PetrolRios.Api.Tests/         Tests de integracion y E2E
-├── frontend/                          React 18 + TypeScript + Vite + Tailwind
-│   ├── src/
-│   │   ├── components/               Componentes reutilizables (UI, layout, auth)
-│   │   ├── pages/                    Paginas (Login, Dashboard, Alertas, etc.)
-│   │   ├── services/                 Clientes API + SignalR
-│   │   ├── contexts/                 AuthContext con gestion de JWT
-│   │   ├── hooks/                    Hooks personalizados
-│   │   ├── types/                    Tipos TypeScript
-│   │   └── lib/                      Utilidades (cn)
-│   └── ...
-├── docs/
-│   ├── tesis.md                       Documento de tesis completo
-│   ├── PROMPT.md                      Especificacion de bloques
-│   ├── ARQUITECTURA.md                Diagramas C4 (Mermaid)
-│   └── contac-schema.sql             Schema Firebird (Contaplus)
-├── scripts/
-│   ├── coverage.sh                    Script de cobertura (Linux/macOS)
-│   └── coverage.ps1                   Script de cobertura (Windows)
-├── docker-compose.yml
-├── CLAUDE.md                          Instrucciones del proyecto
-└── README.md                          Este archivo
+│   ├── PetrolRios.Domain.Tests/
+│   ├── PetrolRios.Detectors.Tests/  CRÍTICO: cobertura > 80% (OE5)
+│   ├── PetrolRios.Api.Tests/        Integración/E2E con PostgreSQL real (Testcontainers)
+│   └── PetrolRios.StationMonitor.Tests/
+├── frontend/                        React 18 + TS + Vite + Tailwind (components, pages, hooks,
+│                                    services [API + SignalR], types, lib)
+├── ejecutables/                     Scripts operativos (1-INICIO, 2-DEMO, 3-DIAGNOSTICO,
+│                                    4-PUBLICACION, 5-DESARROLLO) — ver ejecutables/LEEME.md
+├── INSTALACION/                     Instaladores Win/Linux/macOS + GUIA.md + deploy remoto
+├── _arranque/                       Solo recursos de la BD Firebird de demo (ver _arranque/LEEME.md)
+├── docs/                            tesis.md, contac-schema.sql, ARQUITECTURA.md, OPERACION.md,
+│                                    DESPLIEGUE.md, ANALISIS-SEGURIDAD.md, investigación
+├── scripts/                         verificar-mejoras.bat, coverage.ps1/.sh
+├── docker-compose*.yml              dev / prod / db / central
+├── CLAUDE.md · CAMBIOS.md · README.md
 ```
 
-## Detectores de anomalias
-
-El sistema implementa 4 detectores mediante **Strategy Pattern**, cada uno configurable via reglas en base de datos:
-
-| Detector | Tipo | Reglas |
-|----------|------|--------|
-| **CashFraudDetector** | Fraude de efectivo | Diferencia efectivo vs sistema > $50/turno; Patron gineteo (>3 faltantes en 30 dias) |
-| **InvoiceAnomalyDetector** | Anomalia de factura | Anulaciones > 5% diario; Precio fuera de lista; Campos obligatorios vacios |
-| **PaymentFraudDetector** | Fraude de pago | Reversion tarjeta > 30 min; Credito sin autorizacion; Transacciones duplicadas |
-| **ComplianceViolationDetector** | Violacion normativa | Placa ZZZ999949 > 5 galones; Multiples combustibles/dia; Fuera de horario |
-
-**Scoring:** `Score = RiesgoBase x Multiplicadores` (0-100)
-- Bajo: 0-25 | Medio: 26-50 | Alto: 51-75 | Critico: 76-100
-
-## Pruebas
-
-### Ejecutar todas las pruebas
+## Pruebas y cobertura
 
 ```bash
-dotnet test
+dotnet test                       # todas las pruebas
+.\scripts\coverage.ps1            # cobertura (Windows) → coverage-report/
+ejecutables\5-DESARROLLO\verificar_build_y_tests.bat   # gate completo antes de commitear
 ```
 
-### Ejecutar con cobertura
-
-**Linux/macOS:**
-```bash
-chmod +x scripts/coverage.sh
-./scripts/coverage.sh
-```
-
-**Windows (PowerShell):**
-```powershell
-.\scripts\coverage.ps1
-```
-
-Los reportes de cobertura se generan en `coverage-report/`.
-
-### Tipos de pruebas
-
-| Proyecto | Tipo | Cantidad | Descripcion |
-|----------|------|----------|-------------|
-| `PetrolRios.Domain.Tests` | Unitarias | 4 | Entidades y enums del dominio |
-| `PetrolRios.Detectors.Tests` | Unitarias | 46+ | 4 detectores + scoring (>80% cobertura) |
-| `PetrolRios.Api.Tests` | Integracion | 13+ | Auth, Dashboard, Alertas con PostgreSQL real |
-| `PetrolRios.Api.Tests` | E2E | 6+ | Ciclo completo ETL->deteccion->persistencia->SignalR |
-
-### Frontend
+Estado: **más de 200 pruebas en verde** (Domain, Detectors, API con PostgreSQL real, Monitor). La
+**cobertura de `PetrolRios.Detectors` es 96,3 % en líneas** (84,9 % en ramas) — **supera con holgura
+el umbral del 80 % exigido por el OE5**. Reproducible con `scripts/coverage.ps1`.
 
 ```bash
 cd frontend
-npm run build    # Verificacion de tipos TypeScript
+npm run build    # verificación de tipos + build de producción
 npm run lint     # ESLint
 ```
 
-## API Endpoints
+## API (endpoints principales)
 
-| Metodo | Ruta | Rol minimo | Descripcion |
-|--------|------|-----------|-------------|
-| POST | `/api/v1/auth/login` | Publico | Iniciar sesion |
-| POST | `/api/v1/auth/refresh` | Publico | Renovar JWT |
-| POST | `/api/v1/auth/logout` | Autenticado | Cerrar sesion |
-| POST | `/api/v1/ingesta` | Autenticado | Recibir lote de transacciones (Station Agent) |
-| GET | `/api/v1/dashboard/kpis` | Autenticado | KPIs del sistema |
-| GET | `/api/v1/dashboard/alertas-por-tipo` | Autenticado | Alertas por tipo detector |
-| GET | `/api/v1/dashboard/alertas-por-estacion` | Autenticado | Alertas por estacion |
-| GET | `/api/v1/alertas` | Autenticado | Listar alertas (con filtros y paginacion) |
-| GET | `/api/v1/alertas/{id}` | Autenticado | Detalle de alerta |
-| PATCH | `/api/v1/alertas/{id}/estado` | Autenticado | Cambiar estado de alerta |
-| POST | `/api/v1/alertas/{id}/asignar` | Supervisor+ | Asignar alerta a auditor |
-| GET/POST/PUT/DELETE | `/api/v1/reglas` | Supervisor+ | Gestionar reglas de deteccion |
-| GET/POST/PUT/DELETE | `/api/v1/usuarios` | Admin | Gestionar usuarios |
-| GET | `/api/v1/logs` | Admin | Consultar logs de auditoria |
+| Método | Ruta | Rol mínimo | Descripción |
+|---|---|---|---|
+| POST | `/api/v1/auth/login` · `/login-totp` · `/refresh` · `/olvide-password` · `/desbloquear-cuenta` | Público | Sesión, 2FA, recuperación y desbloqueo |
+| POST | `/api/v1/ingesta` · `/ingesta/heartbeat` | Estación | Recibir lote (idempotente) y señal de vida |
+| GET | `/api/v1/dashboard/*` | Autenticado | KPIs, tendencia, por tipo/estación, top empleados |
+| GET / PATCH | `/api/v1/alertas` · `/{id}` · `/{id}/estado` | Autenticado | Listar/filtrar, detalle, cambiar estado |
+| GET / POST | `/api/v1/alertas/{id}/comentarios` · `/{id}/asignar` | Auditor / Supervisor | Comentarios de auditoría y asignación |
+| GET | `/api/v1/alertas/problemas-estacion` | Autenticado | Carril Operativa agrupado por estación |
+| GET / PUT | `/api/v1/reglas` · `/reglas-personalizadas` (+ `/catalogo`, `/backtest`) | Supervisor+ | Motor de detección configurable |
+| GET | `/api/v1/monitoreo/conexiones` · `/sistema` | Autenticado | Estado de estaciones, BD, SignalR, motor |
+| GET/POST/PUT/DELETE | `/api/v1/usuarios` · `/estaciones` | Admin / Supervisor | Gestión de usuarios y estaciones |
+| GET | `/api/v1/conexion-base` · POST `/probar` · `/guardar` | Admin | Conexión a la base, editable y verificable |
+| GET | `/api/v1/reportes/*` · `/logs` | Supervisor / Admin | Reportes PDF/Excel y auditoría |
 
-## Roles y permisos
+## Roles
 
 | Rol | Permisos |
-|-----|---------|
-| **Auditor** | Ver dashboard, listar/filtrar alertas, cambiar estado, recibir notificaciones |
-| **Supervisor** | Todo lo del Auditor + asignar alertas, configurar reglas, generar reportes |
-| **Administrador** | Todo lo del Supervisor + gestionar usuarios, consultar logs |
+|---|---|
+| **Auditor** | Dashboard, listar/filtrar alertas, cambiar estado, comentar, notificaciones en vivo |
+| **Supervisor** | + asignar alertas, configurar reglas/umbrales, generar reportes, métricas |
+| **Administrador** | + gestionar usuarios y estaciones, conexión a la base, logs de auditoría |
+| **Cuenta de estación** | Solo su estación: el Agente ingesta y el Monitor ve sus problemas operativos |
+
+## Documentación adicional
+
+- `ejecutables/LEEME.md` — qué hace cada script operativo.
+- `INSTALACION/GUIA.md` — instalación en producción paso a paso (Windows/Linux/macOS).
+- `docs/OPERACION.md` · `docs/DESPLIEGUE.md` — operación y despliegue.
+- `docs/ANALISIS-SEGURIDAD.md` — análisis de seguridad.
+- `CAMBIOS.md` — bitácora detallada de todo lo construido.
 
 ## Licencia
 
-Proyecto academico — Universidad de Las Americas (UDLA), 2026.
+Proyecto académico — Universidad de Las Américas (UDLA), 2026.
