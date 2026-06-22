@@ -97,8 +97,10 @@ public sealed class UpdateService
             return (false, "El manifiesto no incluye la URL del ejecutable.");
 
         var dirApp = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-        var exeActual = Path.Combine(dirApp, "PetrolRios.StationAgent.exe");
-        var exeNuevo = Path.Combine(dirApp, "PetrolRios.StationAgent.nuevo.exe");
+        var esWindows = OperatingSystem.IsWindows();
+        const string nombre = "PetrolRios.StationAgent";
+        var exeActual = Path.Combine(dirApp, esWindows ? $"{nombre}.exe" : nombre);
+        var exeNuevo = Path.Combine(dirApp, esWindows ? $"{nombre}.nuevo.exe" : $"{nombre}.nuevo");
 
         // 1) Descargar
         try
@@ -123,21 +125,37 @@ public sealed class UpdateService
             return (false, $"No se pudo descargar la actualización: {ex.Message}");
         }
 
-        // 3) Escribir el actualizador y lanzarlo desacoplado
+        // 3) Programar el reemplazo + reinicio, según el sistema operativo.
         try
         {
-            var servicio = _config.Actual.NombreServicioWindows;
-            var script = Path.Combine(dirApp, "aplicar_actualizacion.bat");
-            await File.WriteAllTextAsync(script, ConstruirScript(dirApp, exeActual, exeNuevo, servicio), ct);
-
-            Process.Start(new ProcessStartInfo
+            if (esWindows)
             {
-                FileName = "cmd.exe",
-                Arguments = $"/c \"{script}\"",
-                UseShellExecute = true,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            });
+                var servicio = _config.Actual.NombreServicioWindows;
+                var script = Path.Combine(dirApp, "aplicar_actualizacion.bat");
+                await File.WriteAllTextAsync(script, ScriptWindows(exeActual, exeNuevo, servicio), ct);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{script}\"",
+                    UseShellExecute = true,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                });
+            }
+            else
+            {
+                // Linux/macOS: el script reemplaza el binario y mata el proceso; systemd (Restart=on-failure)
+                // o launchd (KeepAlive) lo relanzan solos con el binario nuevo. No depende del nombre del servicio.
+                var script = Path.Combine(dirApp, "aplicar_actualizacion.sh");
+                await File.WriteAllTextAsync(script, ScriptUnix(exeActual, exeNuevo, Environment.ProcessId), ct);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    Arguments = $"-c \"nohup bash '{script}' >/dev/null 2>&1 &\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+            }
 
             return (true, $"Descargada la versión {manifiesto.Version}. El agente se reiniciará para aplicarla.");
         }
@@ -148,11 +166,8 @@ public sealed class UpdateService
         }
     }
 
-    /// <summary>
-    /// Script que espera a que el agente cierre, intercambia el .exe y lo reinicia.
-    /// Reinicia el servicio de Windows si existe; si no, ejecuta el .exe directamente.
-    /// </summary>
-    private static string ConstruirScript(string dirApp, string exeActual, string exeNuevo, string servicio) =>
+    /// <summary>Windows: detiene el servicio, intercambia el .exe y lo reinicia (o lo ejecuta directo).</summary>
+    private static string ScriptWindows(string exeActual, string exeNuevo, string servicio) =>
         $"""
         @echo off
         rem Actualizador del Agente PetrolRios — generado automaticamente
@@ -172,4 +187,13 @@ public sealed class UpdateService
         )
         del "%~f0" >nul 2>&1
         """;
+
+    /// <summary>Linux/macOS: reemplaza el binario y mata el proceso; el gestor de servicios lo relanza.</summary>
+    private static string ScriptUnix(string exeActual, string exeNuevo, int pid) =>
+        "#!/usr/bin/env bash\n"
+        + "sleep 4\n"
+        + $"mv -f \"{exeNuevo}\" \"{exeActual}\"\n"
+        + $"chmod +x \"{exeActual}\"\n"
+        + "# Matar el proceso: systemd (Restart) o launchd (KeepAlive) relanzan con el binario nuevo.\n"
+        + $"kill -9 {pid} 2>/dev/null || true\n";
 }

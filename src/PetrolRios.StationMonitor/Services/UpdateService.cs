@@ -92,8 +92,10 @@ public sealed class UpdateService
             return (false, "El manifiesto no incluye la URL del ejecutable.");
 
         var dirApp = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
-        var exeActual = Path.Combine(dirApp, "PetrolRios.StationMonitor.exe");
-        var exeNuevo = Path.Combine(dirApp, "PetrolRios.StationMonitor.nuevo.exe");
+        var esWindows = OperatingSystem.IsWindows();
+        const string nombre = "PetrolRios.StationMonitor";
+        var exeActual = Path.Combine(dirApp, esWindows ? $"{nombre}.exe" : nombre);
+        var exeNuevo = Path.Combine(dirApp, esWindows ? $"{nombre}.nuevo.exe" : $"{nombre}.nuevo");
 
         try
         {
@@ -118,17 +120,33 @@ public sealed class UpdateService
 
         try
         {
-            var script = Path.Combine(dirApp, "aplicar_actualizacion.bat");
-            await File.WriteAllTextAsync(script, ConstruirScript(exeActual, exeNuevo, ServicioWindows), ct);
-
-            Process.Start(new ProcessStartInfo
+            if (esWindows)
             {
-                FileName = "cmd.exe",
-                Arguments = $"/c \"{script}\"",
-                UseShellExecute = true,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            });
+                var script = Path.Combine(dirApp, "aplicar_actualizacion.bat");
+                await File.WriteAllTextAsync(script, ScriptWindows(exeActual, exeNuevo, ServicioWindows), ct);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"{script}\"",
+                    UseShellExecute = true,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                });
+            }
+            else
+            {
+                // Linux/macOS: el script reemplaza el binario y mata el proceso; systemd (Restart=on-failure)
+                // o launchd (KeepAlive) lo relanzan solos con el binario nuevo. No depende del nombre del servicio.
+                var script = Path.Combine(dirApp, "aplicar_actualizacion.sh");
+                await File.WriteAllTextAsync(script, ScriptUnix(exeActual, exeNuevo, Environment.ProcessId), ct);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    Arguments = $"-c \"nohup bash '{script}' >/dev/null 2>&1 &\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+            }
 
             return (true, $"Descargada la versión {manifiesto.Version}. El monitor se reiniciará para aplicarla.");
         }
@@ -139,7 +157,7 @@ public sealed class UpdateService
         }
     }
 
-    private static string ConstruirScript(string exeActual, string exeNuevo, string servicio) =>
+    private static string ScriptWindows(string exeActual, string exeNuevo, string servicio) =>
         $"""
         @echo off
         rem Actualizador del Monitor PetrolRios — generado automaticamente
@@ -159,4 +177,12 @@ public sealed class UpdateService
         )
         del "%~f0" >nul 2>&1
         """;
+
+    private static string ScriptUnix(string exeActual, string exeNuevo, int pid) =>
+        "#!/usr/bin/env bash\n"
+        + "sleep 4\n"
+        + $"mv -f \"{exeNuevo}\" \"{exeActual}\"\n"
+        + $"chmod +x \"{exeActual}\"\n"
+        + "# Matar el proceso: systemd (Restart) o launchd (KeepAlive) relanzan con el binario nuevo.\n"
+        + $"kill -9 {pid} 2>/dev/null || true\n";
 }
