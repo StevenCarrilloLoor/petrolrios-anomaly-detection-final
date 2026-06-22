@@ -64,14 +64,15 @@ public sealed class ConexionBaseController : ControllerBase
 
     private string? ResolverCadena(ProbarConexionRequest request)
     {
-        if (!string.IsNullOrWhiteSpace(request.Cadena))
-            return request.Cadena.Trim();
+        string? cadena = null;
 
-        if (!string.IsNullOrWhiteSpace(request.Servidor)
+        if (!string.IsNullOrWhiteSpace(request.Cadena))
+            cadena = request.Cadena.Trim();
+        else if (!string.IsNullOrWhiteSpace(request.Servidor)
             && !string.IsNullOrWhiteSpace(request.BaseDatos)
             && !string.IsNullOrWhiteSpace(request.Usuario))
         {
-            return _store.ConstruirCadena(
+            cadena = _store.ConstruirCadena(
                 request.Servidor!.Trim(),
                 request.Puerto ?? 5432,
                 request.BaseDatos!.Trim(),
@@ -80,6 +81,7 @@ public sealed class ConexionBaseController : ControllerBase
                 request.ModoSsl ?? "Prefer");
         }
 
-        return null;
+        // Si no se reescribió la contraseña pero es la misma base, reusa la activa.
+        return cadena is null ? null : _store.CompletarPassword(cadena);
     }
 }

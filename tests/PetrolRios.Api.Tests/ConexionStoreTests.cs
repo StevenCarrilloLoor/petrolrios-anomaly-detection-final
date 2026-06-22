@@ -117,4 +117,30 @@ public sealed class ConexionStoreTests
         enmascarada.Should().NotContain("secretoSuperSecreto");
         enmascarada.Should().Contain("********");
     }
+
+    [Fact]
+    public void CompletarPassword_MismaBaseSinPassword_ReusaLaActiva()
+    {
+        var previo = LimpiarEnv();
+        var dir = DirTemporal();
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var store = new ConexionStore(dir, ConfigConAppsettings(null));
+            store.Guardar("Host=db1;Port=5432;Database=petrolrios;Username=pr;Password=secreto123");
+
+            // Mismo destino, sin contraseña: reusa la activa.
+            store.CompletarPassword("Host=db1;Port=5432;Database=petrolrios;Username=pr")
+                .Should().Contain("secreto123");
+
+            // Otro destino: NO reusa.
+            store.CompletarPassword("Host=otro;Port=5432;Database=petrolrios;Username=pr")
+                .Should().NotContain("secreto123");
+        }
+        finally
+        {
+            RestaurarEnv(previo);
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
 }

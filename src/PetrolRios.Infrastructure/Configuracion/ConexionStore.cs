@@ -81,6 +81,36 @@ public sealed class ConexionStore : IConexionStore
         return b.ConnectionString;
     }
 
+    public string CompletarPassword(string cadena)
+    {
+        try
+        {
+            var b = new NpgsqlConnectionStringBuilder(cadena);
+            if (!string.IsNullOrEmpty(b.Password)) return cadena; // ya trae contraseña
+
+            var activa = ResolverActiva();
+            if (string.IsNullOrWhiteSpace(activa)) return cadena;
+            var a = new NpgsqlConnectionStringBuilder(activa);
+
+            var mismoDestino =
+                string.Equals(b.Host, a.Host, StringComparison.OrdinalIgnoreCase)
+                && b.Port == a.Port
+                && string.Equals(b.Database, a.Database, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(b.Username, a.Username, StringComparison.OrdinalIgnoreCase);
+
+            if (mismoDestino && !string.IsNullOrEmpty(a.Password))
+            {
+                b.Password = a.Password;
+                return b.ConnectionString;
+            }
+            return cadena;
+        }
+        catch
+        {
+            return cadena;
+        }
+    }
+
     public string Enmascarar(string cadena)
     {
         try

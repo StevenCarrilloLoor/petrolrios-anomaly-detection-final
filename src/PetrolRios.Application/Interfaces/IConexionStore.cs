@@ -22,6 +22,12 @@ public interface IConexionStore
     /// <summary>Construye una cadena de conexión Npgsql a partir de campos simples.</summary>
     string ConstruirCadena(string servidor, int puerto, string baseDatos, string usuario, string? password, string modoSsl);
 
+    /// <summary>
+    /// Si la cadena no trae contraseña pero apunta al MISMO servidor/base/usuario que la conexión
+    /// activa, reusa la contraseña activa. Permite "Probar conexión" sin reescribir la clave.
+    /// </summary>
+    string CompletarPassword(string cadena);
+
     /// <summary>Devuelve la cadena con la contraseña oculta, para mostrarla sin exponer el secreto.</summary>
     string Enmascarar(string cadena);
 

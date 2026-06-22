@@ -39,8 +39,24 @@ try
     // en cualquier máquina o sistema operativo; el central solo necesita la cadena.
     var configDir = Path.Combine(builder.Environment.ContentRootPath, "config");
     var conexionStore = new PetrolRios.Infrastructure.Configuracion.ConexionStore(configDir, builder.Configuration);
-    var connectionString = conexionStore.ResolverActiva()
-        ?? throw new InvalidOperationException(
+    var connectionString = conexionStore.ResolverActiva();
+
+    // Asistente de primer arranque: SOLO en Producción, si no hay base alcanzable, levanta una
+    // pantalla de configuración (en vez de caerse) hasta que se guarde una conexión que funcione.
+    // En desarrollo/tests no aplica, para no romper el flujo local ni las pruebas de integración.
+    if (builder.Environment.IsProduction())
+    {
+        var alcanzable = !string.IsNullOrWhiteSpace(connectionString)
+            && (await conexionStore.ProbarAsync(connectionString!, CancellationToken.None)).Ok;
+        if (!alcanzable)
+        {
+            await PetrolRios.Api.Setup.SetupMode.EjecutarAsync(args, conexionStore);
+            connectionString = conexionStore.ResolverActiva();
+        }
+    }
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+        throw new InvalidOperationException(
             "Falta la conexión a PostgreSQL. Configúrela por variable de entorno ConnectionStrings__PostgreSQL, " +
             "el archivo config/connection.json (Ajustes → Conexión a la base) o appsettings.");
     builder.Services.AddInfrastructure(connectionString, builder.Configuration);
