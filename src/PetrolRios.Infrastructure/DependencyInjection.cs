@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.RealTime;
 using PetrolRios.Infrastructure.Firebird;
 using PetrolRios.Infrastructure.Persistence;
 using PetrolRios.Infrastructure.Persistence.Repositories;
@@ -36,6 +37,10 @@ public static class DependencyInjection
 
         // Job de detección
         services.AddScoped<Jobs.AnomalyDetectionJob>();
+
+        // Tiempo real entre instancias: fan-out de alertas por PostgreSQL LISTEN/NOTIFY.
+        // (El listener BackgroundService se registra en Program.cs, donde está el hosting.)
+        services.AddSingleton<IAlertaBroadcaster, RealTime.PostgresAlertaBroadcaster>();
 
         // Servicios de aplicación
         services.AddScoped<IJwtService, JwtService>();

@@ -1,12 +1,11 @@
 using System.Diagnostics;
 using System.Text.Json;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.RealTime;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
-using PetrolRios.Infrastructure.Hubs;
 using PetrolRios.Infrastructure.Persistence;
 
 namespace PetrolRios.Infrastructure.Jobs;
@@ -26,7 +25,7 @@ public sealed class AnomalyDetectionJob
     private readonly IEnumerable<IAnomalyDetector> _detectors;
     private readonly IUnitOfWork _unitOfWork;
     private readonly PetrolRiosDbContext _dbContext;
-    private readonly IHubContext<AlertsHub> _hubContext;
+    private readonly IAlertaBroadcaster _broadcaster;
     private readonly IEmailNotificacionService _emailService;
     private readonly ILogger<AnomalyDetectionJob> _logger;
 
@@ -34,14 +33,14 @@ public sealed class AnomalyDetectionJob
         IEnumerable<IAnomalyDetector> detectors,
         IUnitOfWork unitOfWork,
         PetrolRiosDbContext dbContext,
-        IHubContext<AlertsHub> hubContext,
+        IAlertaBroadcaster broadcaster,
         IEmailNotificacionService emailService,
         ILogger<AnomalyDetectionJob> logger)
     {
         _detectors = detectors;
         _unitOfWork = unitOfWork;
         _dbContext = dbContext;
-        _hubContext = hubContext;
+        _broadcaster = broadcaster;
         _emailService = emailService;
         _logger = logger;
     }
@@ -308,44 +307,29 @@ public sealed class AnomalyDetectionJob
 
     private async Task NotifyAlertAsync(Alerta alerta, int estacionId)
     {
-        // La entidad todavía puede no tener Id (SaveChanges ocurre al finalizar el lote).
-        // Este identificador permite deduplicar el mismo aviso enviado por dos grupos sin
-        // confundir dos alertas distintas que temporalmente tienen Id = 0.
-        var notificationId = Guid.NewGuid().ToString("N");
-        var payload = new
-        {
-            NotificationId = notificationId,
-            alerta.Id,
-            TipoDetector = alerta.TipoDetector.ToString(),
-            NivelRiesgo = alerta.NivelRiesgo.ToString(),
-            Ambito = alerta.Ambito.ToString(),
-            alerta.Descripcion,
-            alerta.Score,
-            alerta.FechaDeteccion,
-            EstacionId = estacionId
-        };
+        // El push se difunde por pg_notify a TODAS las instancias del central (cada una lo entrega
+        // a sus propios clientes SignalR). Así el tiempo real funciona con varias instancias
+        // compartiendo una sola base, sin Redis.
+        //
+        // La entidad todavía puede no tener Id (SaveChanges ocurre al finalizar el lote); el
+        // NotificationId permite al cliente deduplicar sin confundir dos alertas con Id = 0.
+        var payload = new AlertaNotificacionPayload(
+            NotificationId: Guid.NewGuid().ToString("N"),
+            Id: alerta.Id,
+            TipoDetector: alerta.TipoDetector.ToString(),
+            NivelRiesgo: alerta.NivelRiesgo.ToString(),
+            Ambito: alerta.Ambito.ToString(),
+            Descripcion: alerta.Descripcion,
+            Score: alerta.Score,
+            FechaDeteccion: alerta.FechaDeteccion,
+            EstacionId: estacionId);
 
-        var tareas = new List<Task>();
+        // Operativa = problema de estación (pestaña "Problemas de estación" + Monitor de estación);
+        // NUNCA "NuevaAlerta", para no confundir a los auditores. Auditoría = bandeja del central.
+        var (evento, grupos) = alerta.Ambito == AmbitoAlerta.Operativa
+            ? ("ProblemaEstacion", new[] { "auditores", "supervisores", "administradores", $"estacion-{estacionId}" })
+            : ("NuevaAlerta", new[] { "auditores", "supervisores", "administradores" });
 
-        if (alerta.Ambito == AmbitoAlerta.Operativa)
-        {
-            // Problema operativo de estación: NO entra a la bandeja de auditoría. Se emite como
-            // "ProblemaEstacion" a los grupos del central (para la pestaña "Problemas de estación")
-            // y al grupo de la estación (Monitor de estación). NUNCA como "NuevaAlerta", para no
-            // confundir a los auditores con incidencias que resuelve la propia estación.
-            tareas.Add(_hubContext.Clients.Group("auditores").SendAsync("ProblemaEstacion", payload));
-            tareas.Add(_hubContext.Clients.Group("supervisores").SendAsync("ProblemaEstacion", payload));
-            tareas.Add(_hubContext.Clients.Group("administradores").SendAsync("ProblemaEstacion", payload));
-            tareas.Add(_hubContext.Clients.Group($"estacion-{estacionId}").SendAsync("ProblemaEstacion", payload));
-        }
-        else
-        {
-            // Alerta de auditoría (fraude): va a la bandeja del central (auditores/supervisores/admins).
-            tareas.Add(_hubContext.Clients.Group("auditores").SendAsync("NuevaAlerta", payload));
-            tareas.Add(_hubContext.Clients.Group("supervisores").SendAsync("NuevaAlerta", payload));
-            tareas.Add(_hubContext.Clients.Group("administradores").SendAsync("NuevaAlerta", payload));
-        }
-
-        await Task.WhenAll(tareas);
+        await _broadcaster.PublicarAsync(new AlertaPush(evento, grupos, payload));
     }
 }

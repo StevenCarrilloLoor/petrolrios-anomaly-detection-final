@@ -1,17 +1,16 @@
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.RealTime;
 using PetrolRios.Application.ReglasPersonalizadas;
 using PetrolRios.Detectors;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
-using PetrolRios.Infrastructure.Hubs;
 using PetrolRios.Infrastructure.Jobs;
 using PetrolRios.Infrastructure.Persistence;
 
@@ -25,9 +24,8 @@ namespace PetrolRios.Api.Tests;
 public sealed class AnomalyDetectionJobE2ETests : IDisposable
 {
     private readonly PetrolRiosDbContext _dbContext;
-    private readonly Mock<IHubContext<AlertsHub>> _hubMock;
-    private readonly Mock<IHubClients> _hubClientsMock;
-    private readonly Mock<IClientProxy> _clientProxyMock;
+    private readonly Mock<IAlertaBroadcaster> _broadcasterMock;
+    private readonly List<AlertaPush> _pushes = new();
     private readonly AnomalyDetectionJob _job;
 
     public AnomalyDetectionJobE2ETests()
@@ -40,12 +38,13 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         // Seed data mínima
         SeedTestData();
 
-        // Mock SignalR hub
-        _hubMock = new Mock<IHubContext<AlertsHub>>();
-        _hubClientsMock = new Mock<IHubClients>();
-        _clientProxyMock = new Mock<IClientProxy>();
-        _hubClientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(_clientProxyMock.Object);
-        _hubMock.Setup(h => h.Clients).Returns(_hubClientsMock.Object);
+        // El job delega el push en IAlertaBroadcaster (fan-out por pg_notify). Capturamos los
+        // push para verificar evento, grupos y payload sin necesidad de SignalR real.
+        _broadcasterMock = new Mock<IAlertaBroadcaster>();
+        _broadcasterMock
+            .Setup(b => b.PublicarAsync(It.IsAny<AlertaPush>(), It.IsAny<CancellationToken>()))
+            .Callback<AlertaPush, CancellationToken>((push, _) => _pushes.Add(push))
+            .Returns(Task.CompletedTask);
 
         // Construir detectores reales via DI
         var services = new ServiceCollection();
@@ -91,7 +90,7 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
             detectors,
             unitOfWorkMock.Object,
             _dbContext,
-            _hubMock.Object,
+            _broadcasterMock.Object,
             emailMock.Object,
             sp.GetRequiredService<ILogger<AnomalyDetectionJob>>());
     }
@@ -284,14 +283,13 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         // Act
         await _job.ExecuteAsync();
 
-        // Assert — SignalR debe invocarse al menos una vez por cada alerta
+        // Assert — cada alerta de auditoría debe publicarse como "NuevaAlerta" a los grupos del central
         var alertaCount = await _dbContext.Alertas.CountAsync();
         if (alertaCount > 0)
         {
-            _clientProxyMock.Verify(
-                p => p.SendCoreAsync("NuevaAlerta", It.IsAny<object?[]>(), It.IsAny<CancellationToken>()),
-                Times.AtLeastOnce,
-                "las alertas detectadas deben notificarse por SignalR");
+            _pushes.Should().Contain(p =>
+                p.Evento == "NuevaAlerta" && p.Grupos.Contains("auditores"),
+                "las alertas detectadas deben difundirse por el broadcaster en tiempo real");
         }
     }
 
@@ -308,15 +306,9 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         personalizadas.Should().Contain(a => a.Ambito == AmbitoAlerta.Operativa);
 
         var estacionId = await _dbContext.Estaciones.Select(e => e.Id).SingleAsync();
-        _hubClientsMock.Verify(
-            c => c.Group($"estacion-{estacionId}"),
-            Times.AtLeastOnce);
-        _clientProxyMock.Verify(
-            p => p.SendCoreAsync(
-                "ProblemaEstacion",
-                It.IsAny<object?[]>(),
-                It.IsAny<CancellationToken>()),
-            Times.AtLeastOnce);
+        _pushes.Should().Contain(p =>
+            p.Evento == "ProblemaEstacion" && p.Grupos.Contains($"estacion-{estacionId}"),
+            "los problemas operativos deben difundirse como ProblemaEstacion al grupo de la estación");
     }
 
     [Fact]

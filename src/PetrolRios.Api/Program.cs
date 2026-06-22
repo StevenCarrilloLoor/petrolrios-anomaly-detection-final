@@ -144,6 +144,10 @@ try
     });
     builder.Services.AddSignalR();
 
+    // Listener del fan-out de alertas en tiempo real: cada instancia escucha (LISTEN) las
+    // notificaciones publicadas por cualquier instancia y las empuja a sus clientes SignalR.
+    builder.Services.AddHostedService<PetrolRios.Infrastructure.RealTime.AlertasNotificacionListener>();
+
     // Hangfire con PostgreSQL storage
     // Hangfire usa su propia conexión si se define; si no, la misma conexión central ya resuelta.
     var hangfireCs = builder.Configuration.GetConnectionString("Hangfire")
