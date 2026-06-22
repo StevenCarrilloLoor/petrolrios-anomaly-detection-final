@@ -1,7 +1,28 @@
-import { Sun, Moon, Monitor, Bell, Volume2, SlidersHorizontal } from "lucide-react";
-import { useAjustes, type Tema } from "@/contexts/SettingsContext";
-import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import {
+  Sun,
+  Moon,
+  Monitor,
+  Bell,
+  Volume2,
+  SlidersHorizontal,
+  Database,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useAjustes, type Tema } from "@/contexts/SettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import { conexionBaseService } from "@/services/conexionBase.service";
+import type {
+  ConexionActiva,
+  ProbarConexionRequest,
+  ProbarConexionResponse,
+  GuardarConexionResponse,
+} from "@/types/conexionBase";
 
 const TEMAS: { valor: Tema; label: string; icono: ReactNode; descripcion: string }[] = [
   { valor: "sistema", label: "Sistema", icono: <Monitor size={20} />, descripcion: "Sigue tu equipo" },
@@ -11,6 +32,8 @@ const TEMAS: { valor: Tema; label: string; icono: ReactNode; descripcion: string
 
 export function AjustesPage() {
   const { ajustes, actualizar } = useAjustes();
+  const { user } = useAuth();
+  const esAdmin = user?.rol === "Administrador";
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -78,6 +101,278 @@ export function AjustesPage() {
           />
         </CardContent>
       </Card>
+
+      {esAdmin && <SeccionConexionBase />}
+    </div>
+  );
+}
+
+function SeccionConexionBase() {
+  const [estado, setEstado] = useState<ConexionActiva | null>(null);
+  const [modo, setModo] = useState<"simple" | "avanzado">("simple");
+  const [form, setForm] = useState({
+    servidor: "",
+    puerto: 5432,
+    baseDatos: "petrolrios",
+    usuario: "petrolrios",
+    password: "",
+    modoSsl: "Prefer",
+    cadena: "",
+  });
+  const [prueba, setPrueba] = useState<ProbarConexionResponse | null>(null);
+  const [guardado, setGuardado] = useState<GuardarConexionResponse | null>(null);
+  const [cargando, setCargando] = useState<"probar" | "guardar" | null>(null);
+
+  useEffect(() => {
+    let activo = true;
+    conexionBaseService
+      .estado()
+      .then((e) => {
+        if (!activo) return;
+        setEstado(e);
+        setForm((f) => ({
+          ...f,
+          servidor: e.servidor ?? f.servidor,
+          puerto: e.puerto || 5432,
+          baseDatos: e.baseDatos ?? f.baseDatos,
+          usuario: e.usuario ?? f.usuario,
+          modoSsl: e.modoSsl || "Prefer",
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  const construirRequest = (): ProbarConexionRequest =>
+    modo === "avanzado"
+      ? { cadena: form.cadena }
+      : {
+          servidor: form.servidor,
+          puerto: form.puerto,
+          baseDatos: form.baseDatos,
+          usuario: form.usuario,
+          password: form.password || undefined,
+          modoSsl: form.modoSsl,
+        };
+
+  const onProbar = async () => {
+    setCargando("probar");
+    setPrueba(null);
+    setGuardado(null);
+    try {
+      setPrueba(await conexionBaseService.probar(construirRequest()));
+    } catch {
+      setPrueba({ ok: false, mensaje: "No se pudo contactar al servidor.", version: null });
+    } finally {
+      setCargando(null);
+    }
+  };
+
+  const onGuardar = async () => {
+    setCargando("guardar");
+    setGuardado(null);
+    try {
+      const r = await conexionBaseService.guardar(construirRequest());
+      setGuardado(r);
+      if (r.ok) setEstado(await conexionBaseService.estado());
+    } catch {
+      setGuardado({ ok: false, mensaje: "No se pudo guardar (¿la conexión falló?)." });
+    } finally {
+      setCargando(null);
+    }
+  };
+
+  const inputCls =
+    "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30";
+
+  return (
+    <Card>
+      <CardHeader
+        title="Conexión a la base de datos"
+        subtitle="Dónde vive PostgreSQL. Pruebe y guarde sin tocar el código; se aplica al reiniciar el central."
+      />
+      <CardContent className="space-y-4">
+        {estado && (
+          <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-foreground">
+              <Database size={14} className="text-primary" />
+              <span className="font-medium">Conexión actual</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">
+                {estado.fuente}
+              </span>
+            </div>
+            <p className="mt-1 break-all font-mono text-muted-foreground">{estado.enmascarada}</p>
+          </div>
+        )}
+
+        {estado && !estado.editableDesdeUi && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-foreground">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+            <span>
+              La conexión está fijada por una variable de entorno, que tiene prioridad. Puede probar
+              aquí, pero para que el guardado surta efecto debe quitar esa variable del entorno.
+            </span>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <BotonModo activo={modo === "simple"} onClick={() => setModo("simple")} label="Campos" />
+          <BotonModo
+            activo={modo === "avanzado"}
+            onClick={() => setModo("avanzado")}
+            label="Cadena (avanzado)"
+          />
+        </div>
+
+        {modo === "simple" ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Campo label="Servidor (host o IP)">
+              <input
+                className={inputCls}
+                value={form.servidor}
+                onChange={(e) => setForm({ ...form, servidor: e.target.value })}
+                placeholder="192.168.1.50 / db.empresa.com"
+              />
+            </Campo>
+            <Campo label="Puerto">
+              <input
+                className={inputCls}
+                type="number"
+                value={form.puerto}
+                onChange={(e) => setForm({ ...form, puerto: Number(e.target.value) || 5432 })}
+              />
+            </Campo>
+            <Campo label="Base de datos">
+              <input
+                className={inputCls}
+                value={form.baseDatos}
+                onChange={(e) => setForm({ ...form, baseDatos: e.target.value })}
+              />
+            </Campo>
+            <Campo label="Usuario">
+              <input
+                className={inputCls}
+                value={form.usuario}
+                onChange={(e) => setForm({ ...form, usuario: e.target.value })}
+              />
+            </Campo>
+            <Campo label="Contraseña">
+              <input
+                className={inputCls}
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder="(sin cambios si se deja vacío)"
+              />
+            </Campo>
+            <Campo label="SSL">
+              <select
+                className={inputCls}
+                value={form.modoSsl}
+                onChange={(e) => setForm({ ...form, modoSsl: e.target.value })}
+              >
+                <option value="Disable">Desactivado</option>
+                <option value="Prefer">Preferir</option>
+                <option value="Require">Requerir</option>
+                <option value="VerifyCA">Verificar CA</option>
+                <option value="VerifyFull">Verificar completo</option>
+              </select>
+            </Campo>
+          </div>
+        ) : (
+          <Campo label="Cadena de conexión (Npgsql)">
+            <textarea
+              className={`${inputCls} font-mono`}
+              rows={3}
+              value={form.cadena}
+              onChange={(e) => setForm({ ...form, cadena: e.target.value })}
+              placeholder="Host=...;Port=5432;Database=...;Username=...;Password=...;SSL Mode=Require"
+            />
+          </Campo>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={onProbar}
+            disabled={cargando !== null}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50"
+          >
+            {cargando === "probar" ? <Loader2 size={15} className="animate-spin" /> : null}
+            Probar conexión
+          </button>
+          <button
+            onClick={onGuardar}
+            disabled={cargando !== null}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {cargando === "guardar" ? <Loader2 size={15} className="animate-spin" /> : null}
+            Guardar
+          </button>
+        </div>
+
+        {prueba && (
+          <Resultado
+            ok={prueba.ok}
+            texto={
+              prueba.ok
+                ? `Conexión exitosa${prueba.version ? ` · PostgreSQL ${prueba.version}` : ""}.`
+                : prueba.mensaje ?? "Falló la conexión."
+            }
+          />
+        )}
+        {guardado && <Resultado ok={guardado.ok} texto={guardado.mensaje} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BotonModo({
+  activo,
+  onClick,
+  label,
+}: {
+  activo: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+        activo
+          ? "border-primary bg-primary/5 text-primary"
+          : "border-border text-muted-foreground hover:bg-muted"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function Campo({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function Resultado({ ok, texto }: { ok: boolean; texto: string }) {
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-lg border p-3 text-xs text-foreground ${
+        ok ? "border-green-500/40 bg-green-500/10" : "border-red-500/40 bg-red-500/10"
+      }`}
+    >
+      {ok ? (
+        <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-green-600" />
+      ) : (
+        <XCircle size={14} className="mt-0.5 shrink-0 text-red-600" />
+      )}
+      <span>{texto}</span>
     </div>
   );
 }

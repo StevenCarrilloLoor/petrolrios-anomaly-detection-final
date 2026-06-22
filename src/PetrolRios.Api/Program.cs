@@ -33,10 +33,18 @@ try
 
     // Capas de la aplicación (Clean Architecture)
     builder.Services.AddApplication();
-    builder.Services.AddInfrastructure(
-        builder.Configuration.GetConnectionString("PostgreSQL")
-        ?? throw new InvalidOperationException("Falta ConnectionStrings:PostgreSQL en la configuración."),
-        builder.Configuration);
+
+    // Conexión a PostgreSQL flexible y editable sin recompilar: la resuelve ConexionStore con
+    // prioridad variable de entorno › config/connection.json › appsettings. La base puede vivir
+    // en cualquier máquina o sistema operativo; el central solo necesita la cadena.
+    var configDir = Path.Combine(builder.Environment.ContentRootPath, "config");
+    var conexionStore = new PetrolRios.Infrastructure.Configuracion.ConexionStore(configDir, builder.Configuration);
+    var connectionString = conexionStore.ResolverActiva()
+        ?? throw new InvalidOperationException(
+            "Falta la conexión a PostgreSQL. Configúrela por variable de entorno ConnectionStrings__PostgreSQL, " +
+            "el archivo config/connection.json (Ajustes → Conexión a la base) o appsettings.");
+    builder.Services.AddInfrastructure(connectionString, builder.Configuration);
+    builder.Services.AddSingleton<PetrolRios.Application.Interfaces.IConexionStore>(conexionStore);
     builder.Services.AddDetectors();
 
     // JWT Authentication
@@ -137,9 +145,9 @@ try
     builder.Services.AddSignalR();
 
     // Hangfire con PostgreSQL storage
+    // Hangfire usa su propia conexión si se define; si no, la misma conexión central ya resuelta.
     var hangfireCs = builder.Configuration.GetConnectionString("Hangfire")
-        ?? builder.Configuration.GetConnectionString("PostgreSQL")
-        ?? throw new InvalidOperationException("Falta ConnectionStrings:Hangfire en la configuración.");
+        ?? connectionString;
     builder.Services.AddHangfire(config => config
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
         .UseSimpleAssemblyNameTypeSerializer()

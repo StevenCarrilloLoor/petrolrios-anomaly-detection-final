@@ -82,3 +82,7 @@ agent-config.json
 
 # Secretos locales (SMTP/App Password) — nunca al repo
 **/appsettings.Secrets.json
+
+# Conexión a la base persistida desde Ajustes (puede contener credenciales) — nunca al repo
+**/config/connection.json
+connection.json
