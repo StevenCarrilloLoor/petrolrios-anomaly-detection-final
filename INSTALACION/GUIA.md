@@ -149,11 +149,23 @@ No se "daña" nada y todo vuelve solo, **si quedó instalado como servicio**:
 
 # PARTE E — Actualizar (sin reinstalar en cada estación)
 
-- **Central:** en el servidor, trae el código nuevo y corre:
+- **Central — desde el propio servidor:** trae el código nuevo y corre:
   ```bash
+  git pull
   docker compose -f docker-compose.prod.yml up -d --build
   ```
   Reconstruye y reinicia, conservando la base. Es **un solo lugar**.
+
+- **Central — de forma REMOTA (desde tu computadora):** no necesitas ir al servidor. Desde tu PC,
+  con tus cambios ya commiteados, ejecuta:
+  - **Windows:** `INSTALACION\actualizar-central.ps1` (o `powershell -File ...`)
+  - **Linux/macOS:** `./INSTALACION/actualizar-central.sh`
+
+  La primera vez te pregunta el **servidor SSH** (`usuario@ip-o-dominio`) y la **ruta** del proyecto
+  allá (lo guarda para la próxima). Entonces: sube tus commits a GitHub, entra por **SSH** al
+  servidor, hace `git pull` y reconstruye el central con Docker — todo desde tu máquina. La base se
+  conserva. (Requisito: que el servidor tenga **SSH** accesible: en la misma red, por VPN/túnel, o
+  con IP pública. En un servidor Windows, habilita **OpenSSH Server**.)
 - **Agentes y monitores (las 10 estaciones, sin visitarlas):** publicas **una** versión nueva y
   cada estación la baja sola, verifica el checksum, intercambia su ejecutable y reinicia su servicio.
   Pasos: sube `<Version>` en `Directory.Build.props`, corre `publicar.bat`, y publica el

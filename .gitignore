@@ -86,3 +86,6 @@ agent-config.json
 # Conexión a la base persistida desde Ajustes (puede contener credenciales) — nunca al repo
 **/config/connection.json
 connection.json
+
+# Config del deploy remoto (servidor SSH, ruta) — local de cada quien
+INSTALACION/.deploy.config
