@@ -73,6 +73,10 @@ public sealed class EstacionesController : ControllerBase
             return BadRequest(new { mensaje = "El código de estación es obligatorio." });
         if (string.IsNullOrWhiteSpace(request.Nombre))
             return BadRequest(new { mensaje = "El nombre de la estación es obligatorio." });
+        // Misma política que el login (mínimo 6): si no, el usuario-agente quedaría inservible
+        // (se crearía pero el login lo rechazaría y el agente nunca podría autenticarse).
+        if (!string.IsNullOrWhiteSpace(request.PasswordAgente) && request.PasswordAgente.Trim().Length < 6)
+            return BadRequest(new { mensaje = "La contraseña del agente debe tener al menos 6 caracteres (si no, el agente no podrá iniciar sesión)." });
         if (await _dbContext.Estaciones.AnyAsync(e => e.Codigo == codigo, ct))
             return Conflict(new { mensaje = $"Ya existe una estación con código '{codigo}'." });
 

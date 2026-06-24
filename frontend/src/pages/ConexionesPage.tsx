@@ -727,6 +727,11 @@ function CrearEstacionModal({
               <button
                 onClick={() => {
                   setError(null);
+                  const pwd = form.passwordAgente.trim();
+                  if (pwd && pwd.length < 6) {
+                    setError("La contraseña del agente debe tener al menos 6 caracteres (si no, el agente no podrá iniciar sesión).");
+                    return;
+                  }
                   mutation.mutate();
                 }}
                 disabled={!form.codigo.trim() || !form.nombre.trim() || mutation.isPending}
