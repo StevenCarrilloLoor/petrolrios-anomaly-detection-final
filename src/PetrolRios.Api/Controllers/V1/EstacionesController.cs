@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.Estaciones;
+using PetrolRios.Application.DTOs.Usuarios;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Domain.Entities;
 using PetrolRios.Infrastructure.Persistence;
 
 namespace PetrolRios.Api.Controllers.V1;
@@ -20,11 +22,14 @@ public sealed class EstacionesController : ControllerBase
 {
     private readonly PetrolRiosDbContext _dbContext;
     private readonly ILogService _logService;
+    private readonly IUsuarioService _usuarioService;
 
-    public EstacionesController(PetrolRiosDbContext dbContext, ILogService logService)
+    public EstacionesController(
+        PetrolRiosDbContext dbContext, ILogService logService, IUsuarioService usuarioService)
     {
         _dbContext = dbContext;
         _logService = logService;
+        _usuarioService = usuarioService;
     }
 
     /// <summary>Listar todas las estaciones registradas.</summary>
@@ -51,6 +56,84 @@ public sealed class EstacionesController : ControllerBase
             .ToListAsync(ct);
         return Ok(estaciones);
     }
+
+    /// <summary>
+    /// Alta de una estación nueva CON su usuario-agente. El sistema NO está limitado a 10 estaciones;
+    /// esto permite escalar a más. Crea la estación y su cuenta de servicio (rol Agente, ligada a la
+    /// estación) y devuelve sus credenciales UNA sola vez para configurar el agente de esa estación.
+    /// </summary>
+    [HttpPost]
+    [Authorize(Roles = "Administrador")]
+    [ProducesResponseType(typeof(ProvisionarEstacionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Crear([FromBody] CrearEstacionRequest request, CancellationToken ct)
+    {
+        var codigo = (request.Codigo ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(codigo))
+            return BadRequest(new { mensaje = "El código de estación es obligatorio." });
+        if (string.IsNullOrWhiteSpace(request.Nombre))
+            return BadRequest(new { mensaje = "El nombre de la estación es obligatorio." });
+        if (await _dbContext.Estaciones.AnyAsync(e => e.Codigo == codigo, ct))
+            return Conflict(new { mensaje = $"Ya existe una estación con código '{codigo}'." });
+
+        // 1) Crear la estación.
+        var estacion = Estacion.Create(
+            request.Nombre.Trim(),
+            codigo,
+            string.IsNullOrWhiteSpace(request.Direccion) ? "(pendiente de completar)" : request.Direccion!.Trim(),
+            string.IsNullOrWhiteSpace(request.Zona) ? null : request.Zona!.Trim());
+        await _dbContext.Estaciones.AddAsync(estacion, ct);
+        await _dbContext.SaveChangesAsync(ct);
+
+        // 2) Crear su usuario-agente (rol Agente — SIN acceso a la app central) reutilizando UsuarioService.
+        var email = $"agent-{codigo.ToLowerInvariant()}@petrolrios.com";
+        var password = string.IsNullOrWhiteSpace(request.PasswordAgente)
+            ? GenerarPassword()
+            : request.PasswordAgente!.Trim();
+        var agenteRolId = await _dbContext.Roles
+            .Where(r => r.Nombre == "Agente").Select(r => r.Id).FirstOrDefaultAsync(ct);
+
+        var agenteCreado = false;
+        if (agenteRolId > 0 && !await _dbContext.Usuarios.AnyAsync(u => u.Email == email, ct))
+        {
+            await _usuarioService.CreateAsync(
+                new CrearUsuarioRequest(email, $"Agente Estacion {codigo}", password, agenteRolId, estacion.Id), ct);
+            agenteCreado = true;
+        }
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Creación de estación", "Estacion", estacion.Id,
+            new { estacion.Codigo, estacion.Nombre, AgenteEmail = email }, ct: ct);
+
+        return CreatedAtAction(nameof(GetAll), new ProvisionarEstacionResponse(
+            MapToResponse(estacion), email, agenteCreado ? password : null, agenteCreado));
+    }
+
+    /// <summary>Contraseña aleatoria legible para el usuario-agente (se muestra una sola vez).</summary>
+    private static string GenerarPassword()
+    {
+        const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        var bytes = new byte[12];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+        var sb = new System.Text.StringBuilder("Ag-");
+        foreach (var b in bytes) sb.Append(chars[b % chars.Length]);
+        return sb.ToString();
+    }
+
+    private static EstacionResponse MapToResponse(Estacion e) => new()
+    {
+        Id = e.Id,
+        Codigo = e.Codigo,
+        Nombre = e.Nombre,
+        Direccion = e.Direccion,
+        Zona = e.Zona,
+        Activa = e.Activa,
+        UltimoHeartbeat = e.UltimoHeartbeat,
+        VersionAgente = e.VersionAgente,
+        HoraApertura = e.HoraApertura.ToString("HH:mm"),
+        HoraCierre = e.HoraCierre.ToString("HH:mm"),
+        CorreoContacto = e.CorreoContacto
+    };
 
     /// <summary>Actualizar nombre, dirección y zona de una estación.</summary>
     [HttpPut("{id:int}")]

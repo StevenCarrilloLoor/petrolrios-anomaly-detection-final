@@ -30,3 +30,25 @@ public sealed record EliminarEstacionResponse(
     bool Eliminada,
     bool Desactivada,
     string Mensaje);
+
+/// <summary>
+/// Alta de una estación nueva. Además de la estación, crea su usuario-agente
+/// (<c>agent-{codigo}@petrolrios.com</c>, rol Auditor, ligado a la estación) para que el
+/// agente de campo pueda autenticarse. Si <c>PasswordAgente</c> viene vacía, se genera una.
+/// </summary>
+public sealed record CrearEstacionRequest(
+    string Codigo,
+    string Nombre,
+    string? Zona = null,
+    string? Direccion = null,
+    string? PasswordAgente = null);
+
+/// <summary>
+/// Resultado del alta: la estación creada y las credenciales del usuario-agente. La contraseña
+/// se devuelve EN CLARO una sola vez (al crearse) para configurarla en el agente de esa estación.
+/// </summary>
+public sealed record ProvisionarEstacionResponse(
+    EstacionResponse Estacion,
+    string AgenteEmail,
+    string? AgentePassword,
+    bool AgenteCreado);

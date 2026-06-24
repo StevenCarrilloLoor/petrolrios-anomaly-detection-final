@@ -48,11 +48,13 @@ public sealed class UsuarioService : IUsuarioService
         var existente = await _unitOfWork.Usuarios.GetByEmailAsync(request.Email, ct);
         if (existente is not null)
             throw new InvalidOperationException($"Ya existe un usuario con email '{request.Email}'.");
-        await ValidarEstacionAsync(request.EstacionId, ct);
+
+        // Estación: por código de estación NUEVA (se crea si no existe, escala a >10) o por EstacionId existente.
+        var estacionId = await ResolverEstacionAsync(request.EstacionId, request.CodigoEstacionNueva, ct);
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
         var usuario = Usuario.Create(request.Email, request.NombreCompleto, passwordHash, request.RolId);
-        usuario.AsignarEstacion(request.EstacionId);
+        usuario.AsignarEstacion(estacionId);
 
         // El Administrador da de alta y avala las cuentas (sistema interno), así que el correo queda
         // verificado de una vez y el usuario puede iniciar sesión sin fricción. Solo si la
@@ -165,6 +167,30 @@ public sealed class UsuarioService : IUsuarioService
             .AnyAsync(e => e.Id == estacionId.Value && e.Activa, ct);
         if (!existe)
             throw new ArgumentException($"La estación {estacionId.Value} no existe o está inactiva.");
+    }
+
+    /// <summary>
+    /// Determina la estación a asignar a un usuario: si se indica un código de estación NUEVA, la
+    /// busca y la crea si no existe (permite escalar a más de 10 estaciones desde el alta de usuarios);
+    /// si no, valida y usa el <paramref name="estacionId"/> indicado.
+    /// </summary>
+    private async Task<int?> ResolverEstacionAsync(int? estacionId, string? codigoNuevo, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(codigoNuevo))
+        {
+            var codigo = codigoNuevo.Trim().ToUpperInvariant();
+            var est = await _dbContext.Estaciones.FirstOrDefaultAsync(e => e.Codigo == codigo, ct);
+            if (est is null)
+            {
+                est = Estacion.Create($"Estación {codigo}", codigo, "(pendiente de completar)", null);
+                await _dbContext.Estaciones.AddAsync(est, ct);
+                await _dbContext.SaveChangesAsync(ct);
+            }
+            return est.Id;
+        }
+
+        await ValidarEstacionAsync(estacionId, ct);
+        return estacionId;
     }
 
     private static UsuarioResponse MapToResponse(Usuario u) => new()

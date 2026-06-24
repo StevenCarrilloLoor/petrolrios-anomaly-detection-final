@@ -19,7 +19,13 @@ public sealed record CrearUsuarioRequest(
     string NombreCompleto,
     string Password,
     int RolId,
-    int? EstacionId = null);
+    int? EstacionId = null,
+    /// <summary>
+    /// Código de una estación NUEVA a crear y asignar en el momento (p. ej. "EST-011"). Si se
+    /// indica y la estación no existe, se crea; tiene prioridad sobre <see cref="EstacionId"/>.
+    /// Permite escalar a más estaciones desde el alta de usuarios sin un paso previo.
+    /// </summary>
+    string? CodigoEstacionNueva = null);
 
 public sealed record ActualizarUsuarioRequest(
     string? NombreCompleto,

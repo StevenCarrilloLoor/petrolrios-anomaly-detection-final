@@ -30,6 +30,7 @@ public static class SeedData
         // Pasos idempotentes: aplican también sobre bases ya sembradas
         await EnsureReglasNuevasAsync(context);
         await EnsureUsuariosDemoAsync(context);
+        await EnsureRolAgenteAsync(context);
         await EnsureAgentUsersStationAssignmentAsync(context);
         await EnsureCuentasAccesoAsync(context, config);
 
@@ -97,6 +98,33 @@ public static class SeedData
             if (agente is not null && agente.EstacionId != estacion.Id)
                 agente.AsignarEstacion(estacion.Id);
         }
+    }
+
+    /// <summary>
+    /// Asegura el rol "Agente" (cuenta de servicio del Station Agent, SIN acceso a la app central) y
+    /// re-asigna a ese rol las cuentas de agente (agent-*) que vinieran con otro rol (antes Auditor).
+    /// Idempotente: corre en cada arranque para corregir bases ya existentes — defensa en profundidad:
+    /// un agente nunca debe poder entrar al central como auditor.
+    /// </summary>
+    private static async Task EnsureRolAgenteAsync(PetrolRiosDbContext context)
+    {
+        var agenteRol = await context.Roles.FirstOrDefaultAsync(r => r.Nombre == "Agente");
+        if (agenteRol is null)
+        {
+            agenteRol = Rol.Create(
+                "Agente",
+                "Agente de estacion - cuenta de servicio del Station Agent: solo conecta y envia datos, SIN acceso a la app central");
+            await context.Roles.AddAsync(agenteRol);
+            await context.SaveChangesAsync();
+        }
+
+        var agentes = await context.Usuarios
+            .Where(u => u.Email.StartsWith("agent-") && u.RolId != agenteRol.Id)
+            .ToListAsync();
+        foreach (var a in agentes)
+            a.ActualizarPerfil(null, agenteRol.Id);
+        if (agentes.Count > 0)
+            await context.SaveChangesAsync();
     }
 
     /// <summary>
@@ -247,7 +275,8 @@ public static class SeedData
         {
             Rol.Create("Auditor", "Auditor interno - revisa alertas y documenta hallazgos"),
             Rol.Create("Supervisor", "Supervisor de auditoría - asigna casos, configura umbrales, genera reportes"),
-            Rol.Create("Administrador", "Administrador del sistema - gestiona usuarios, roles y configuración")
+            Rol.Create("Administrador", "Administrador del sistema - gestiona usuarios, roles y configuración"),
+            Rol.Create("Agente", "Agente de estacion - cuenta de servicio del Station Agent: solo conecta y envia datos, SIN acceso a la app central")
         };
         await context.Roles.AddRangeAsync(roles);
         await context.SaveChangesAsync();
@@ -432,8 +461,9 @@ public static class SeedData
 
     private static async Task SeedAgentUsersAsync(PetrolRiosDbContext context)
     {
-        // Usuarios tipo Auditor para los Station Agents (1 por estacion)
-        var auditorRol = await context.Roles.FirstAsync(r => r.Nombre == "Auditor");
+        // Cuentas de servicio tipo Agente para los Station Agents (1 por estacion).
+        // Rol "Agente": solo ingesta/heartbeat; SIN acceso a la app central (lo bloquea la politica Central).
+        var agenteRol = await context.Roles.FirstAsync(r => r.Nombre == "Agente");
         var estaciones = await context.Estaciones.ToListAsync();
 
         foreach (var est in estaciones)
@@ -443,7 +473,7 @@ public static class SeedData
                 email,
                 $"Agente Estacion {est.Codigo}",
                 BCrypt.Net.BCrypt.HashPassword("Agent123!"),
-                auditorRol.Id);
+                agenteRol.Id);
             agent.AsignarEstacion(est.Id);
             agent.MarcarEmailVerificado(); // cuenta de servicio del agente
             await context.Usuarios.AddAsync(agent);

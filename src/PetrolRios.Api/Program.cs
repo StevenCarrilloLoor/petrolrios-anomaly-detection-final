@@ -113,8 +113,11 @@ try
         options.AddPolicy("Central", policy =>
         {
             policy.RequireAuthenticatedUser();
+            // Defensa en profundidad: ni las cuentas ligadas a una estación (claim EstacionId) ni el
+            // rol "Agente" (cuenta de servicio del Station Agent) pueden entrar a la app central.
             policy.RequireAssertion(context =>
-                !context.User.HasClaim(c => c.Type == PetrolRiosClaimTypes.EstacionId));
+                !context.User.HasClaim(c => c.Type == PetrolRiosClaimTypes.EstacionId)
+                && !context.User.IsInRole("Agente"));
         });
     });
 
