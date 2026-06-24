@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 19 de junio de 2026.
+Última actualización: 24 de junio de 2026.
 
 ---
 
@@ -121,3 +121,35 @@ De auditoría/fraude (carril Auditoría → central):
 - [x] **Pruebas rigurosas en Chrome (19-jun-2026):** central, formulario usuario↔estación,
   problemas globales, Station Agent, fuente dinámica sincronizada y Monitor de estación con
   actualización automática al insertar una alerta nueva.
+
+---
+
+## Actualización (24 de junio de 2026) — preparación de producción
+
+**Hecho y commiteado:**
+- [x] **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado`
+  sincronizado por el agente desde Firebird (`VEND`/`EMPL`), `IEmpleadoDirectorio` resuelve
+  `(estación, código) → nombre` en alertas, dashboard y reportes, sin tocar las 25 reglas.
+  Datos demo coheridos (`VEND` con códigos reales de 3 caracteres). *(CAMBIOS §43–44)*
+- [x] **Escalabilidad real >10 estaciones:** alta de estación + usuario-agente de **dos formas**
+  (botón "Nueva estación" con modal de credenciales, y código de estación nuevo desde "Nuevo
+  Usuario"). El sistema ya no está amarrado a 10 estaciones fijas. *(CAMBIOS §45)*
+- [x] **Rol "Agente" propio (seguridad):** los agentes dejaron de usar el rol Auditor; nuevo rol
+  `Agente` sin acceso a la app central (política "Central" lo excluye). Repunte idempotente de los
+  `agent-*` existentes (Auditor→Agente). *(CAMBIOS §45)*
+- [x] **Robustez del agente y del gate:** contador de enviadas cuenta los reenvíos del
+  store-and-forward; guardado del panel endurecido (`/api/fuentes`, errores visibles);
+  `verificar-mejoras.bat` detiene servicios, asegura `dotnet-ef` y muestra progreso en vivo.
+  *(CAMBIOS §46)*
+- [x] **Validación de contraseña del agente (≥6) al crear estación** (frontend + backend) — antes
+  dejaba crear un agente con clave que el login luego rechazaba. Prueba E2E **EST-777** en Chrome:
+  rechazo de `1234`, creación con `123456`, agente conectado (Autenticado 182 ms, 2 transacciones
+  enviadas, fuentes Sincronizada). *(CAMBIOS §47)*
+- [x] **Dist del agente republicado** (v2.3.0) desde el código actual, listo para instalar por estación.
+
+**Pendiente real (sin cambios):**
+- [ ] Watermark por ID monotónico + ventana de solapamiento (punto ciego de fecha).
+- [ ] Prueba física en otra PC de estación con el instalador publicado y la red real.
+- [ ] Despliegue productivo con TLS/HTTPS y secretos definitivos.
+- [ ] Republicar dist del **Servidor** y **Monitor** antes del go-live (`ejecutables\4-PUBLICACION\publicar.bat`).
+- [ ] Revisión de seguridad final sin huecos.

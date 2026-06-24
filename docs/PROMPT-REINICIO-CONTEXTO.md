@@ -19,7 +19,10 @@ Eres mi compañero de ingeniería en mi **proyecto de tesis** PetrolRíos. Traba
   detente a preguntarme cuando yo lo pedí explícitamente (p. ej. antes de un refactor grande).
 - **Agrupa cambios pequeños** para no repetir el ciclo de verificación por cada uno.
 - Si encuentras **bugs**, arréglalos.
-- Documenta lo que agregas/quitas en `CAMBIOS.md`.
+- **Actualiza SIEMPRE la documentación de contexto legado con CADA cambio** (no solo al final):
+  `CAMBIOS.md` (bitácora con sección numerada + commits + verificación), `docs/PENDIENTES.md`
+  (marcar hecho / agregar lo nuevo + fecha) y este mismo `docs/PROMPT-REINICIO-CONTEXTO.md`
+  (estado actual, sección 6). Así, si el contexto se compacta, el siguiente arranque no pierde el hilo.
 
 ## 2. Primero, reconstruye el contexto (ANTES de cualquier cambio)
 
@@ -75,6 +78,12 @@ de servicio (cada una con un Firebird `CONTAC.FDB` en **solo lectura**). Tres ap
 **Auditoría** (fraude → bandeja del central). El carril de cada regla del motor **ya es editable**
 (propiedad `Ambito` en `ReglaDeteccion`; los detectores la respetan).
 
+**Roles (RBAC):** `Administrador`, `Supervisor`, `Auditor` (personas que usan la app central) y
+**`Agente`** (cuenta de servicio de cada estación — usuarios `agent-*` que SOLO envían datos; la
+política "Central" los excluye, no pueden entrar al dashboard/bandeja). **Escalable a >10 estaciones:**
+el Administrador da de alta una estación + su usuario-agente desde "Nueva estación" (modal con
+credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente corre v2.3.0.
+
 ## 5. Mis credenciales y los permisos que te doy
 
 - **admin@petrolrios.com / Oportunidad1234** (Administrador).
@@ -86,7 +95,25 @@ de servicio (cada una con un Firebird `CONTAC.FDB` en **solo lectura**). Tres ap
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Hecho y commiteado:**
+**Última ronda — preparación de producción (24-jun-2026), commiteado:**
+- **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado` que el
+  agente sincroniza desde Firebird (`VEND`/`EMPL`); `IEmpleadoDirectorio` resuelve `(estación,código)→
+  nombre` en alertas, dashboard y reportes, sin tocar las 25 reglas. *(CAMBIOS §43–44)*
+- **Escalabilidad >10 estaciones + rol `Agente`** propio (seguridad): alta de estación + usuario-agente
+  desde "Nueva estación" (modal con credenciales) y desde "Nuevo Usuario" (código nuevo). Los `agent-*`
+  ya NO son Auditor; la política "Central" excluye al rol Agente. *(CAMBIOS §45, commits `2d3d12a`,`bf8782a`)*
+- **Robustez del agente y del gate:** el contador de enviadas cuenta los reenvíos; guardado del panel
+  endurecido; `verificar-mejoras.bat` detiene servicios, asegura `dotnet-ef` y muestra progreso en vivo.
+  *(CAMBIOS §46, commits `a50a79f`,`e4146c7`)*
+- **Validación de contraseña del agente (≥6)** al crear estación (front+back). Prueba E2E **EST-777**
+  en Chrome: rechazo de `1234`, creación con `123456`, agente conectado (182 ms, 2 enviadas,
+  Sincronizada). *(CAMBIOS §47, commit `c66fb56`)*
+- **Conteos de pruebas actuales:** Domain 40, Detectors 119, Monitor 2, Api 53 (+16 de integración
+  saltadas sin Docker). Cobertura de `PetrolRios.Detectors` ≈ 96% líneas (OE5). Agente v2.3.0.
+- **Pendiente para go-live:** republicar dist del Servidor y Monitor; prueba física en otra PC con la
+  red real; TLS/HTTPS + secretos definitivos; watermark por ID monotónico. (Ver `docs/PENDIENTES.md`.)
+
+**Hecho y commiteado (rondas previas):**
 - 5 etapas previas: arreglo de login/correo/verificación; sacar alertas operativas de la bandeja de
   auditoría; separar Reglas y Fuentes de datos + rediseño; página de Ajustes (QOL); rediseño del Monitor.
 - Función de **desbloqueo de cuenta** por autoservicio desde el login (con demo en vivo end-to-end).

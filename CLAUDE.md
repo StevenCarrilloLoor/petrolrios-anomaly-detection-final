@@ -118,6 +118,23 @@ PetrolRios.sln
 - **Nombres:** `PascalCase` para clases/tipos, `camelCase` para variables/métodos,
   `SCREAMING_SNAKE_CASE` para constantes.
 
+## Mantenimiento de documentación (contexto legado — OBLIGATORIO)
+
+Con **CADA** cambio que se agregue, modifique o elimine (no solo al final de una sesión), actualiza la
+documentación de contexto legado para que, si la conversación se compacta, el siguiente arranque no
+pierda el hilo:
+
+1. **`CAMBIOS.md`** — añade una sección numerada nueva (motivación, qué se hizo, **verificación** y los
+   hashes de commit). Es la bitácora oficial del proyecto.
+2. **`docs/PENDIENTES.md`** — marca lo hecho, agrega lo nuevo que quede pendiente y actualiza la fecha
+   de "Última actualización".
+3. **`docs/PROMPT-REINICIO-CONTEXTO.md`** — actualiza la sección 6 "Estado actual del trabajo" (commits
+   recientes, conteos de pruebas, versión del agente).
+
+Mantén también al día los docs que dependan del cambio (`README.md`, `INSTALACION.md`,
+`ejecutables/LEEME.md`, etc.) cuando el cambio los afecte. La tesis (`docs/Tesis.md`) está
+**desactualizada y NO se edita**: el código es la fuente de verdad.
+
 ## Lo que NO debes hacer
 
 - No uses Machine Learning — la tesis explícitamente lo excluye (L02).

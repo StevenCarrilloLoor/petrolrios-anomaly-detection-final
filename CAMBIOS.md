@@ -1206,3 +1206,82 @@ de las alertas y la estructura/contenido real de `VEND` (Firebird) — confirman
 despachos rápidos, *Washington Bravo (008)* en venta sin placa, etc. — las 11 alertas con su nombre.
 En producción los `COD_VEND` reales ya coinciden con `VEND`, por lo que esto solo corrige el set de
 demostración.
+
+---
+
+## 45. Escalabilidad real: alta de estaciones (>10) + rol "Agente" propio (seguridad)
+
+**Motivación.** El sistema no debe quedar amarrado a 10 estaciones fijas: PetrolRíos puede crecer.
+Además se detectó un riesgo de seguridad: los usuarios-agente de estación usaban el rol **Auditor**,
+lo que les habría permitido entrar a la aplicación central. Un agente es una **cuenta de servicio**,
+no una persona — debe tener su propio rol sin acceso al sistema de auditoría.
+
+**Alta de estación de dos formas (ambas pedidas por el usuario):**
+- **Botón "Nueva estación"** (solo Administrador) en la página de Conexiones: un modal crea la
+  estación **y** su usuario-agente de una sola vez y muestra las credenciales **una única vez** para
+  configurar el agente de esa estación. Endpoint `POST /api/v1/estaciones`
+  (`CrearEstacionRequest` → `ProvisionarEstacionResponse` con email y contraseña del agente). Si no se
+  indica contraseña, se genera una aleatoria legible (`GenerarPassword`, prefijo `Ag-`).
+- **Desde "Nuevo Usuario":** el formulario acepta un **código de estación nuevo**
+  (`CodigoEstacionNueva`); `UsuarioService.CreateAsync` hace *find-or-create* de la estación por
+  código (`ResolverEstacionAsync`). Así se crean el agente y su estación en un solo paso.
+
+**Rol "Agente" separado (seguridad):**
+- Nuevo rol **`Agente`** sembrado en `SeedData` (`SeedRolesAsync`); los usuarios `agent-*` se crean
+  con este rol, no con Auditor.
+- **Repunte idempotente** (`EnsureRolAgenteAsync`): en bases ya existentes crea el rol si falta y
+  **reapunta todos los `agent-*` de Auditor→Agente** (`ActualizarPerfil(null, agenteRol.Id)`).
+  Verificado en vivo: 10 agentes migrados, rol Agente creado (Id 4).
+- **La política "Central"** (la que protege la app de auditoría) ahora excluye al rol Agente además
+  de a quien tenga claim `EstacionId`: `!HasClaim(EstacionId) && !IsInRole("Agente")`. Un agente puede
+  autenticarse para enviar datos, pero **no** puede entrar al dashboard ni a la bandeja central.
+
+**Verificación.** Build Release 0/0; gate completo en verde (Domain 40, Detectors 119, Monitor 2,
+Api 53 + 16 de integración saltadas sin Docker; EF sin cambios pendientes; lint y build de frontend
+limpios). E2E en Chrome: se creó una estación con su agente, las credenciales se mostraron una sola
+vez, y el rol del agente quedó como `Agente`. *(commits `2d3d12a`, `bf8782a`)*
+
+---
+
+## 46. Robustez del agente y del gate de pruebas
+
+Tres correcciones encontradas al preparar producción:
+
+- **El contador "transacciones enviadas" no contaba los reenvíos.** Al reenviar lotes pendientes del
+  store-and-forward, el total del panel no se incrementaba. `CycleRunner`: tras
+  `RetrySendPendingBatchesAsync`, si se enviaron pendientes se suman a `TotalTransaccionesEnviadas`.
+  (No era un bug de duplicación de alertas — se confirmó que las filas eran genuinamente distintas;
+  solo el contador estaba mal.)
+- **Guardado del panel del agente endurecido.** `guardarFuentes` apuntaba al endpoint equivocado;
+  ahora usa `/api/fuentes`. El guardado de configuración mueve la construcción del payload **dentro**
+  del `try` y muestra mensajes de error visibles si algo falla (antes "no parecía guardar" sin avisar).
+- **Gate de verificación arreglado** (`scripts/verificar-mejoras.bat`): (1) detiene los servicios
+  antes de compilar (`taskkill` de Api/Agent/Monitor) — sin esto el build fallaba con `MSB3027`;
+  (2) asegura la herramienta `dotnet-ef` (`|| dotnet tool install`) — en frío el chequeo de migración
+  fallaba; (3) reescrito para mostrar el **progreso en vivo, paso a paso**, con `pause` al final, en
+  vez de redirigir todo a un log y dejar la ventana "en negro" hasta el final.
+
+**Verificación.** Gate ejecutado de punta a punta en verde tras los cambios; panel del agente
+guardando fuentes y configuración con confirmación visible; dist del agente republicado (v2.3.0).
+*(commits `a50a79f`, `e4146c7`)*
+
+---
+
+## 47. Validación de contraseña del agente al crear estación + prueba E2E (EST-777)
+
+**Bug detectado por el usuario.** Al crear una estación con contraseña `1234`, el sistema la
+**aceptaba sin avisar**, pero el login exige mínimo 6 caracteres (`LoginRequestValidator`), así que el
+usuario-agente quedaba **inservible**: creado, pero incapaz de autenticarse.
+
+**Arreglo (frontend + backend, misma política que el login):**
+- **Backend** (`EstacionesController.Crear`): rechaza con 400 y mensaje claro si `PasswordAgente`
+  tiene menos de 6 caracteres, antes de crear nada.
+- **Frontend** (`CrearEstacionModal` en `ConexionesPage`): valida en el `onClick` y muestra el error
+  en rojo sin llamar a la API.
+
+**Prueba E2E en Chrome (EST-777).** Se intentó crear `EST-777` con `1234` → el modal lo **rechazó**
+con "La contraseña del agente debe tener al menos 6 caracteres…" (bug confirmado y corregido). Se creó
+con `123456` → credenciales mostradas (`agent-est-777@petrolrios.com`) → login OK (rol **Agente**) →
+se configuró el agente a EST-777 → **Autenticado en 182 ms**, **2 transacciones enviadas**,
+0 pendientes, fuentes ANUL/TANQ_REPO **Sincronizada**. Flujo Firebird→agente→central probado de punta
+a punta con una estación nueva. *(commit `c66fb56`)*
