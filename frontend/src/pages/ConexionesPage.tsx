@@ -21,8 +21,11 @@ import {
   Save,
   X,
   Users,
+  Plus,
+  KeyRound,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import type { ProvisionarEstacionResponse } from "@/services/estaciones.service";
 
 const REFRESCO_MS = 10_000;
 
@@ -56,6 +59,7 @@ export function ConexionesPage() {
   const [editCorreo, setEditCorreo] = useState("");
   const [editActiva, setEditActiva] = useState(true);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const [showCrear, setShowCrear] = useState(false);
 
   const {
     data: sistema,
@@ -276,6 +280,21 @@ export function ConexionesPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Alta de estación nueva (Administrador): el sistema escala a más de 10 estaciones */}
+      {puedeEliminar && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowCrear(true)}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus size={16} /> Nueva estación
+          </button>
+        </div>
+      )}
+      {showCrear && (
+        <CrearEstacionModal onClose={() => setShowCrear(false)} onCreado={invalidar} />
       )}
 
       {/* Agentes por estación */}
@@ -581,4 +600,144 @@ function formatearMinutos(minutos: number | null): string {
   if (minutos < 60) return `${Math.round(minutos)} min`;
   if (minutos < 1440) return `${Math.floor(minutos / 60)} h ${Math.round(minutos % 60)} min`;
   return `${Math.floor(minutos / 1440)} días`;
+}
+
+/**
+ * Alta de una estación nueva + su usuario-agente. Al crearla, muestra las credenciales del agente
+ * (usuario y contraseña) UNA sola vez, para configurarlas en el Station Agent de esa estación.
+ */
+function CrearEstacionModal({
+  onClose,
+  onCreado,
+}: {
+  onClose: () => void;
+  onCreado: () => void;
+}) {
+  const [form, setForm] = useState({ codigo: "", nombre: "", zona: "", passwordAgente: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<ProvisionarEstacionResponse | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      estacionesService.crear({
+        codigo: form.codigo.trim(),
+        nombre: form.nombre.trim(),
+        zona: form.zona.trim() || null,
+        passwordAgente: form.passwordAgente.trim() || null,
+      }),
+    onSuccess: (r) => {
+      setResultado(r);
+      onCreado();
+    },
+    onError: (e: unknown) => {
+      const d = (e as { response?: { data?: { mensaje?: string } } })?.response?.data?.mensaje;
+      setError(d || "No se pudo crear la estación.");
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-xl">
+        {resultado ? (
+          <>
+            <h3 className="text-lg font-semibold text-foreground">Estación creada</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Configura el agente de <b>{resultado.estacion.codigo}</b> con estas credenciales
+              (se muestran <b>una sola vez</b>):
+            </p>
+            <div className="mt-3 space-y-2 rounded-lg bg-muted/50 p-4 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Usuario (email)</span>
+                <span className="font-mono">{resultado.agenteEmail}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <KeyRound size={13} /> Contraseña
+                </span>
+                <span className="font-mono font-semibold text-foreground">
+                  {resultado.agentePassword ?? "(el usuario ya existía)"}
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={onClose}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Listo
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3 className="text-lg font-semibold text-foreground">Nueva estación</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Crea la estación y su usuario-agente (rol Agente, sin acceso al central) para que el
+              Station Agent de campo pueda conectarse.
+            </p>
+            {error && (
+              <div className="mt-3 rounded-md bg-destructive/10 p-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Código *</label>
+                <input
+                  value={form.codigo}
+                  onChange={(e) => setForm({ ...form, codigo: e.target.value })}
+                  placeholder="EST-011"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Nombre *</label>
+                <input
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  placeholder="Estación …"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Zona</label>
+                <input
+                  value={form.zona}
+                  onChange={(e) => setForm({ ...form, zona: e.target.value })}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Contraseña del agente</label>
+                <input
+                  value={form.passwordAgente}
+                  onChange={(e) => setForm({ ...form, passwordAgente: e.target.value })}
+                  placeholder="(vacío = generar una)"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-3">
+              <button
+                onClick={onClose}
+                className="rounded-md border border-border px-4 py-2 text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setError(null);
+                  mutation.mutate();
+                }}
+                disabled={!form.codigo.trim() || !form.nombre.trim() || mutation.isPending}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {mutation.isPending ? "Creando…" : "Crear estación"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }

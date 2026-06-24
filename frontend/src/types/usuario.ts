@@ -15,6 +15,8 @@ export interface CrearUsuarioRequest {
   password: string;
   rolId: number;
   estacionId?: number | null;
+  /** Código de una estación NUEVA a crear y asignar en el momento (escala a >10 estaciones). */
+  codigoEstacionNueva?: string | null;
 }
 
 export interface ActualizarUsuarioRequest {

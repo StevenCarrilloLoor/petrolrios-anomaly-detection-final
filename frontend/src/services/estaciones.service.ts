@@ -37,6 +37,21 @@ export interface ManifiestoVersionResponse {
   obligatoria: boolean;
 }
 
+export interface CrearEstacionRequest {
+  codigo: string;
+  nombre: string;
+  zona?: string | null;
+  direccion?: string | null;
+  passwordAgente?: string | null;
+}
+
+export interface ProvisionarEstacionResponse {
+  estacion: Omit<EstacionResponse, "enLinea">;
+  agenteEmail: string;
+  agentePassword: string | null;
+  agenteCreado: boolean;
+}
+
 export const estacionesService = {
   getAll: () =>
     api.get<Omit<EstacionResponse, "enLinea">[]>("/estaciones").then((r) => {
@@ -54,6 +69,9 @@ export const estacionesService = {
 
   update: (id: number, data: ActualizarEstacionRequest) =>
     api.put<EstacionResponse>(`/estaciones/${id}`, data).then((r) => r.data),
+
+  crear: (data: CrearEstacionRequest) =>
+    api.post<ProvisionarEstacionResponse>("/estaciones", data).then((r) => r.data),
 
   delete: (id: number) =>
     api.delete<EliminarEstacionResponse>(`/estaciones/${id}`).then((r) => r.data),

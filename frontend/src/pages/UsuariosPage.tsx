@@ -190,14 +190,22 @@ function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
     password: "",
     rolId: 1,
     estacionId: null as number | null,
+    codigoEstacionNueva: "",
   });
   const [confirma, setConfirma] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: () => usuariosService.create(form),
+    mutationFn: () =>
+      usuariosService.create({
+        ...form,
+        // Si se escribió un código de estación nueva, prevalece sobre el desplegable.
+        codigoEstacionNueva: form.codigoEstacionNueva.trim() || null,
+        estacionId: form.codigoEstacionNueva.trim() ? null : form.estacionId,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      void queryClient.invalidateQueries({ queryKey: ["estaciones"] });
       onClose();
     },
     onError: (e: unknown) => {
@@ -311,6 +319,19 @@ function CreateUsuarioForm({ onClose }: { onClose: () => void }) {
           <p className="mt-1 text-xs text-muted-foreground">
             Al asignar una estación, la cuenta solo puede leer sus problemas operativos.
           </p>
+          <input
+            value={form.codigoEstacionNueva}
+            onChange={(e) =>
+              setForm({ ...form, codigoEstacionNueva: e.target.value })
+            }
+            placeholder="o crear estación nueva (código, p. ej. EST-011)"
+            className="mt-2 w-full rounded-md border border-dashed border-border bg-background px-3 py-2 text-sm"
+          />
+          {form.codigoEstacionNueva.trim() && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              Se creará la estación {form.codigoEstacionNueva.trim().toUpperCase()} si no existe.
+            </p>
+          )}
         </div>
       </div>
       <div className="mt-4 flex gap-3">
