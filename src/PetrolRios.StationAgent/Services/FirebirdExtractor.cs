@@ -369,6 +369,28 @@ public sealed class FirebirdExtractor
             .ToList();
     }
 
+    /// <summary>
+    /// Lee el catálogo de empleados/despachadores de Firebird (VEND) para que el central muestre el
+    /// NOMBRE junto al código de la alerta. Toma VEND.NOM_VEND y, si viene vacío, EMPL.NOM_EMPL (vía
+    /// VEND.NUM_EMPL). Solo lectura; tolera que VEND no exista (la excepción la maneja el ciclo).
+    /// </summary>
+    public async Task<IReadOnlyList<EmpleadoAgente>> ObtenerEmpleadosAsync(CancellationToken ct)
+    {
+        using var connection = CreateConnection();
+        const string sql = """
+            SELECT TRIM(v.COD_VEND) AS Codigo,
+                   COALESCE(NULLIF(TRIM(v.NOM_VEND), ''), TRIM(e.NOM_EMPL)) AS Nombre
+            FROM VEND v
+            LEFT JOIN EMPL e ON e.NUM_EMPL = v.NUM_EMPL
+            WHERE TRIM(v.COD_VEND) <> ''
+            """;
+        var filas = await connection.QueryAsync<EmpleadoAgente>(
+            new CommandDefinition(sql, cancellationToken: ct));
+        return filas
+            .Where(e => !string.IsNullOrWhiteSpace(e.Codigo) && !string.IsNullOrWhiteSpace(e.Nombre))
+            .ToList();
+    }
+
     /// <summary>Traduce el código de tipo de Firebird (RDB$FIELD_TYPE) a un nombre legible.</summary>
     private static string MapearTipoFirebird(short? tipo, short? subtipo, short? escala, short? longitud)
     {
@@ -695,3 +717,10 @@ public sealed record ColumnaEsquemaAgente(string Nombre, string Tipo, int Longit
 
 /// <summary>Una tabla con sus columnas, para reportar el esquema al central.</summary>
 public sealed record TablaEsquemaAgente(string Tabla, IReadOnlyList<ColumnaEsquemaAgente> Columnas);
+
+/// <summary>Un empleado/despachador del catálogo de la estación (código → nombre), leído de VEND.</summary>
+public sealed class EmpleadoAgente
+{
+    public string Codigo { get; set; } = string.Empty;
+    public string Nombre { get; set; } = string.Empty;
+}

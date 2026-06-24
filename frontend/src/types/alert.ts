@@ -27,6 +27,7 @@ export interface AlertaResponse {
   score: number;
   fechaDeteccion: string;
   empleadoCodigo: string | null;
+  empleadoNombre: string | null;
   transaccionReferencia: string | null;
   estacionId: number;
   estacionNombre: string;

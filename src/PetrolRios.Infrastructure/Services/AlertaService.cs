@@ -15,11 +15,13 @@ public sealed class AlertaService : IAlertaService
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly PetrolRiosDbContext _dbContext;
+    private readonly IEmpleadoDirectorio _empleados;
 
-    public AlertaService(IUnitOfWork unitOfWork, PetrolRiosDbContext dbContext)
+    public AlertaService(IUnitOfWork unitOfWork, PetrolRiosDbContext dbContext, IEmpleadoDirectorio empleados)
     {
         _unitOfWork = unitOfWork;
         _dbContext = dbContext;
+        _empleados = empleados;
     }
 
     public async Task<PaginatedResponse<AlertaResponse>> GetFilteredAsync(
@@ -38,9 +40,13 @@ public sealed class AlertaService : IAlertaService
             .Where(e => estacionIds.Contains(e.Id))
             .ToDictionaryAsync(e => e.Id, e => e.Nombre, ct);
 
+        // Resolver el nombre del empleado (código → nombre) para mostrarlo junto al código.
+        var empleados = await _empleados.CargarAsync(
+            alertas.Select(a => (a.EstacionId, a.EmpleadoCodigo)), ct);
+
         return new PaginatedResponse<AlertaResponse>
         {
-            Items = alertas.Select(a => MapToResponse(a, estaciones)).ToList(),
+            Items = alertas.Select(a => MapToResponse(a, estaciones, empleados)).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = count
@@ -73,6 +79,9 @@ public sealed class AlertaService : IAlertaService
             .GroupBy(a => a.EstacionId)
             .ToDictionary(g => g.Key, g => g.First().Estacion.Nombre);
 
+        var empleados = await _empleados.CargarAsync(
+            alertas.Select(a => (a.EstacionId, a.EmpleadoCodigo)), ct);
+
         return alertas
             .GroupBy(a => new { a.EstacionId, Fecha = a.FechaDeteccion.Date })
             .Select(g => new ProblemaEstacionGrupo
@@ -81,7 +90,7 @@ public sealed class AlertaService : IAlertaService
                 EstacionNombre = estaciones.GetValueOrDefault(g.Key.EstacionId, ""),
                 Fecha = g.Key.Fecha,
                 Total = g.Count(),
-                Problemas = g.Select(a => MapToResponse(a, estaciones)).ToList()
+                Problemas = g.Select(a => MapToResponse(a, estaciones, empleados)).ToList()
             })
             .OrderByDescending(x => x.Fecha)
             .ThenBy(x => x.EstacionNombre)
@@ -97,7 +106,8 @@ public sealed class AlertaService : IAlertaService
         if (alerta is null) return null;
 
         var estaciones = new Dictionary<int, string> { [alerta.EstacionId] = alerta.Estacion.Nombre };
-        return MapToResponse(alerta, estaciones);
+        var empleados = await _empleados.CargarAsync([(alerta.EstacionId, alerta.EmpleadoCodigo)], ct);
+        return MapToResponse(alerta, estaciones, empleados);
     }
 
     public async Task<AlertaResponse> CambiarEstadoAsync(int id, CambiarEstadoRequest request, CancellationToken ct = default)
@@ -120,7 +130,8 @@ public sealed class AlertaService : IAlertaService
         await _dbContext.SaveChangesAsync(ct);
 
         var estaciones = new Dictionary<int, string> { [alerta.EstacionId] = alerta.Estacion.Nombre };
-        return MapToResponse(alerta, estaciones);
+        var empleados = await _empleados.CargarAsync([(alerta.EstacionId, alerta.EmpleadoCodigo)], ct);
+        return MapToResponse(alerta, estaciones, empleados);
     }
 
     public async Task AsignarAsync(int alertaId, AsignarAlertaRequest request, CancellationToken ct = default)
@@ -183,7 +194,8 @@ public sealed class AlertaService : IAlertaService
         };
     }
 
-    private static AlertaResponse MapToResponse(Alerta a, Dictionary<int, string> estaciones) => new()
+    private static AlertaResponse MapToResponse(
+        Alerta a, Dictionary<int, string> estaciones, DirectorioEmpleados empleados) => new()
     {
         Id = a.Id,
         TipoDetector = a.TipoDetector.ToString(),
@@ -194,6 +206,7 @@ public sealed class AlertaService : IAlertaService
         Score = a.Score,
         FechaDeteccion = a.FechaDeteccion,
         EmpleadoCodigo = a.EmpleadoCodigo,
+        EmpleadoNombre = empleados.Nombre(a.EstacionId, a.EmpleadoCodigo),
         TransaccionReferencia = a.TransaccionReferencia,
         EstacionId = a.EstacionId,
         EstacionNombre = estaciones.GetValueOrDefault(a.EstacionId, ""),

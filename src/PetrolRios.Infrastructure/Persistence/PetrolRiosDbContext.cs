@@ -11,6 +11,7 @@ public class PetrolRiosDbContext : DbContext
     public DbSet<AsignacionAlerta> AsignacionesAlerta => Set<AsignacionAlerta>();
     public DbSet<ComentarioAlerta> ComentariosAlerta => Set<ComentarioAlerta>();
     public DbSet<EjecucionJob> EjecucionesJob => Set<EjecucionJob>();
+    public DbSet<Empleado> Empleados => Set<Empleado>();
     public DbSet<Estacion> Estaciones => Set<Estacion>();
     public DbSet<EstacionWatermark> EstacionWatermarks => Set<EstacionWatermark>();
     public DbSet<EsquemaTabla> EsquemasTabla => Set<EsquemaTabla>();

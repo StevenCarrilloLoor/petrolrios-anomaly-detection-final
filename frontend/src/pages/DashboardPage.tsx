@@ -434,8 +434,17 @@ export function DashboardPage() {
                       key={`${emp.empleadoCodigo}-${emp.estacionNombre}`}
                       className="border-b border-border last:border-0"
                     >
-                      <td className="px-6 py-2.5 font-mono font-medium">
-                        {emp.empleadoCodigo}
+                      <td className="px-6 py-2.5">
+                        {emp.empleadoNombre ? (
+                          <div className="flex flex-col leading-tight">
+                            <span className="font-medium">{emp.empleadoNombre}</span>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {emp.empleadoCodigo}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-mono font-medium">{emp.empleadoCodigo}</span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground">
                         {emp.estacionNombre}

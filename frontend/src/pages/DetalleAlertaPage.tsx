@@ -234,7 +234,14 @@ export function DetalleAlertaPage() {
             value={new Date(alerta.fechaDeteccion).toLocaleString("es-EC")}
           />
           {alerta.empleadoCodigo && (
-            <InfoField label="Empleado" value={alerta.empleadoCodigo} />
+            <InfoField
+              label="Empleado"
+              value={
+                alerta.empleadoNombre
+                  ? `${alerta.empleadoNombre} (${alerta.empleadoCodigo})`
+                  : alerta.empleadoCodigo
+              }
+            />
           )}
           {alerta.transaccionReferencia && (
             <InfoField label="Referencia" value={alerta.transaccionReferencia} />

@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IIngestaService, IngestaService>();
         services.AddScoped<IReporteService, ReporteService>();
         services.AddScoped<IMonitoreoService, MonitoreoService>();
+        services.AddScoped<IEmpleadoDirectorio, EmpleadoDirectorio>();
         services.AddScoped<IEmailNotificacionService, EmailNotificacionService>();
         services.AddSingleton<QrLoginService>(); // estado en memoria del login por QR
         services.AddSingleton<PasswordResetService>(); // tokens de recuperacion en memoria

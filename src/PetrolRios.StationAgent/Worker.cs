@@ -21,6 +21,7 @@ public sealed class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private DateTime _ultimaRevisionUpdate = DateTime.MinValue;
     private DateTime _ultimoReporteEsquema = DateTime.MinValue;
+    private DateTime _ultimoSyncEmpleados = DateTime.MinValue;
 
     public Worker(
         CycleRunner cycleRunner,
@@ -74,6 +75,10 @@ public sealed class Worker : BackgroundService
                     if (latido.ReportarEsquema || DateTime.UtcNow - _ultimoReporteEsquema > TimeSpan.FromHours(6))
                         await ReportarEsquemaAsync(stoppingToken);
 
+                    // Sincronizar el catálogo de empleados (código → nombre) cada ~6 h.
+                    if (DateTime.UtcNow - _ultimoSyncEmpleados > TimeSpan.FromHours(6))
+                        await SincronizarEmpleadosAsync(stoppingToken);
+
                     // Revisar el feed de actualización cada ~5 minutos (no en cada vuelta)
                     if (DateTime.UtcNow - _ultimaRevisionUpdate > TimeSpan.FromMinutes(5))
                     {
@@ -119,6 +124,28 @@ public sealed class Worker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "No se pudo reportar el esquema (se reintenta luego)");
+        }
+    }
+
+    /// <summary>
+    /// Lee el catálogo de empleados de Firebird (VEND/EMPL) y lo sincroniza con el central para que
+    /// las alertas muestren el NOMBRE junto al código. Tolerante a fallos: se reintenta en la próxima vuelta.
+    /// </summary>
+    private async Task SincronizarEmpleadosAsync(CancellationToken ct)
+    {
+        try
+        {
+            var empleados = await _extractor.ObtenerEmpleadosAsync(ct);
+            if (empleados.Count == 0) return;
+            if (await _serverClient.EnviarEmpleadosAsync(empleados, ct))
+            {
+                _ultimoSyncEmpleados = DateTime.UtcNow;
+                _state.RegistrarEvento("INFO", $"Catálogo de empleados sincronizado ({empleados.Count})");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No se pudo sincronizar el catálogo de empleados (se reintenta luego)");
         }
     }
 

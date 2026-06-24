@@ -220,6 +220,41 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.ToTable("ejecuciones_job", (string)null);
                 });
 
+            modelBuilder.Entity("PetrolRios.Domain.Entities.Empleado", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EstacionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EstacionId", "Codigo")
+                        .IsUnique();
+
+                    b.ToTable("empleados", (string)null);
+                });
+
             modelBuilder.Entity("PetrolRios.Domain.Entities.EsquemaTabla", b =>
                 {
                     b.Property<int>("Id")
@@ -859,6 +894,17 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Navigation("Alerta");
 
                     b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("PetrolRios.Domain.Entities.Empleado", b =>
+                {
+                    b.HasOne("PetrolRios.Domain.Entities.Estacion", "Estacion")
+                        .WithMany()
+                        .HasForeignKey("EstacionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Estacion");
                 });
 
             modelBuilder.Entity("PetrolRios.Domain.Entities.EstacionWatermark", b =>

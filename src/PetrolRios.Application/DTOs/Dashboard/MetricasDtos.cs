@@ -12,7 +12,8 @@ public sealed record TopEmpleadoResponse(
     int CantidadAlertas,
     double ScorePromedio,
     int Criticas,
-    string EstacionNombre);
+    string EstacionNombre,
+    string? EmpleadoNombre = null);
 
 /// <summary>Métricas de efectividad y resolución para el dashboard ejecutivo (CU-13).</summary>
 public sealed record MetricasResolucionResponse

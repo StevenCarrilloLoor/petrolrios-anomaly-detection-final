@@ -19,15 +19,17 @@ public sealed class ReporteService : IReporteService
     private const int MaxFilasReporte = 5000;
 
     private readonly PetrolRiosDbContext _dbContext;
+    private readonly IEmpleadoDirectorio _empleados;
 
     static ReporteService()
     {
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    public ReporteService(PetrolRiosDbContext dbContext)
+    public ReporteService(PetrolRiosDbContext dbContext, IEmpleadoDirectorio empleados)
     {
         _dbContext = dbContext;
+        _empleados = empleados;
     }
 
     public async Task<byte[]> GenerarPdfAsync(
@@ -38,6 +40,8 @@ public sealed class ReporteService : IReporteService
         var alertas = await GetAlertasAsync(tipo, nivel, estado, estacionId, desde, hasta, ct);
         var filtros = DescribirFiltros(tipo, nivel, estado, estacionId, desde, hasta,
             await NombreEstacionAsync(estacionId, ct));
+        var empleados = await _empleados.CargarAsync(
+            alertas.Select(a => (a.EstacionId, a.EmpleadoCodigo)), ct);
 
         var documento = Document.Create(container =>
         {
@@ -125,7 +129,7 @@ public sealed class ReporteService : IReporteService
                             table.Cell().Background(fondo).Padding(3).Text(alerta.Score.ToString("F1")).FontSize(7);
                             table.Cell().Background(fondo).Padding(3).Text(alerta.Estado.ToString()).FontSize(7);
                             table.Cell().Background(fondo).Padding(3).Text(alerta.Estacion.Nombre).FontSize(7);
-                            table.Cell().Background(fondo).Padding(3).Text(alerta.EmpleadoCodigo ?? "—").FontSize(7);
+                            table.Cell().Background(fondo).Padding(3).Text(EmpleadoMostrar(empleados, alerta)).FontSize(7);
                             table.Cell().Background(fondo).Padding(3).Text(alerta.Descripcion).FontSize(7);
                         }
                     });
@@ -152,6 +156,8 @@ public sealed class ReporteService : IReporteService
         var alertas = await GetAlertasAsync(tipo, nivel, estado, estacionId, desde, hasta, ct);
         var filtros = DescribirFiltros(tipo, nivel, estado, estacionId, desde, hasta,
             await NombreEstacionAsync(estacionId, ct));
+        var empleados = await _empleados.CargarAsync(
+            alertas.Select(a => (a.EstacionId, a.EmpleadoCodigo)), ct);
 
         using var workbook = new XLWorkbook();
 
@@ -181,7 +187,7 @@ public sealed class ReporteService : IReporteService
             hoja.Cell(fila, 5).Value = alerta.Score;
             hoja.Cell(fila, 6).Value = alerta.Estado.ToString();
             hoja.Cell(fila, 7).Value = alerta.Estacion.Nombre;
-            hoja.Cell(fila, 8).Value = alerta.EmpleadoCodigo ?? "";
+            hoja.Cell(fila, 8).Value = EmpleadoMostrar(empleados, alerta);
             hoja.Cell(fila, 9).Value = alerta.TransaccionReferencia ?? "";
             hoja.Cell(fila, 10).Value = alerta.Descripcion;
             if (alerta.FechaResolucion.HasValue)
@@ -283,5 +289,14 @@ public sealed class ReporteService : IReporteService
         if (desde.HasValue) partes.Add($"Desde: {desde:yyyy-MM-dd}");
         if (hasta.HasValue) partes.Add($"Hasta: {hasta:yyyy-MM-dd}");
         return partes.Count > 0 ? string.Join(" | ", partes) : "Sin filtros (todas las alertas)";
+    }
+
+    /// <summary>Texto del empleado para el reporte: "Nombre (código)", o solo el código si no hay nombre.</summary>
+    private static string EmpleadoMostrar(DirectorioEmpleados empleados, Alerta a)
+    {
+        var codigo = a.EmpleadoCodigo;
+        if (string.IsNullOrWhiteSpace(codigo)) return "—";
+        var nombre = empleados.Nombre(a.EstacionId, codigo);
+        return nombre is null ? codigo : $"{nombre} ({codigo})";
     }
 }

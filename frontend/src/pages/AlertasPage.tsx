@@ -224,8 +224,17 @@ export function AlertasPage() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3">{alerta.estacionNombre}</td>
-                    <td className="px-4 py-3 font-mono">
-                      {alerta.empleadoCodigo ?? "—"}
+                    <td className="px-4 py-3">
+                      {alerta.empleadoNombre ? (
+                        <span className="flex flex-col leading-tight">
+                          <span className="font-medium">{alerta.empleadoNombre}</span>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {alerta.empleadoCodigo}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="font-mono">{alerta.empleadoCodigo ?? "—"}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <ScoreBar score={alerta.score} />

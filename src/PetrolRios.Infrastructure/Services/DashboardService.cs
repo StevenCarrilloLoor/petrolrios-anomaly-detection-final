@@ -13,10 +13,12 @@ public sealed class DashboardService : IDashboardService
         [EstadoAlerta.Confirmada, EstadoAlerta.FalsoPositivo, EstadoAlerta.Cerrada];
 
     private readonly PetrolRiosDbContext _dbContext;
+    private readonly IEmpleadoDirectorio _empleados;
 
-    public DashboardService(PetrolRiosDbContext dbContext)
+    public DashboardService(PetrolRiosDbContext dbContext, IEmpleadoDirectorio empleados)
     {
         _dbContext = dbContext;
+        _empleados = empleados;
     }
 
     /// <summary>
@@ -109,10 +111,11 @@ public sealed class DashboardService : IDashboardService
 
         var resultado = await AlertasAuditoria
             .Where(a => a.EmpleadoCodigo != null && a.EmpleadoCodigo != "")
-            .GroupBy(a => new { a.EmpleadoCodigo, a.Estacion.Nombre })
+            .GroupBy(a => new { a.EmpleadoCodigo, a.EstacionId, a.Estacion.Nombre })
             .Select(g => new
             {
                 g.Key.EmpleadoCodigo,
+                g.Key.EstacionId,
                 EstacionNombre = g.Key.Nombre,
                 Cantidad = g.Count(),
                 ScorePromedio = g.Average(a => a.Score),
@@ -123,13 +126,18 @@ public sealed class DashboardService : IDashboardService
             .Take(top)
             .ToListAsync(ct);
 
+        // Resolver el nombre del empleado para mostrarlo junto al código en el ranking.
+        var empleados = await _empleados.CargarAsync(
+            resultado.Select(r => (r.EstacionId, (string?)r.EmpleadoCodigo)), ct);
+
         return resultado
             .Select(r => new TopEmpleadoResponse(
                 r.EmpleadoCodigo!,
                 r.Cantidad,
                 Math.Round(r.ScorePromedio, 1),
                 r.Criticas,
-                r.EstacionNombre))
+                r.EstacionNombre,
+                empleados.Nombre(r.EstacionId, r.EmpleadoCodigo)))
             .ToList();
     }
 

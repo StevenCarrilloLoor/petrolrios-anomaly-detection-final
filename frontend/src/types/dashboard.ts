@@ -35,6 +35,7 @@ export interface TendenciaDiaResponse {
 
 export interface TopEmpleadoResponse {
   empleadoCodigo: string;
+  empleadoNombre: string | null;
   cantidadAlertas: number;
   scorePromedio: number;
   criticas: number;

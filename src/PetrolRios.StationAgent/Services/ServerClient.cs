@@ -276,6 +276,36 @@ public sealed class ServerClient
         }
     }
 
+    /// <summary>
+    /// Sincroniza el catálogo de empleados (código → nombre) de la estación con el central, para que
+    /// las alertas muestren el nombre junto al código. Devuelve true si el central confirmó.
+    /// </summary>
+    public async Task<bool> EnviarEmpleadosAsync(IReadOnlyList<EmpleadoAgente> empleados, CancellationToken ct)
+    {
+        if (empleados.Count == 0) return true;
+        var settings = _config.Actual;
+        try
+        {
+            await EnsureAuthenticatedAsync(settings, ct);
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _token);
+
+            var payload = new
+            {
+                CodigoEstacion = settings.CodigoEstacion,
+                Empleados = empleados.Select(e => new { e.Codigo, e.Nombre })
+            };
+            var resp = await _httpClient.PostAsJsonAsync(
+                Url(settings.ServerUrl, "/api/v1/empleados/sync"), payload, ct);
+            return resp.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No se pudo sincronizar el catálogo de empleados con el central");
+            return false;
+        }
+    }
+
     private async Task EnsureAuthenticatedAsync(AgentSettings settings, CancellationToken ct)
     {
         if (_token is not null && DateTime.UtcNow < _tokenExpiration.AddMinutes(-5))

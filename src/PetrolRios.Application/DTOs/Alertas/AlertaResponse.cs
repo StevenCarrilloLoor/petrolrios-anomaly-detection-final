@@ -12,6 +12,8 @@ public sealed record AlertaResponse
     public double Score { get; init; }
     public DateTime FechaDeteccion { get; init; }
     public string? EmpleadoCodigo { get; init; }
+    /// <summary>Nombre del empleado resuelto desde el catálogo (null si no hay match: se muestra solo el código).</summary>
+    public string? EmpleadoNombre { get; init; }
     public string? TransaccionReferencia { get; init; }
     public int EstacionId { get; init; }
     public string EstacionNombre { get; init; } = string.Empty;

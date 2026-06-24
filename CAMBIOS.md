@@ -1153,3 +1153,31 @@ HTML por clase queda en `coverage-report/` (ignorado por git como artefacto de b
 
 **Vínculo con la tesis.** Es la evidencia directa del **OE5** ("cobertura de pruebas unitarias > 80%
 en el módulo de detección").
+
+## 43. Nombre del empleado en las alertas (no solo el código)
+
+Para poder **actuar de inmediato**, las alertas que involucran a un despachador ahora muestran su
+**nombre** junto al código (antes solo se veía `COD_VEND`, p. ej. `V001`).
+
+**El reto:** el nombre no existe en el central — a PostgreSQL solo llega el código dentro de cada
+factura/turno; el nombre vive solo en Firebird (`VEND.NOM_VEND`, llave `COD_VEND`; respaldo
+`EMPL.NOM_EMPL` vía `VEND.NUM_EMPL`). Hubo que traerlo.
+
+**Diseño (catálogo + resolución, sin tocar las reglas):**
+- **Catálogo central `Empleado`** (`EstacionId`, `Codigo`, `Nombre`) con índice único
+  `(EstacionId, Codigo)` y migración `AgregarCatalogoEmpleados`. El **agente lo sincroniza** desde
+  Firebird cada ~6 h (`FirebirdExtractor.ObtenerEmpleadosAsync`: `TRIM(COD_VEND)` →
+  `COALESCE(NULLIF(NOM_VEND,''), NOM_EMPL)`) y lo envía a `POST /api/v1/empleados/sync` (mismo
+  aislamiento por estación que la ingesta).
+- **`IEmpleadoDirectorio`** resuelve `(estación, código) → nombre` (cruce por TRIM + mayúsculas). Se
+  usa al construir `AlertaResponse` (lista, detalle, cambio de estado, problemas de estación), en el
+  **top-empleados del dashboard** y en los **reportes PDF/Excel** ("Nombre (código)").
+- **No toca ninguna de las 25 reglas** ni el pipeline de detección: el código sigue siendo la llave
+  inmutable guardada en la alerta; el nombre es la resolución legible y se aplica **también a las
+  alertas ya existentes** (resolución al leer). Sin match, se muestra solo el código.
+- **Frontend:** Alertas, Detalle y Dashboard muestran el nombre con el código debajo; tipos actualizados.
+
+**Verificación.** Build Release 0/0; migración `AgregarCatalogoEmpleados` (tabla `empleados` + índice
+único + FK a estaciones); **tests en verde** (Domain 40, Detectors 119, Monitor 2, API 53 + 16 de
+integración saltadas sin Docker); frontend (`tsc -b && vite build`) limpio. 6 pruebas nuevas
+(`EmpleadoTests`, `EmpleadoDirectorioTests`).
