@@ -71,8 +71,12 @@ public sealed class CycleRunner
             _logger.LogInformation("Ciclo iniciado — extrayendo desde {Watermark:O}", _lastWatermark);
             _state.RegistrarEvento("INFO", $"Ciclo iniciado (watermark {_lastWatermark:HH:mm:ss})");
 
-            // 1. Reintentar lotes pendientes (store-and-forward)
+            // 1. Reintentar lotes pendientes (store-and-forward). Lo reenviado SÍ cuenta como
+            //    transacciones enviadas (antes el contador "Transacciones enviadas" ignoraba la cola
+            //    y mostraba 0 aunque se vaciaran cientos de lotes — confuso).
             var pendientesEnviados = await RetrySendPendingBatchesAsync(ct);
+            if (pendientesEnviados > 0)
+                _state.TotalTransaccionesEnviadas += pendientesEnviados;
 
             // 2. Extraer nuevas transacciones desde Firebird. Antes pedimos al central el
             //    catálogo de fuentes extra (registradas una sola vez por el ingeniero). Si el

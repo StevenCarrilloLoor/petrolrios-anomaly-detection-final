@@ -571,31 +571,33 @@ function mostrarResultado(id, ok, texto){
 }
 
 async function guardarConfig(){
-  const payload = {
-    codigoEstacion: document.getElementById('f-codigo').value,
-    nombreEstacion: document.getElementById('f-nombre').value,
-    zonaEstacion: document.getElementById('f-zona').value,
-    serverUrl: document.getElementById('f-serverurl').value,
-    email: document.getElementById('f-email').value,
-    password: document.getElementById('f-password').value,
-    serverTimeoutSegundos: parseInt(document.getElementById('f-timeout').value) || 30,
-    firebirdHost: document.getElementById('f-fbhost').value,
-    firebirdPort: parseInt(document.getElementById('f-fbport').value) || 3050,
-    firebirdDatabase: document.getElementById('f-fbdatabase').value,
-    firebirdUser: document.getElementById('f-fbuser').value,
-    firebirdPassword: document.getElementById('f-fbpassword').value,
-    firebirdCharset: document.getElementById('f-fbcharset').value,
-    firebirdDialect: parseInt(document.getElementById('f-fbdialect').value) || 3,
-    firebirdWireCrypt: document.getElementById('f-fbwirecrypt').value,
-    intervaloSegundos: parseInt(document.getElementById('f-intervalo').value) || 30,
-    inicioAutomatico: document.getElementById('f-auto').value === 'true',
-    updateFeedUrl: document.getElementById('f-updateurl').value,
-    updateFeedFallbackUrl: document.getElementById('f-updateurl2').value,
-    requiereLoginPanel: document.getElementById('f-requierelogin').value === 'true',
-    panelLocalUsuario: document.getElementById('f-localuser').value,
-    panelLocalPassword: document.getElementById('f-localpass').value
-  };
+  // Todo va dentro del try: si algun campo del formulario faltara, el error se MUESTRA
+  // (antes el payload se armaba afuera y una excepcion mataba el guardado en silencio).
   try{
+    const payload = {
+      codigoEstacion: document.getElementById('f-codigo').value,
+      nombreEstacion: document.getElementById('f-nombre').value,
+      zonaEstacion: document.getElementById('f-zona').value,
+      serverUrl: document.getElementById('f-serverurl').value,
+      email: document.getElementById('f-email').value,
+      password: document.getElementById('f-password').value,
+      serverTimeoutSegundos: parseInt(document.getElementById('f-timeout').value) || 30,
+      firebirdHost: document.getElementById('f-fbhost').value,
+      firebirdPort: parseInt(document.getElementById('f-fbport').value) || 3050,
+      firebirdDatabase: document.getElementById('f-fbdatabase').value,
+      firebirdUser: document.getElementById('f-fbuser').value,
+      firebirdPassword: document.getElementById('f-fbpassword').value,
+      firebirdCharset: document.getElementById('f-fbcharset').value,
+      firebirdDialect: parseInt(document.getElementById('f-fbdialect').value) || 3,
+      firebirdWireCrypt: document.getElementById('f-fbwirecrypt').value,
+      intervaloSegundos: parseInt(document.getElementById('f-intervalo').value) || 30,
+      inicioAutomatico: document.getElementById('f-auto').value === 'true',
+      updateFeedUrl: document.getElementById('f-updateurl').value,
+      updateFeedFallbackUrl: document.getElementById('f-updateurl2').value,
+      requiereLoginPanel: document.getElementById('f-requierelogin').value === 'true',
+      panelLocalUsuario: document.getElementById('f-localuser').value,
+      panelLocalPassword: document.getElementById('f-localpass').value
+    };
     const r = await fetch('/api/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
     if(r.ok){
       mostrarResultado('resultado-config', true, 'Configuración guardada. El agente ya está operando con estos datos.');
@@ -604,10 +606,12 @@ async function guardarConfig(){
       document.getElementById('f-localpass').value = '';
       verificarSesion();
     } else {
-      const j = await r.json();
-      mostrarResultado('resultado-config', false, j.mensaje || 'No se pudo guardar.');
+      const j = await r.json().catch(() => ({}));
+      mostrarResultado('resultado-config', false, j.mensaje || ('No se pudo guardar (HTTP ' + r.status + ').'));
     }
-  }catch(e){ mostrarResultado('resultado-config', false, 'No se pudo contactar al agente.'); }
+  }catch(e){
+    mostrarResultado('resultado-config', false, 'No se pudo guardar: ' + (e && e.message ? e.message : 'error desconocido'));
+  }
   refrescar();
 }
 
