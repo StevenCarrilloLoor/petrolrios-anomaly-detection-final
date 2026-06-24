@@ -1181,3 +1181,28 @@ factura/turno; el nombre vive solo en Firebird (`VEND.NOM_VEND`, llave `COD_VEND
 único + FK a estaciones); **tests en verde** (Domain 40, Detectors 119, Monitor 2, API 53 + 16 de
 integración saltadas sin Docker); frontend (`tsc -b && vite build`) limpio. 6 pruebas nuevas
 (`EmpleadoTests`, `EmpleadoDirectorioTests`).
+
+## 44. Datos demo coherentes para que el nombre del empleado aparezca
+
+Al probar en vivo, las alertas seguían mostrando **solo el código**. La causa **no era el código**
+(la resolución de §43 funciona): era un desfase en los **datos de prueba**. Las ventas anómalas de
+`inserciones_anomalias.sql` estaban atribuidas a despachadores `EMP-001…EMP-009`, **códigos que no
+existen en `VEND`** — la tabla real usa `COD_VEND CHAR(3)` y en la BD demo solo había 4 despachadores
+(`001 Almacén`, `002 Oficina`, `003 Luis Sotomayor`, `11 San Jacinto`). El agente sincronizaba bien
+ese catálogo, pero ningún `EMP-xxx` cruzaba → no había nombre que mostrar.
+
+**Diagnóstico (en la máquina):** se consultó el catálogo `empleados` (PostgreSQL), los `EmpleadoCodigo`
+de las alertas y la estructura/contenido real de `VEND` (Firebird) — confirmando el desfase de códigos.
+
+**Arreglo (coherencia de datos demo, sin tocar el motor):**
+- Nuevo `_arranque/inserciones_vendedores_demo.sql`: da de alta en `VEND` despachadores con **códigos
+  reales de 3 caracteres** (`004…010`) y nombres realistas (`UPDATE OR INSERT`, idempotente). Se
+  enganchó en `96_insertar_anomalias_firebird.bat` para que cada demo siembre los despachadores.
+- `inserciones_anomalias.sql`: cada escenario ahora apunta a un despachador real (`003…010`) en vez de
+  `EMP-xxx`, así cada anomalía queda atribuida a un nombre distinto.
+
+**Verificación en Chrome (E2E real).** Tras regenerar las alertas, la lista y el detalle muestran
+`Nombre (código)`: *Luis Sotomayor (003)* en la alerta de placa genérica, *María Quiñónez (005)* en
+despachos rápidos, *Washington Bravo (008)* en venta sin placa, etc. — las 11 alertas con su nombre.
+En producción los `COD_VEND` reales ya coinciden con `VEND`, por lo que esto solo corrige el set de
+demostración.

@@ -8,6 +8,10 @@ rem  ciclo (60 s) y las empujara a /api/v1/ingesta.
 rem ============================================================
 cd /d "%~dp0"
 
+echo [0/2] Sembrando despachadores demo en VEND (para que las alertas muestren el nombre)...
+docker cp "inserciones_vendedores_demo.sql" petrolrios-firebird:/tmp/vend.sql
+docker exec petrolrios-firebird /usr/local/firebird/bin/isql -user SYSDBA -pas masterkey /firebird/data/CONTAC.FDB -i /tmp/vend.sql
+
 echo [1/2] Copiando script SQL al contenedor...
 docker cp "inserciones_anomalias.sql" petrolrios-firebird:/tmp/ins.sql
 if errorlevel 1 (
