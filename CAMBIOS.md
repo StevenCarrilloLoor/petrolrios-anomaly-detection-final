@@ -1285,3 +1285,25 @@ con `123456` → credenciales mostradas (`agent-est-777@petrolrios.com`) → log
 se configuró el agente a EST-777 → **Autenticado en 182 ms**, **2 transacciones enviadas**,
 0 pendientes, fuentes ANUL/TANQ_REPO **Sincronizada**. Flujo Firebird→agente→central probado de punta
 a punta con una estación nueva. *(commit `c66fb56`)*
+
+---
+
+## 48. Verificación E2E del motor de reglas personalizadas con una regla creada por el usuario (despacho ≥400 gal)
+
+Prueba de punta a punta de que una regla **definida por el usuario desde la interfaz** (no una de las 25
+integradas) dispara a través del pipeline completo Firebird→agente→central.
+
+- **Regla del usuario:** "Despacho execivo" (carril Auditoría, riesgo base 57), fuente **Despachos de
+  combustible (DESP / `DetalleFactura`)**, condición **`Cantidad >= 400`** galones. El campo `Cantidad`
+  del builder mapea a `DESP.CAN_DESP`.
+- **Inserción en Firebird (nunca en PostgreSQL):** un despacho de **450 galones** en la tabla `DESP`
+  (`FIN_DESP = CURRENT_TIMESTAMP`) vía isql en el contenedor `petrolrios-firebird`. Se respeta la regla
+  de oro: los datos de prueba siempre entran por Firebird, para demostrar que el agente funciona.
+- **Resultado (verificado en Chrome):** el agente de **EST-777** extrajo el despacho por watermark, lo
+  empujó al central, y el `CustomRuleDetector` generó la **alerta #30 — Crítico, score 86** con evidencia
+  legible: *Fuente DetalleFactura · Cantidad 450 · Condición `Cantidad >= 400` · Monto $1260 · Regla
+  "Despacho execivo"*, atribuida a la estación Estacion Prueba 777.
+
+Confirma la plataforma de detección configurable de extremo a extremo: el usuario crea una regla de
+negocio sin tocar código y el sistema la evalúa sobre datos reales que entran por el agente. *(prueba de
+verificación; sin cambios de código)*
