@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>PetrolRios.StationMonitor</RootNamespace>
+    <!-- Ver nota en PetrolRios.StationAgent.csproj: desactiva CET/Shadow Stack para que el .exe
+         arranque en CPUs con CET + Windows con proteccion de pila por hardware (Windows Server). -->
+    <CETCompat>false</CETCompat>
   </PropertyGroup>
 
   <ItemGroup>

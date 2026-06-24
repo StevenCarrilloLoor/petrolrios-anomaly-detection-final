@@ -5,6 +5,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>PetrolRios.StationAgent</RootNamespace>
+    <!-- Desactiva la marca CET / Shadow Stack del ejecutable. En CPUs con CET (Intel/AMD
+         recientes) y Windows con "Hardware-enforced Stack Protection" activada (frecuente en
+         Windows Server), el runtime de .NET 9 aborta al arrancar con el assert
+         "AreShadowStacksEnabled" (threads.cpp). Sin esto el .exe no levanta en esos equipos. -->
+    <CETCompat>false</CETCompat>
   </PropertyGroup>
 
   <ItemGroup>

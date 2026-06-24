@@ -1307,3 +1307,30 @@ integradas) dispara a través del pipeline completo Firebird→agente→central.
 Confirma la plataforma de detección configurable de extremo a extremo: el usuario crea una regla de
 negocio sin tocar código y el sistema la evalúa sobre datos reales que entran por el agente. *(prueba de
 verificación; sin cambios de código)*
+
+---
+
+## 49. Fix de producción: el .exe no arrancaba en Windows Server con CET / Shadow Stack
+
+**Síntoma (en producción).** En el servidor de la estación, `PetrolRios.StationAgent.exe` abortaba al
+arrancar con: `CLR: Assert failure ... !AreShadowStacksEnabled() ... threads.cpp`.
+
+**Causa.** No es Windows Server en sí, sino que el CPU del servidor tiene **CET (Control-flow Enforcement
+Technology)** y Windows tiene activada la **"Protección de pila reforzada por hardware" (Shadow Stack)**.
+El runtime de .NET 9 tiene un defecto conocido en esa ruta y aborta el proceso. Es un problema
+documentado de .NET 9 en equipos/SO con CET (frecuente en servidores y CPUs recientes Intel/AMD).
+
+**Solución.** Compilar los ejecutables sin la marca CET, con **`<CETCompat>false</CETCompat>`** en el
+`PropertyGroup` de los **3 proyectos que generan `.exe`**: `PetrolRios.StationAgent`,
+`PetrolRios.StationMonitor` y `PetrolRios.Api`. Así Windows no fuerza shadow stacks sobre estos binarios
+y arrancan en cualquier equipo. (El binario solo deja de usar esa protección concreta; conserva el resto
+del endurecimiento.)
+
+**Verificación.** Republicado el agente win-x64 self-contained single-file con `PUBLISH_EXIT=0`; el nuevo
+`.exe` (~50 MB) arranca en local y retoma EST-777 (panel v2.3.0, configuración intacta). La validación
+definitiva es en el servidor con CET: redeploy del `.exe` y arranque sin el assert.
+
+**Workaround inmediato (sin recompilar), por si hay que destrabar el servidor al instante:** en el
+servidor, en PowerShell como administrador —
+`Set-ProcessMitigation -Name PetrolRios.StationAgent.exe -Disable UserShadowStack,UserShadowStackStrictMode`
+(desactiva el shadow stack solo para ese proceso). El fix permanente es el `.exe` recompilado.

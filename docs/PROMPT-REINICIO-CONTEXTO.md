@@ -108,6 +108,11 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 - **Validación de contraseña del agente (≥6)** al crear estación (front+back). Prueba E2E **EST-777**
   en Chrome: rechazo de `1234`, creación con `123456`, agente conectado (182 ms, 2 enviadas,
   Sincronizada). *(CAMBIOS §47, commit `c66fb56`)*
+- **Fix de producción CET/Shadow Stack:** el `.exe` abortaba en el servidor (assert
+  `AreShadowStacksEnabled`, threads.cpp) en CPUs con CET + Windows con protección de pila por hardware.
+  Solución: **`<CETCompat>false</CETCompat>`** en los 3 proyectos `.exe` (StationAgent, StationMonitor,
+  Api) y republicar. Workaround sin recompilar: `Set-ProcessMitigation -Name <exe> -Disable UserShadowStack`.
+  *(CAMBIOS §49)*
 - **Conteos de pruebas actuales:** Domain 40, Detectors 119, Monitor 2, Api 53 (+16 de integración
   saltadas sin Docker). Cobertura de `PetrolRios.Detectors` ≈ 96% líneas (OE5). Agente v2.3.0.
 - **Pendiente para go-live:** republicar dist del Servidor y Monitor; prueba física en otra PC con la

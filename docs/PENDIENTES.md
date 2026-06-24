@@ -146,6 +146,10 @@ De auditoría/fraude (carril Auditoría → central):
   rechazo de `1234`, creación con `123456`, agente conectado (Autenticado 182 ms, 2 transacciones
   enviadas, fuentes Sincronizada). *(CAMBIOS §47)*
 - [x] **Dist del agente republicado** (v2.3.0) desde el código actual, listo para instalar por estación.
+- [x] **Fix de producción CET / Shadow Stack:** el `.exe` no arrancaba en el servidor (assert
+  `AreShadowStacksEnabled`, threads.cpp) por CPU con CET + Windows con protección de pila por hardware.
+  Solución: `<CETCompat>false</CETCompat>` en los 3 proyectos exe (Agent, Monitor, Api) + republicar.
+  *(CAMBIOS §49)*
 
 **Pendiente real (sin cambios):**
 - [ ] Watermark por ID monotónico + ventana de solapamiento (punto ciego de fecha).
