@@ -225,6 +225,10 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         };
         AgregarValoresClave(regla.FuenteDatos, registro, condiciones, metadata);
 
+        // Enriquecimiento: agrega a la evidencia los campos elegidos por el usuario, incluidos los de
+        // tablas relacionadas (placa, vendedor, cliente, n° de factura), resueltos en memoria.
+        AgregarCamposMostrar(context, regla, registro, metadata);
+
         return new DetectedAnomaly
         {
             TipoDetector = TipoDetector.Personalizada,
@@ -284,6 +288,64 @@ public sealed class CustomRuleDetector : IAnomalyDetector
             if (valor is not null) metadata[campo] = valor;
         }
     }
+
+    /// <summary>
+    /// Agrega a la evidencia los campos que el usuario eligió mostrar (<c>CamposMostrarJson</c>). Cada
+    /// elemento es "Campo" (propio de la fuente) o "Fuente.Campo" (de una tabla relacionada): en ese
+    /// caso busca la relación definida, cruza en memoria por su llave y trae el campo (placa, vendedor,
+    /// cliente, n° de factura…). Tolerante a fallos: lo que no resuelve se omite y nunca lanza.
+    /// </summary>
+    private static void AgregarCamposMostrar(
+        DetectionContext context, ReglaPersonalizada regla, object registro, Dictionary<string, object> metadata)
+    {
+        if (string.IsNullOrWhiteSpace(regla.CamposMostrarJson)) return;
+
+        List<string>? campos;
+        try { campos = JsonSerializer.Deserialize<List<string>>(regla.CamposMostrarJson, JsonOpts); }
+        catch { return; }
+        if (campos is null) return;
+
+        foreach (var refCampo in campos.Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().Take(12))
+        {
+            var partes = refCampo.Split('.', 2);
+
+            // Campo propio de la fuente.
+            if (partes.Length == 1)
+            {
+                var propio = CatalogoReglasPersonalizadas.GetValor(regla.FuenteDatos, partes[0].Trim(), registro);
+                if (propio is not null) metadata[EtiquetaCampo(regla.FuenteDatos, partes[0].Trim())] = propio;
+                continue;
+            }
+
+            // Campo de una tabla relacionada: "Fuente.Campo".
+            var destino = partes[0].Trim();
+            var campoDestino = partes[1].Trim();
+            var rel = context.Relaciones.FirstOrDefault(r =>
+                r.Activa
+                && string.Equals(r.FuenteOrigen, regla.FuenteDatos, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(r.FuenteDestino, destino, StringComparison.OrdinalIgnoreCase));
+            if (rel is null) continue;
+
+            var llave = Convert.ToString(
+                CatalogoReglasPersonalizadas.GetValor(regla.FuenteDatos, rel.CampoOrigen, registro),
+                CultureInfo.InvariantCulture)?.Trim();
+            if (string.IsNullOrEmpty(llave)) continue;
+
+            var relacionado = ObtenerFuente(context, destino).FirstOrDefault(d =>
+                string.Equals(
+                    Convert.ToString(CatalogoReglasPersonalizadas.GetValor(destino, rel.CampoDestino, d),
+                        CultureInfo.InvariantCulture)?.Trim(),
+                    llave, StringComparison.OrdinalIgnoreCase));
+            if (relacionado is null) continue;
+
+            var valorRel = CatalogoReglasPersonalizadas.GetValor(destino, campoDestino, relacionado);
+            if (valorRel is not null) metadata[$"{EtiquetaCampo(destino, campoDestino)} ({destino})"] = valorRel;
+        }
+    }
+
+    /// <summary>Etiqueta legible de un campo (del catálogo) o el nombre crudo si no está catalogado.</summary>
+    private static string EtiquetaCampo(string fuente, string campo) =>
+        CatalogoReglasPersonalizadas.BuscarCampo(fuente, campo)?.Etiqueta ?? campo;
 
     private static string? GetTexto(string fuente, string? campo, object registro) =>
         campo is null

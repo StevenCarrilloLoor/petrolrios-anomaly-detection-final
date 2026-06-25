@@ -642,6 +642,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Auditoria");
 
+                    b.Property<string>("CamposMostrarJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("CondicionesJson")
                         .IsRequired()
                         .HasColumnType("jsonb");
@@ -682,6 +685,56 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("reglas_personalizadas", (string)null);
+                });
+
+            modelBuilder.Entity("PetrolRios.Domain.Entities.RelacionTabla", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("CampoDestino")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CampoOrigen")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Etiqueta")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("FuenteDestino")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("FuenteOrigen")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FuenteOrigen", "FuenteDestino", "CampoOrigen", "CampoDestino")
+                        .IsUnique();
+
+                    b.ToTable("relaciones_tabla", (string)null);
                 });
 
             modelBuilder.Entity("PetrolRios.Domain.Entities.Rol", b =>

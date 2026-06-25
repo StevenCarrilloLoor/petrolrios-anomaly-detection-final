@@ -23,6 +23,12 @@ public sealed record ReglaPersonalizadaResponse
     /// <summary>Carril de las alertas que genera la regla: "Operativa" o "Auditoria".</summary>
     public string Ambito { get; init; } = "Auditoria";
 
+    /// <summary>
+    /// Campos a mostrar en la alerta. Cada uno es un campo propio ("Cantidad") o de una tabla
+    /// relacionada en formato "Fuente.Campo" ("Factura.Placa").
+    /// </summary>
+    public IReadOnlyList<string> CamposMostrar { get; init; } = [];
+
     public bool Activa { get; init; }
 }
 
@@ -46,6 +52,12 @@ public sealed record GuardarReglaPersonalizadaRequest
     /// <summary>"Operativa" (problema de estación) o "Auditoria" (posible irregularidad). Por defecto Auditoría.</summary>
     public string Ambito { get; init; } = "Auditoria";
 
+    /// <summary>
+    /// Campos a mostrar en la evidencia de la alerta. Cada uno es un campo propio ("Cantidad") o de
+    /// una tabla relacionada en formato "Fuente.Campo" ("Factura.Placa"). Opcional.
+    /// </summary>
+    public IReadOnlyList<string> CamposMostrar { get; init; } = [];
+
     public bool Activa { get; init; } = true;
 }
 
@@ -66,7 +78,33 @@ public sealed record CatalogoReglasResponse
 public sealed record FuenteCatalogo(
     string Nombre,
     string Etiqueta,
-    IReadOnlyList<CampoCatalogo> Campos);
+    IReadOnlyList<CampoCatalogo> Campos,
+    /// <summary>
+    /// Campos de tablas RELACIONADAS disponibles para esta fuente (vía relaciones definidas). El
+    /// <see cref="CampoCatalogo.Nombre"/> viene como "Fuente.Campo" (p. ej. "Factura.Placa") para
+    /// usarlos como "campo a mostrar en la alerta" o en condiciones. Vacío si no hay relaciones.
+    /// </summary>
+    IReadOnlyList<CampoCatalogo>? CamposRelacionados = null);
+
+/// <summary>Relación entre dos fuentes/tablas para enriquecer alertas (CRUD de Admin).</summary>
+public sealed record RelacionTablaResponse(
+    int Id,
+    string FuenteOrigen,
+    string FuenteDestino,
+    string CampoOrigen,
+    string CampoDestino,
+    string Etiqueta,
+    bool Activa);
+
+public sealed record GuardarRelacionTablaRequest
+{
+    public required string FuenteOrigen { get; init; }
+    public required string FuenteDestino { get; init; }
+    public required string CampoOrigen { get; init; }
+    public required string CampoDestino { get; init; }
+    public string Etiqueta { get; init; } = string.Empty;
+    public bool Activa { get; init; } = true;
+}
 
 /// <summary>
 /// Un campo de una fuente, documentado para el builder. Además del nombre/etiqueta/tipo, trae el

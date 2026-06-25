@@ -65,6 +65,12 @@ public sealed class AnomalyDetectionJob
             var reglasPersonalizadas = await _dbContext.ReglasPersonalizadas
                 .AsNoTracking()
                 .ToListAsync(ct);
+            // Relaciones entre tablas (para enriquecer las alertas de reglas personalizadas con campos
+            // de tablas relacionadas). Solo las activas; se cargan una vez por ciclo.
+            var relacionesTabla = await _dbContext.RelacionesTabla
+                .AsNoTracking()
+                .Where(r => r.Activa)
+                .ToListAsync(ct);
             var totalAlertas = 0;
             var estacionesProcesadas = 0;
 
@@ -72,7 +78,8 @@ public sealed class AnomalyDetectionJob
             {
                 // Construir contexto de detección para esta estación
                 var watermark = await _unitOfWork.Estaciones.GetWatermarkAsync(estacion.Id, ct);
-                var context = await BuildDetectionContextAsync(estacion, watermark, reglas, reglasPersonalizadas, ct);
+                var context = await BuildDetectionContextAsync(
+                    estacion, watermark, reglas, reglasPersonalizadas, relacionesTabla, ct);
 
                 // Ejecutar los 4 detectores en paralelo
                 var detectionTasks = _detectors
@@ -149,6 +156,7 @@ public sealed class AnomalyDetectionJob
         EstacionWatermark? watermark,
         IReadOnlyList<ReglaDeteccion> reglas,
         IReadOnlyList<ReglaPersonalizada> reglasPersonalizadas,
+        IReadOnlyList<RelacionTabla> relaciones,
         CancellationToken ct)
     {
         var desde = watermark?.UltimaExtraccion ?? DateTime.UtcNow.AddHours(-1);
@@ -224,6 +232,7 @@ public sealed class AnomalyDetectionJob
             TarjetasTurno = tarjetas,
             Reglas = reglas,
             ReglasPersonalizadas = reglasPersonalizadas,
+            Relaciones = relaciones,
             AlertasPreviasPorEmpleado = alertasPrevias,
             HoraApertura = estacion.HoraApertura,
             HoraCierre = estacion.HoraCierre

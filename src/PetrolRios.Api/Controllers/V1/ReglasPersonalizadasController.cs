@@ -104,6 +104,31 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             agregadas.Add(fc.Nombre);
         }
 
+        // Adjuntar a cada fuente los campos de sus tablas RELACIONADAS (vía relaciones activas), con
+        // el nombre "Fuente.Campo" para usarlos como "campo a mostrar en la alerta" o en condiciones.
+        var relaciones = await _dbContext.RelacionesTabla.AsNoTracking().Where(r => r.Activa).ToListAsync(ct);
+        if (relaciones.Count > 0)
+        {
+            var porNombre = fuentes
+                .GroupBy(f => f.Nombre, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < fuentes.Count; i++)
+            {
+                var relacionados = new List<CampoCatalogo>();
+                foreach (var rel in relaciones.Where(r =>
+                    string.Equals(r.FuenteOrigen, fuentes[i].Nombre, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!porNombre.TryGetValue(rel.FuenteDestino, out var destino)) continue;
+                    relacionados.AddRange(destino.Campos.Select(c => new CampoCatalogo(
+                        $"{rel.FuenteDestino}.{c.Nombre}",
+                        $"{c.Etiqueta} · {rel.Etiqueta}",
+                        c.Tipo, c.Rol, c.Descripcion, c.Icono)));
+                }
+                if (relacionados.Count > 0)
+                    fuentes[i] = fuentes[i] with { CamposRelacionados = relacionados };
+            }
+        }
+
         var catalogo = new CatalogoReglasResponse
         {
             Fuentes = fuentes,
@@ -246,6 +271,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.Activa = request.Activa;
         regla.ExpresionAvanzada = string.IsNullOrWhiteSpace(request.ExpresionAvanzada)
             ? null : request.ExpresionAvanzada.Trim();
+        regla.CamposMostrarJson = SerializarCamposMostrar(request.CamposMostrar);
 
         await _dbContext.ReglasPersonalizadas.AddAsync(regla, ct);
         await _dbContext.SaveChangesAsync(ct);
@@ -283,6 +309,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.RiesgoBase = request.RiesgoBase;
         regla.Ambito = ReglaPersonalizada.NormalizarAmbito(request.Ambito);
         regla.Activa = request.Activa;
+        regla.CamposMostrarJson = SerializarCamposMostrar(request.CamposMostrar);
         await _dbContext.SaveChangesAsync(ct);
 
         await this.RegistrarAuditoriaAsync(_logService,
@@ -364,7 +391,27 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             ExpresionAvanzada = regla.ExpresionAvanzada,
             RiesgoBase = regla.RiesgoBase,
             Ambito = regla.Ambito,
+            CamposMostrar = DeserializarCamposMostrar(regla.CamposMostrarJson),
             Activa = regla.Activa
         };
+    }
+
+    /// <summary>Serializa la lista de campos a mostrar (null si está vacía, para no guardar "[]").</summary>
+    private static string? SerializarCamposMostrar(IReadOnlyList<string>? campos)
+    {
+        var limpios = (campos ?? [])
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Select(c => c.Trim())
+            .Distinct()
+            .ToList();
+        return limpios.Count == 0 ? null : JsonSerializer.Serialize(limpios);
+    }
+
+    /// <summary>Lee la lista de campos a mostrar desde su JSON; tolerante a null/inválido.</summary>
+    private static IReadOnlyList<string> DeserializarCamposMostrar(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return [];
+        try { return JsonSerializer.Deserialize<List<string>>(json, JsonOpts) ?? []; }
+        catch { return []; }
     }
 }

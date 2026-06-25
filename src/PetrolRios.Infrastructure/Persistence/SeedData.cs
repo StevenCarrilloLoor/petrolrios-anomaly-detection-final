@@ -29,11 +29,39 @@ public static class SeedData
 
         // Pasos idempotentes: aplican también sobre bases ya sembradas
         await EnsureReglasNuevasAsync(context);
+        await EnsureRelacionesTablaAsync(context);
         await EnsureUsuariosDemoAsync(context);
         await EnsureRolAgenteAsync(context);
         await EnsureAgentUsersStationAssignmentAsync(context);
         await EnsureCuentasAccesoAsync(context, config);
 
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Siembra (idempotente) las relaciones clave entre tablas para enriquecer las alertas de las
+    /// reglas personalizadas. La principal: un Despacho (DetalleFactura) se relaciona con su Factura
+    /// por el código de cliente, de modo que una regla sobre despachos pueda mostrar la placa, el
+    /// vendedor, el cliente y el número de factura (que viven en la factura). El Admin puede agregar
+    /// más desde la interfaz.
+    /// </summary>
+    private static async Task EnsureRelacionesTablaAsync(PetrolRiosDbContext context)
+    {
+        var deseadas = new[]
+        {
+            RelacionTabla.Create("DetalleFactura", "Factura", "CodigoCliente", "CodigoCliente",
+                "Factura del despacho (placa, vendedor, cliente, N° de factura)"),
+            RelacionTabla.Create("Factura", "DetalleFactura", "CodigoCliente", "CodigoCliente",
+                "Despacho de la factura (galones, producto)"),
+        };
+
+        foreach (var rel in deseadas)
+        {
+            var existe = await context.RelacionesTabla.AnyAsync(r =>
+                r.FuenteOrigen == rel.FuenteOrigen && r.FuenteDestino == rel.FuenteDestino
+                && r.CampoOrigen == rel.CampoOrigen && r.CampoDestino == rel.CampoDestino);
+            if (!existe) await context.RelacionesTabla.AddAsync(rel);
+        }
         await context.SaveChangesAsync();
     }
 

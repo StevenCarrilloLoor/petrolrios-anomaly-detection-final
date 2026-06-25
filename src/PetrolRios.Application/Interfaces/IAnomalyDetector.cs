@@ -46,6 +46,13 @@ public sealed class DetectionContext
     // Reglas de negocio definidas por el usuario (evaluadas por CustomRuleDetector)
     public IReadOnlyList<ReglaPersonalizada> ReglasPersonalizadas { get; init; } = [];
 
+    /// <summary>
+    /// Relaciones entre fuentes/tablas (p. ej. DetalleFactura→Factura por código de cliente).
+    /// Las usa <c>CustomRuleDetector</c> para enriquecer la evidencia de una alerta con campos de una
+    /// tabla relacionada (placa, vendedor, cliente, n° de factura), resolviendo el cruce en memoria.
+    /// </summary>
+    public IReadOnlyList<RelacionTabla> Relaciones { get; init; } = [];
+
     // Historial de alertas previas por empleado (para detección de reincidencia)
     public IReadOnlyDictionary<string, int> AlertasPreviasPorEmpleado { get; init; } =
         new Dictionary<string, int>();

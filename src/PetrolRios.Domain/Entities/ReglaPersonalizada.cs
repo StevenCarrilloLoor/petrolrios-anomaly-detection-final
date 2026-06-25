@@ -31,6 +31,15 @@ public class ReglaPersonalizada : BaseEntity
     public double RiesgoBase { get; set; } = 50;
 
     /// <summary>
+    /// Campos a mostrar en la evidencia de la alerta (JSON de lista de strings). Cada elemento es un
+    /// campo propio de la fuente ("Cantidad") o uno de una tabla relacionada en formato
+    /// "Fuente.Campo" ("Factura.Placa"). El detector los resuelve (cruzando en memoria con la
+    /// relación definida) y los agrega a la evidencia, para que la alerta tenga más contexto
+    /// (quién, qué placa, qué cliente, qué factura). Si está vacío, se usa el comportamiento previo.
+    /// </summary>
+    public string? CamposMostrarJson { get; set; }
+
+    /// <summary>
     /// Carril de las alertas que genera esta regla: "Operativa" (problema de estación → avisa al
     /// administrador de la estación) o "Auditoria" (fraude → central). Por defecto Auditoría.
     /// </summary>
@@ -41,7 +50,7 @@ public class ReglaPersonalizada : BaseEntity
     public static ReglaPersonalizada Create(
         string nombre, string descripcion, string fuenteDatos,
         string condicionesJson, string? agregacionJson, double riesgoBase,
-        string ambito = "Auditoria") =>
+        string ambito = "Auditoria", string? camposMostrarJson = null) =>
         new()
         {
             Nombre = nombre,
@@ -50,7 +59,8 @@ public class ReglaPersonalizada : BaseEntity
             CondicionesJson = condicionesJson,
             AgregacionJson = agregacionJson,
             RiesgoBase = riesgoBase,
-            Ambito = NormalizarAmbito(ambito)
+            Ambito = NormalizarAmbito(ambito),
+            CamposMostrarJson = string.IsNullOrWhiteSpace(camposMostrarJson) ? null : camposMostrarJson
         };
 
     /// <summary>Acepta solo "Operativa" o "Auditoria" (por defecto Auditoría).</summary>
