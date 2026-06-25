@@ -165,10 +165,17 @@ Cada campo se muestra con ícono + nombre legible + descripción (glosario Conta
 prefijo + tipo del esquema). Verificado: build 0/0, tests verde, frontend build OK. *(Falta verlo en
 Chrome en vivo — se hará junto al E2E de la Parte 2.)*
 
-**Parte 2 — Juntar tablas + enriquecer la alerta: [ ] PENDIENTE (bloque grande, diseño listo).**
-Que el creador traiga campos de tablas relacionadas y el usuario elija cuáles se muestran en la alerta
-(quién, placa, cliente, n° de factura). Diseño aprobado por el usuario ("lo más completo y profesional",
-relaciones auto-detectadas **y** pantalla de admin). Plan de implementación:
+**Parte 2 — Juntar tablas + enriquecer la alerta: [x] HECHA (CAMBIOS §51, commits `74b84f9` backend +
+`cd4e3df` frontend).** Entidad `RelacionTabla` + migración `EnriquecimientoReglasYRelaciones` + seed
+(Despacho→Factura) + `CamposMostrarJson` en la regla + enriquecimiento en `CustomRuleDetector` +
+`/catalogo` con campos relacionados + CRUD `/api/v1/relaciones-tabla` + selector "Información a mostrar
+en la alerta" en el builder. Verificado: build+tests verde, migración sin cambios pendientes, y **en
+vivo** (la migración se aplicó al arrancar, la relación se sembró, y el selector muestra los campos
+relacionados — 🚗 Placa, Código de vendedor, Código de cliente, etc. — de "Factura del despacho").
+Falta opcional: pantalla de **Admin** para CRUD de relaciones desde la UI (la API ya existe) y un E2E
+de inserción real (despacho+factura en Firebird) para ver la alerta ya enriquecida.
+
+Diseño original (referencia):
 1. **Entidad `RelacionTabla`** (Domain) + EF config + DbSet + **migración** + seed de relaciones clave
    (Despacho→Factura por cliente/manguera; Factura→Cliente por COD_CLIE; Factura→Vendedor por COD_VEND…).
    Patrón a copiar: `FuenteDatos` (BaseEntity, private setters, `Create`/`Actualizar`).

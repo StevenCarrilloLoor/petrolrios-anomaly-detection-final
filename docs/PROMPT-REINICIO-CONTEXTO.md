@@ -120,10 +120,13 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   - **Parte 1 (HECHA, commit `353740c`, CAMBIOS §50):** documentación automática de campos — el builder
     muestra ícono + nombre legible + descripción (`DiccionarioCamposContaplus`: glosario + inferencia por
     prefijo + tipo del esquema) en vez de códigos crudos.
-  - **Parte 2 (PENDIENTE, diseño en `docs/PENDIENTES.md`):** juntar tablas + elegir qué campos
-    relacionados se muestran en la alerta (placa/cliente/vendedor/factura). Lleva entidad `RelacionTabla`
-    + 2 migraciones + enriquecer `CustomRuleDetector` (el `DetectionContext` ya tiene todas las tablas en
-    memoria) + pantalla admin de relaciones + E2E.
+  - **Parte 2 (HECHA, commits `74b84f9` backend + `cd4e3df` frontend, CAMBIOS §51):** juntar tablas +
+    elegir qué campos relacionados se muestran en la alerta (placa/cliente/vendedor/factura). Entidad
+    `RelacionTabla` + migración `EnriquecimientoReglasYRelaciones` + seed Despacho→Factura +
+    `CamposMostrarJson` + enriquecimiento en `CustomRuleDetector` (cruza en memoria) + `/catalogo` con
+    campos relacionados + CRUD `/api/v1/relaciones-tabla` + selector en el builder. Verificado en vivo
+    (migración aplicada, relación sembrada, selector muestra 🚗 Placa / vendedor / cliente de "Factura
+    del despacho"). Opcional pendiente: pantalla Admin de relaciones (API ya existe) y E2E de inserción.
 - **Conteos de pruebas actuales:** Domain 40, Detectors 119, Monitor 2, Api 53 (+16 de integración
   saltadas sin Docker). Cobertura de `PetrolRios.Detectors` ≈ 96% líneas (OE5). Agente v2.3.0.
 - **Pendiente para go-live:** republicar dist del Servidor y Monitor; prueba física en otra PC con la
