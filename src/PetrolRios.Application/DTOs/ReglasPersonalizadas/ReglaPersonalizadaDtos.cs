@@ -29,6 +29,9 @@ public sealed record ReglaPersonalizadaResponse
     /// </summary>
     public IReadOnlyList<string> CamposMostrar { get; init; } = [];
 
+    /// <summary>Si true, esta regla envía correo a supervisores/administradores cuando se dispara.</summary>
+    public bool NotificarCorreo { get; init; }
+
     public bool Activa { get; init; }
 }
 
@@ -57,6 +60,9 @@ public sealed record GuardarReglaPersonalizadaRequest
     /// una tabla relacionada en formato "Fuente.Campo" ("Factura.Placa"). Opcional.
     /// </summary>
     public IReadOnlyList<string> CamposMostrar { get; init; } = [];
+
+    /// <summary>Si true, la regla envía correo a supervisores/administradores cuando se dispara. Opt-in.</summary>
+    public bool NotificarCorreo { get; init; }
 
     public bool Activa { get; init; } = true;
 }

@@ -272,6 +272,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.ExpresionAvanzada = string.IsNullOrWhiteSpace(request.ExpresionAvanzada)
             ? null : request.ExpresionAvanzada.Trim();
         regla.CamposMostrarJson = SerializarCamposMostrar(request.CamposMostrar);
+        regla.NotificarCorreo = request.NotificarCorreo;
 
         await _dbContext.ReglasPersonalizadas.AddAsync(regla, ct);
         await _dbContext.SaveChangesAsync(ct);
@@ -310,6 +311,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.Ambito = ReglaPersonalizada.NormalizarAmbito(request.Ambito);
         regla.Activa = request.Activa;
         regla.CamposMostrarJson = SerializarCamposMostrar(request.CamposMostrar);
+        regla.NotificarCorreo = request.NotificarCorreo;
         await _dbContext.SaveChangesAsync(ct);
 
         await this.RegistrarAuditoriaAsync(_logService,
@@ -392,6 +394,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             RiesgoBase = regla.RiesgoBase,
             Ambito = regla.Ambito,
             CamposMostrar = DeserializarCamposMostrar(regla.CamposMostrarJson),
+            NotificarCorreo = regla.NotificarCorreo,
             Activa = regla.Activa
         };
     }

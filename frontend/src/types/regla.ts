@@ -12,6 +12,8 @@ export interface ReglaDeteccionResponse {
   activa: boolean;
   /** Carril: "Operativa" (estación), "Auditoria" (central) o "Ambos" (los dos). */
   ambito: "Operativa" | "Auditoria" | "Ambos";
+  /** Si true, la regla envía correo a supervisores/administradores cuando se dispara. */
+  notificarCorreo: boolean;
 }
 
 export interface CrearReglaRequest {
@@ -27,4 +29,6 @@ export interface ActualizarReglaRequest {
   activa?: boolean | null;
   /** Cambia el carril: "Operativa", "Auditoria" o "Ambos". */
   ambito?: "Operativa" | "Auditoria" | "Ambos" | null;
+  /** Activa/desactiva el aviso por correo de esta regla. */
+  notificarCorreo?: boolean | null;
 }

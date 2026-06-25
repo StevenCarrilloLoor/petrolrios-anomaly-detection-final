@@ -597,6 +597,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<bool>("NotificarCorreo")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("ParametroNombre")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -670,6 +673,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<bool>("NotificarCorreo")
+                        .HasColumnType("boolean");
 
                     b.Property<double>("RiesgoBase")
                         .HasColumnType("double precision");

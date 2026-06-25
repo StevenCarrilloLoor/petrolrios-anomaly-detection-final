@@ -18,6 +18,12 @@ public class ReglaDeteccion : BaseEntity
     /// </summary>
     public AmbitoAlerta Ambito { get; set; } = AmbitoAlerta.Auditoria;
 
+    /// <summary>
+    /// Si es true, además de aparecer en el panel, esta regla envía un correo a supervisores y
+    /// administradores cuando se dispara (no solo las críticas). Opt-in; por defecto false.
+    /// </summary>
+    public bool NotificarCorreo { get; set; }
+
     public static ReglaDeteccion Create(
         TipoDetector tipoDetector,
         string nombre,

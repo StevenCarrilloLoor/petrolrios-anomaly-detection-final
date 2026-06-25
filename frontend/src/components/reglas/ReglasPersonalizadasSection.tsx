@@ -65,6 +65,8 @@ interface FormularioRegla {
   ambito: "Operativa" | "Auditoria";
   /** Campos a mostrar en la alerta ("Campo" propio o "Fuente.Campo" relacionado). */
   camposMostrar: string[];
+  /** Si true, la regla envía correo a supervisores/administradores cuando se dispara. */
+  notificarCorreo: boolean;
 }
 
 const formularioVacio = (fuente: string): FormularioRegla => ({
@@ -80,6 +82,7 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
   riesgoBase: 50,
   ambito: "Auditoria",
   camposMostrar: [],
+  notificarCorreo: false,
 });
 
 interface Plantilla {
@@ -225,6 +228,7 @@ export function ReglasPersonalizadasSection() {
         riesgoBase: regla.riesgoBase,
         ambito: regla.ambito,
         camposMostrar: regla.camposMostrar ?? [],
+        notificarCorreo: regla.notificarCorreo,
         activa: !regla.activa,
       }),
     onSuccess: invalidar,
@@ -277,6 +281,7 @@ export function ReglasPersonalizadasSection() {
       riesgoBase: p.riesgoBase,
       ambito: p.ambito,
       camposMostrar: [],
+      notificarCorreo: false,
     });
     setEditando(0);
     setErrores([]);
@@ -303,6 +308,7 @@ export function ReglasPersonalizadasSection() {
       riesgoBase: regla.riesgoBase,
       ambito: regla.ambito ?? "Auditoria",
       camposMostrar: regla.camposMostrar ?? [],
+      notificarCorreo: regla.notificarCorreo ?? false,
     });
     setEditando(regla.id);
     setErrores([]);
@@ -328,6 +334,7 @@ export function ReglasPersonalizadasSection() {
       riesgoBase: f.riesgoBase,
       ambito: f.ambito,
       camposMostrar: f.camposMostrar,
+      notificarCorreo: f.notificarCorreo,
       activa: true,
     };
   }
@@ -590,6 +597,21 @@ export function ReglasPersonalizadasSection() {
                   </button>
                 </div>
               </div>
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background p-3 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.notificarCorreo}
+                  onChange={(e) => setForm({ ...form, notificarCorreo: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-foreground">Avisar por correo cuando se dispare</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Envía un correo a supervisores y administradores cada vez que esta regla genere una
+                    alerta (además del aviso automático de las críticas).
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Selector de modo: básico (visual) vs avanzado (expresión) */}

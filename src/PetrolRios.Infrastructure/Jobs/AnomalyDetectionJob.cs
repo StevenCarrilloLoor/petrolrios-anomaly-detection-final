@@ -113,9 +113,12 @@ public sealed class AnomalyDetectionJob
                         // Notificar por SignalR
                         await NotifyAlertAsync(alerta, estacion.Id);
 
-                        // Notificación por correo para alertas críticas (opcional, como en la tesis)
+                        // Correo: siempre en críticas (como en la tesis); y si la regla que la generó
+                        // pidió aviso por correo (opt-in por regla, motor o personalizada).
                         if (alerta.NivelRiesgo == NivelRiesgo.Critico)
                             await NotificarCriticaPorCorreoAsync(alerta, estacion, ct);
+                        else if (anomaly.NotificarCorreo)
+                            await NotificarReglaPorCorreoAsync(alerta, estacion, ct);
                     }
                 }
 
@@ -266,6 +269,39 @@ public sealed class AnomalyDetectionJob
             $"<p><b>Fecha:</b> {alerta.FechaDeteccion:yyyy-MM-dd HH:mm} UTC</p>" +
             $"<hr><p style='color:#64748b;font-size:12px'>Revise el detalle en el panel de PetrolRíos. " +
             $"Este es un aviso automático; no responda a este correo.</p>";
+
+        await _emailService.EnviarAsync(asunto, cuerpo, _destinatariosCorreo, ct);
+    }
+
+    /// <summary>
+    /// Correo por una regla marcada con "avisar por correo" (opt-in), aunque la alerta no sea crítica.
+    /// Va a supervisores y administradores (mismos destinatarios que las críticas).
+    /// </summary>
+    private async Task NotificarReglaPorCorreoAsync(Alerta alerta, Estacion estacion, CancellationToken ct)
+    {
+        if (!_emailService.Habilitado) return;
+
+        _destinatariosCorreo ??= await _dbContext.Usuarios
+            .AsNoTracking()
+            .Where(u => u.Activo
+                && (u.Rol.Nombre == "Supervisor" || u.Rol.Nombre == "Administrador")
+                && u.Email != "")
+            .Select(u => u.Email)
+            .ToListAsync(ct);
+
+        if (_destinatariosCorreo.Count == 0) return;
+
+        var asunto = $"[PetrolRíos] Alerta de regla marcada en {estacion.Nombre} ({alerta.NivelRiesgo}, score {alerta.Score})";
+        var cuerpo =
+            $"<h2 style='color:#b45309'>Alerta de una regla con aviso por correo</h2>" +
+            $"<p>La regla que generó esta alerta está configurada para avisar por correo cuando se dispara.</p>" +
+            $"<p><b>Estación:</b> {estacion.Nombre} ({estacion.Codigo})</p>" +
+            $"<p><b>Detector:</b> {alerta.TipoDetector}</p>" +
+            $"<p><b>Nivel de riesgo:</b> {alerta.NivelRiesgo} — score {alerta.Score}/100</p>" +
+            $"<p><b>Descripción:</b> {alerta.Descripcion}</p>" +
+            $"<p><b>Fecha:</b> {alerta.FechaDeteccion:yyyy-MM-dd HH:mm} UTC</p>" +
+            $"<hr><p style='color:#64748b;font-size:12px'>Revise el detalle en el panel de PetrolRíos. " +
+            $"Aviso automático; no responda a este correo.</p>";
 
         await _emailService.EnviarAsync(asunto, cuerpo, _destinatariosCorreo, ct);
     }

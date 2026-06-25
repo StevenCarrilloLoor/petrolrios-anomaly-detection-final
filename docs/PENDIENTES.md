@@ -9,7 +9,7 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 - **D** [x] **HECHO + Chrome** — abrir el detalle desde "Problemas de estación" sin perder la pestaña: la estación expandida + días viven en la URL (`?dias&g`) y el detalle vuelve a su origen con el botón "Volver a problemas de estación". (CAMBIOS §56)
 - **F** [x] **HECHO + gate verde** — alertas de reglas personalizadas legibles: descripción de la regla + condición en lenguaje natural en la alerta (la condición técnica queda en la evidencia). (CAMBIOS §56)
 - **C** [x] **HECHO + Chrome** — unidad del umbral (horas/$/%/galones/veces/"1=activado") con tooltip + **doble carril** `AmbitoAlerta.Ambos` (el chip cicla Operativa→Auditoría→Ambos; routing en `AnomalyDetectionJob` + `AlertaService`). Sin migración (enum int + unidad derivada). (CAMBIOS §57)
-- **A** [ ] **Notificación por correo por regla** (motor + personalizadas): flag por regla; el job envía correo cuando esa regla dispara (no solo en críticas).
+- **A** [x] **HECHO + Chrome** — correo por regla (motor + personalizadas): flag `NotificarCorreo` (migración `NotificarCorreoRegla`) estampado en `RuleBasedDetector`/`CustomRuleDetector` → el job llama `NotificarReglaPorCorreoAsync`; UI campana (motor) + casilla "Avisar por correo" (custom). (CAMBIOS §58)
 - **B** [ ] Ajustes: la conexión a BD ya es solo-admin; falta **sección de operación** (nivel que dispara correo + cron del job, persistidos como `ConexionStore`) y **tamaño de letra** accesible para todos.
 - **E** [ ] **Leído/no leído por usuario**: entidad `AlertaVista` (alerta×usuario) + endpoint marcar-vista + indicador por cuenta (si el admin la ve, el auditor la sigue viendo nueva).
 

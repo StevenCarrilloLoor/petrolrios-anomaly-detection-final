@@ -25,6 +25,8 @@ export interface ReglaPersonalizadaResponse {
   ambito: "Operativa" | "Auditoria";
   /** Campos a mostrar en la alerta ("Campo" propio o "Fuente.Campo" relacionado). */
   camposMostrar: string[];
+  /** Si true, la regla envía correo a supervisores/administradores cuando se dispara. */
+  notificarCorreo: boolean;
   activa: boolean;
 }
 
@@ -40,6 +42,8 @@ export interface GuardarReglaPersonalizadaRequest {
   ambito: "Operativa" | "Auditoria";
   /** Campos a mostrar en la alerta ("Campo" propio o "Fuente.Campo" relacionado). */
   camposMostrar: string[];
+  /** Si true, la regla envía correo a supervisores/administradores cuando se dispara. */
+  notificarCorreo: boolean;
   activa: boolean;
 }
 

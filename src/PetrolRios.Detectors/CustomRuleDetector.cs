@@ -250,6 +250,7 @@ public sealed class CustomRuleDetector : IAnomalyDetector
             Ambito = AmbitoDe(regla),
             EstacionId = context.EstacionId,
             EmpleadoCodigo = empleado,
+            NotificarCorreo = regla.NotificarCorreo,
             TransaccionReferencia = $"REGLA-{regla.Id}",
             Metadata = metadata
         };
@@ -291,6 +292,7 @@ public sealed class CustomRuleDetector : IAnomalyDetector
             Ambito = AmbitoDe(regla),
             EstacionId = context.EstacionId,
             EmpleadoCodigo = esEmpleado && !string.IsNullOrWhiteSpace(grupo) ? grupo : null,
+            NotificarCorreo = regla.NotificarCorreo,
             TransaccionReferencia = $"REGLA-{regla.Id}-{grupo}",
             Metadata = metadata
         };

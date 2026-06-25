@@ -21,6 +21,8 @@ import {
   Building2,
   ShieldCheck,
   Layers,
+  Bell,
+  BellOff,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -292,6 +294,28 @@ export function ReglasPage() {
                               <Pencil size={11} className="text-muted-foreground/40 group-hover:text-primary" />
                             </button>
                           )}
+
+                          <button
+                            onClick={() =>
+                              updateMutation.mutate({
+                                id: regla.id,
+                                data: { notificarCorreo: !regla.notificarCorreo },
+                              })
+                            }
+                            disabled={updateMutation.isPending}
+                            title={
+                              regla.notificarCorreo
+                                ? "Avisar por correo: ACTIVADO. Esta regla manda un correo a supervisores/administradores cuando se dispara. Clic para desactivar."
+                                : "Avisar por correo cuando esta regla se dispare (además de las críticas). Clic para activar."
+                            }
+                            className={`rounded-md p-1.5 transition-colors disabled:opacity-50 ${
+                              regla.notificarCorreo
+                                ? "text-primary hover:bg-primary/10"
+                                : "text-muted-foreground/40 hover:bg-muted hover:text-muted-foreground"
+                            }`}
+                          >
+                            {regla.notificarCorreo ? <Bell size={15} /> : <BellOff size={15} />}
+                          </button>
 
                           <button
                             role="switch"

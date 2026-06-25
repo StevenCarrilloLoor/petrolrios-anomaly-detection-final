@@ -26,6 +26,9 @@ public sealed record ReglaDeteccionResponse
     /// detectores lo respetan al generar las alertas.
     /// </summary>
     public string Ambito { get; init; } = "Auditoria";
+
+    /// <summary>Si true, esta regla envía correo a supervisores/administradores cuando se dispara.</summary>
+    public bool NotificarCorreo { get; init; }
 }
 
 public sealed record CrearReglaRequest(
@@ -38,4 +41,5 @@ public sealed record CrearReglaRequest(
 public sealed record ActualizarReglaRequest(
     double? ValorUmbral,
     bool? Activa,
-    string? Ambito = null);
+    string? Ambito = null,
+    bool? NotificarCorreo = null);

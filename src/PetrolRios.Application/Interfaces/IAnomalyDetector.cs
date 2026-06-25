@@ -82,4 +82,12 @@ public sealed class DetectedAnomaly
     public string? EmpleadoCodigo { get; init; }
     public string? TransaccionReferencia { get; init; }
     public Dictionary<string, object> Metadata { get; init; } = [];
+
+    /// <summary>
+    /// La regla que originó esta anomalía pidió aviso por correo cuando se dispara (además del aviso
+    /// automático de las críticas). Lo marca el orquestador (built-in) o el detector (personalizadas)
+    /// desde la configuración de la regla; el job envía el correo. Es settable para poder estamparlo
+    /// después de construir la anomalía.
+    /// </summary>
+    public bool NotificarCorreo { get; set; }
 }

@@ -52,6 +52,8 @@ public sealed class ReglaService : IReglaService
         if (!string.IsNullOrWhiteSpace(request.Ambito)
             && Enum.TryParse<AmbitoAlerta>(request.Ambito, true, out var ambito))
             regla.Ambito = ambito;
+        if (request.NotificarCorreo.HasValue)
+            regla.NotificarCorreo = request.NotificarCorreo.Value;
 
         await _unitOfWork.SaveChangesAsync(ct);
         return MapToResponse(regla);
@@ -109,7 +111,8 @@ public sealed class ReglaService : IReglaService
             Unidad = unidad,
             AyudaUmbral = ayuda,
             Activa = r.Activa,
-            Ambito = r.Ambito.ToString()
+            Ambito = r.Ambito.ToString(),
+            NotificarCorreo = r.NotificarCorreo
         };
     }
 }

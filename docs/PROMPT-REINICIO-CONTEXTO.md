@@ -106,7 +106,11 @@ pestaña, (E) leído/no leído por usuario, (F) alertas de reglas personalizadas
   Chrome: cada umbral muestra su unidad —50 USD, 18 horas, 30 %, 1=activado—; el chip de carril cicla a
   `Ambos` violeta y se restauró). Unidad derivada en `ReglaService.UmbralMeta` (sin columna) + nuevo
   `AmbitoAlerta.Ambos` con routing en `AnomalyDetectionJob`/`AlertaService`; sin migración (enum int).
-  **Pendientes: A, B, E** (ver `docs/PENDIENTES.md`).
+- **Etapa 3 (A) HECHA y verificada** (build 0w/0e, migración `NotificarCorreoRegla`, Domain 40 + Detectors
+  119, front limpio; Chrome: campana de regla pasa a azul y persiste). `DetectedAnomaly.NotificarCorreo`
+  estampado en `RuleBasedDetector` (built-in, un solo lugar) y `CustomRuleDetector`; el job manda correo
+  por regla marcada (`NotificarReglaPorCorreoAsync`); UI campana (motor) + casilla (custom).
+  **Pendientes: B, E** (ver `docs/PENDIENTES.md`).
 
 **Última ronda — preparación de producción (24-jun-2026), commiteado:**
 - **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado` que el

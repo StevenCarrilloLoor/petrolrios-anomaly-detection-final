@@ -47,10 +47,17 @@ public class ReglaPersonalizada : BaseEntity
 
     public bool Activa { get; set; } = true;
 
+    /// <summary>
+    /// Si es true, esta regla envía un correo a supervisores y administradores cuando se dispara
+    /// (además del aviso automático de las críticas). Opt-in; por defecto false.
+    /// </summary>
+    public bool NotificarCorreo { get; set; }
+
     public static ReglaPersonalizada Create(
         string nombre, string descripcion, string fuenteDatos,
         string condicionesJson, string? agregacionJson, double riesgoBase,
-        string ambito = "Auditoria", string? camposMostrarJson = null) =>
+        string ambito = "Auditoria", string? camposMostrarJson = null,
+        bool notificarCorreo = false) =>
         new()
         {
             Nombre = nombre,
@@ -60,7 +67,8 @@ public class ReglaPersonalizada : BaseEntity
             AgregacionJson = agregacionJson,
             RiesgoBase = riesgoBase,
             Ambito = NormalizarAmbito(ambito),
-            CamposMostrarJson = string.IsNullOrWhiteSpace(camposMostrarJson) ? null : camposMostrarJson
+            CamposMostrarJson = string.IsNullOrWhiteSpace(camposMostrarJson) ? null : camposMostrarJson,
+            NotificarCorreo = notificarCorreo
         };
 
     /// <summary>Acepta "Operativa", "Auditoria" o "Ambos" (doble carril); por defecto Auditoría.</summary>

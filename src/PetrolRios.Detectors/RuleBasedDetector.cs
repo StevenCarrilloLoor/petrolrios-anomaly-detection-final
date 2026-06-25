@@ -43,7 +43,12 @@ public abstract class RuleBasedDetector : IAnomalyDetector
             // Configuración persistida de la regla (umbral, carril, activa). Null = aún no está en BD.
             var config = context.Reglas.FirstOrDefault(r => r.ParametroNombre == regla.Parametro);
             if (config is { Activa: false }) continue; // regla desactivada: no se evalúa
-            anomalies.AddRange(regla.Evaluar(context, config));
+
+            var nuevas = regla.Evaluar(context, config);
+            // Si la regla pidió aviso por correo, marcar sus anomalías para que el job lo envíe.
+            if (config?.NotificarCorreo == true)
+                foreach (var a in nuevas) a.NotificarCorreo = true;
+            anomalies.AddRange(nuevas);
         }
 
         _logger.LogDebug("{Detector}: {Count} anomalías en estación {Est}",

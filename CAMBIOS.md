@@ -1563,3 +1563,27 @@ enum se guarda como int, así que **tampoco hubo migración** (EF: "No changes t
 = sin cambios; `tsc -b && vite build` limpio. En Chrome: cada umbral muestra su unidad (50 USD, 3
 veces, 30 días, 30 %, 18 horas, 1 = activado); el chip de "Diferencia efectivo" cicló Auditoría →
 Ambos (violeta, contador "Ambos: 1") → Operativa → Auditoría (restaurado). Etapas A/B/E pendientes.
+
+---
+
+## 58. Lote del 25-jun — etapa 3 (A): notificación por correo por regla
+
+El correo ya no es solo para las críticas: ahora **cada regla** (del motor y personalizada) puede
+**marcar "avisar por correo"** y, cuando se dispara, el sistema manda un correo a supervisores y
+administradores.
+
+**Mecanismo.** `DetectedAnomaly.NotificarCorreo` (settable). Los detectores del motor lo estampan en
+**un solo lugar** (`RuleBasedDetector`: si `config.NotificarCorreo`, marca las anomalías de esa regla);
+`CustomRuleDetector` lo estampa desde `regla.NotificarCorreo`. En `AnomalyDetectionJob`, tras crear la
+alerta: si es crítica → correo de siempre; **si no, y la regla pidió correo → `NotificarReglaPorCorreoAsync`**
+(mismos destinatarios: supervisores + administradores). Columnas nuevas `ReglaDeteccion.NotificarCorreo`
+y `ReglaPersonalizada.NotificarCorreo` → migración `NotificarCorreoRegla`.
+
+**UI.** En "Motor de detección", cada regla tiene un **botón de campana** (🔔 azul = activado / gris =
+apagado) junto al interruptor de activa. En "Reglas personalizadas", el formulario tiene una casilla
+**"Avisar por correo cuando se dispare"**. DTOs y servicios de ambos lados mapean `NotificarCorreo`.
+
+**Verificación.** Build Release 0w/0e; migración `20260625175307_NotificarCorreoRegla` creada y EF
+"sin cambios pendientes al modelo"; Domain **40** + Detectors **119**; `tsc -b && vite build` limpio.
+En Chrome: la campana de "Transacciones duplicadas" pasó a **azul** (activada y persistida) y volví a
+apagarla (restaurado). Etapas B/E pendientes.
