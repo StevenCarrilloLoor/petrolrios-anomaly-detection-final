@@ -150,6 +150,39 @@ De auditoría/fraude (carril Auditoría → central):
   `AreShadowStacksEnabled`, threads.cpp) por CPU con CET + Windows con protección de pila por hardware.
   Solución: `<CETCompat>false</CETCompat>` en los 3 proyectos exe (Agent, Monitor, Api) + republicar.
   *(CAMBIOS §49)*
+- [x] **Conectividad VPN documentada** (`docs/CONECTIVIDAD-VPN.md`): diagnóstico (subredes distintas +
+  NAT + red POS hostil), por qué falla ZeroTier (REQUESTING_CONFIGURATION), solución recomendada
+  **Tailscale** (relay 443) y alternativas. Pendiente real: levantar la VPN en el servidor de la estación.
+
+---
+
+## Mejora del creador de reglas (pedido del ingeniero, 24-jun) — EN CURSO
+
+Hacer el motor de reglas usable por gente no técnica, escalable y procedural. Dos partes:
+
+**Parte 1 — Documentación automática de campos: [x] HECHA Y COMMITEADA (CAMBIOS §50, commit `353740c`).**
+Cada campo se muestra con ícono + nombre legible + descripción (glosario Contaplus + inferencia por
+prefijo + tipo del esquema). Verificado: build 0/0, tests verde, frontend build OK. *(Falta verlo en
+Chrome en vivo — se hará junto al E2E de la Parte 2.)*
+
+**Parte 2 — Juntar tablas + enriquecer la alerta: [ ] PENDIENTE (bloque grande, diseño listo).**
+Que el creador traiga campos de tablas relacionadas y el usuario elija cuáles se muestran en la alerta
+(quién, placa, cliente, n° de factura). Diseño aprobado por el usuario ("lo más completo y profesional",
+relaciones auto-detectadas **y** pantalla de admin). Plan de implementación:
+1. **Entidad `RelacionTabla`** (Domain) + EF config + DbSet + **migración** + seed de relaciones clave
+   (Despacho→Factura por cliente/manguera; Factura→Cliente por COD_CLIE; Factura→Vendedor por COD_VEND…).
+   Patrón a copiar: `FuenteDatos` (BaseEntity, private setters, `Create`/`Actualizar`).
+2. **`ReglaPersonalizada`**: nueva columna `CamposMostrarJson` (lista de campos propios+relacionados a
+   exponer en la alerta) + **migración**.
+3. **`CustomRuleDetector`**: tras hacer match, resolver las relaciones (el `DetectionContext` ya tiene
+   TODAS las tablas en memoria — ver `PlacaGenericaRule` que une `context.Facturas`+`context.Detalles`)
+   y agregar los campos relacionados + seleccionados a `DetectedAnomaly.Metadata` (la "Evidencia").
+4. **API**: CRUD de relaciones (`/relaciones-tabla`, solo Admin) + el `/catalogo` ofrece los campos
+   relacionados por fuente; `GuardarReglaPersonalizadaRequest` acepta `CamposMostrar`.
+5. **Frontend**: en el builder, campos relacionados (para condiciones) + selector "Información a mostrar
+   en la alerta"; pantalla de administración de relaciones (Admin).
+6. **E2E en Chrome**: regla sobre Despachos que muestre placa+vendedor+cliente en la alerta; insertar en
+   Firebird (no Postgres) y confirmar la alerta enriquecida. Commit + CAMBIOS §51.
 
 **Pendiente real (sin cambios):**
 - [ ] Watermark por ID monotónico + ventana de solapamiento (punto ciego de fecha).

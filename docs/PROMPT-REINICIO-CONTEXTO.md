@@ -113,6 +113,17 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   Solución: **`<CETCompat>false</CETCompat>`** en los 3 proyectos `.exe` (StationAgent, StationMonitor,
   Api) y republicar. Workaround sin recompilar: `Set-ProcessMitigation -Name <exe> -Disable UserShadowStack`.
   *(CAMBIOS §49)*
+- **Conectividad/VPN:** `docs/CONECTIVIDAD-VPN.md` (subredes distintas + NAT en la red POS; ZeroTier
+  queda en REQUESTING_CONFIGURATION; recomendado **Tailscale** por su relay sobre 443). Pendiente:
+  levantar la VPN real en la estación.
+- **Creador de reglas más usable (pedido del ingeniero), 2 partes:**
+  - **Parte 1 (HECHA, commit `353740c`, CAMBIOS §50):** documentación automática de campos — el builder
+    muestra ícono + nombre legible + descripción (`DiccionarioCamposContaplus`: glosario + inferencia por
+    prefijo + tipo del esquema) en vez de códigos crudos.
+  - **Parte 2 (PENDIENTE, diseño en `docs/PENDIENTES.md`):** juntar tablas + elegir qué campos
+    relacionados se muestran en la alerta (placa/cliente/vendedor/factura). Lleva entidad `RelacionTabla`
+    + 2 migraciones + enriquecer `CustomRuleDetector` (el `DetectionContext` ya tiene todas las tablas en
+    memoria) + pantalla admin de relaciones + E2E.
 - **Conteos de pruebas actuales:** Domain 40, Detectors 119, Monitor 2, Api 53 (+16 de integración
   saltadas sin Docker). Cobertura de `PetrolRios.Detectors` ≈ 96% líneas (OE5). Agente v2.3.0.
 - **Pendiente para go-live:** republicar dist del Servidor y Monitor; prueba física en otra PC con la
