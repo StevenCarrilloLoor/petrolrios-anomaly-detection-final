@@ -61,7 +61,7 @@ export function useResetNotifications(): () => void {
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const queryClient = useQueryClient();
   const [alertCount, setAlertCount] = useState(0);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -72,6 +72,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     ajustesRef.current = ajustes;
   }, [ajustes]);
+  // El usuario también por ref: el handler de asignación necesita saber si la alerta es para MÍ.
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const addToast = useCallback((toast: Omit<Toast, "id">) => {
     const id = crypto.randomUUID();
@@ -138,6 +143,25 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       void queryClient.invalidateQueries({ queryKey: ["monitoreo"] });
     };
 
+    // ALERTA ASIGNADA: avisa en vivo al asignado (toast personalizado "es tuya") y, a supervisores/
+    // administradores, una confirmación. Refresca las bandejas para que aparezca el responsable.
+    const handleAlertaAsignada = (alerta: AlertaResponse) => {
+      if (yaRecibida(alerta)) return;
+      const paraMi =
+        alerta.asignadoAId != null && alerta.asignadoAId === userRef.current?.id;
+      if (ajustesRef.current.mostrarToasts) {
+        addToast({
+          title: paraMi ? "Te asignaron una alerta" : "Alerta asignada",
+          message: paraMi
+            ? `La alerta #${alerta.id} es ahora tuya: ${alerta.descripcion}`
+            : `Alerta #${alerta.id} asignada a ${alerta.asignadoANombre ?? "un responsable"}`,
+          level: alerta.nivelRiesgo,
+        });
+      }
+      if (paraMi && ajustesRef.current.sonidoAlertas) reproducirBeepCritico();
+      void queryClient.invalidateQueries({ queryKey: ["alertas"] });
+    };
+
     const unsubscribeAlerta = subscribeSignalREvent<AlertaResponse>(
       "NuevaAlerta",
       handleNuevaAlerta,
@@ -146,10 +170,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       "ProblemaEstacion",
       handleProblemaEstacion,
     );
+    const unsubscribeAsignada = subscribeSignalREvent<AlertaResponse>(
+      "AlertaAsignada",
+      handleAlertaAsignada,
+    );
 
     return () => {
       unsubscribeAlerta();
       unsubscribeProblema();
+      unsubscribeAsignada();
     };
   }, [token, addToast, queryClient]);
 

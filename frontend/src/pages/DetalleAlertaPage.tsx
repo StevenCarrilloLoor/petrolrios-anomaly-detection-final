@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Send,
   UserPlus,
+  UserCheck,
   FileWarning,
 } from "lucide-react";
 
@@ -289,6 +290,34 @@ export function DetalleAlertaPage() {
         )}
       </div>
 
+      {/* Asignación actual: a quién está asignada, por quién y cuándo (visible para todos). */}
+      {alerta.asignadoANombre && (
+        <div className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-5 py-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <UserCheck size={18} />
+          </div>
+          <div className="text-sm">
+            <span className="text-muted-foreground">Asignada a </span>
+            <span className="font-semibold text-foreground">{alerta.asignadoANombre}</span>
+            {alerta.asignadoARol && (
+              <span className="text-muted-foreground"> ({alerta.asignadoARol})</span>
+            )}
+            {alerta.asignadoPorNombre && (
+              <span className="text-muted-foreground">
+                {" "}
+                · asignada por {alerta.asignadoPorNombre}
+              </span>
+            )}
+            {alerta.fechaAsignacion && (
+              <span className="text-muted-foreground">
+                {" "}
+                · {new Date(alerta.fechaAsignacion).toLocaleString("es-EC")}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Acciones */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {transitions.length > 0 && (
@@ -317,16 +346,22 @@ export function DetalleAlertaPage() {
 
         {canAssign && alerta.estado !== "Cerrada" && (
           <div className="rounded-xl border border-border bg-background p-6 shadow-sm">
-            <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
-              <UserPlus size={17} /> Asignar a auditor
+            <h3 className="mb-1 flex items-center gap-2 text-base font-semibold text-foreground">
+              <UserPlus size={17} />{" "}
+              {alerta.asignadoANombre ? "Reasignar alerta" : "Asignar a auditor"}
             </h3>
+            <p className="mb-4 text-xs text-muted-foreground">
+              {alerta.asignadoANombre
+                ? `Actualmente asignada a ${alerta.asignadoANombre}. Al reasignar se le avisará por correo al nuevo responsable.`
+                : "El auditor asignado recibirá un correo y un aviso en tiempo real."}
+            </p>
             <div className="flex gap-3">
               <select
                 value={assignAuditorId}
                 onChange={(e) => setAssignAuditorId(e.target.value)}
                 className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
               >
-                <option value="">Seleccione un auditor…</option>
+                <option value="">Seleccione un responsable…</option>
                 {(auditores ?? []).map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.nombreCompleto} ({a.rol})
@@ -338,7 +373,7 @@ export function DetalleAlertaPage() {
                 disabled={!assignAuditorId || asignarMutation.isPending}
                 className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                Asignar
+                {alerta.asignadoANombre ? "Reasignar" : "Asignar"}
               </button>
             </div>
           </div>

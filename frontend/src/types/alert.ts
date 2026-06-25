@@ -32,6 +32,12 @@ export interface AlertaResponse {
   estacionId: number;
   estacionNombre: string;
   metadataJson: string | null;
+  // Asignación: a quién está asignada la alerta, quién la asignó y cuándo (null si nunca se asignó).
+  asignadoAId?: number | null;
+  asignadoANombre?: string | null;
+  asignadoARol?: string | null;
+  asignadoPorNombre?: string | null;
+  fechaAsignacion?: string | null;
 }
 
 export interface ProblemaEstacionGrupo {

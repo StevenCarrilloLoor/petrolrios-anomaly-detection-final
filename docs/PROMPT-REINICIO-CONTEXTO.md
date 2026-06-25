@@ -88,44 +88,27 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 - **admin@petrolrios.com / Oportunidad1234** (Administrador).
 - **stevencarrilloloor@gmail.com / Oportunidad1234** (mi cuenta).
-- Te **autorizo** a usar mi computadora, Chrome y a **ver mi Gmail abierto** para pruebas E2E
+- Te **autorizo** a usar mi computadora, Chrome y a **ver mi Gmail abierto** para pruebas E2E
   (p. ej. leer los correos de recuperación/desbloqueo).
 - Recuerda tus reglas de seguridad: **no escribes contraseñas en campos** → haz login por API
   (`POST /api/v1/auth/login` y guarda el token en `localStorage`).
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Lote del 25-jun — 6 mejoras del ingeniero (en etapas; CAMBIOS §56):** (A) correo por regla, (B) Ajustes
-permisos+operación+tamaño de letra, (C) unidad del umbral + doble carril `Ambos`, (D) detalle sin perder
-pestaña, (E) leído/no leído por usuario, (F) alertas de reglas personalizadas legibles + con descripción.
-- **Etapa 1 (D + F) HECHA y verificada** (build Release 0w/0e, 119/119 Detectors, front limpio; Chrome:
-  "Volver a problemas de estación" regresa con la estación expandida). `CustomRuleDetector` ahora lidera la
-  descripción con `regla.Descripcion` + condición en lenguaje natural; `ProblemasEstacionPage`/`DetalleAlertaPage`
-  guardan el origen (`?dias&g` + `state.volverA`).
-- **Etapa 2 (C) HECHA y verificada** (Domain 40 + Detectors 119, EF "sin cambios al modelo", front limpio;
-  Chrome: cada umbral muestra su unidad —50 USD, 18 horas, 30 %, 1=activado—; el chip de carril cicla a
-  `Ambos` violeta y se restauró). Unidad derivada en `ReglaService.UmbralMeta` (sin columna) + nuevo
-  `AmbitoAlerta.Ambos` con routing en `AnomalyDetectionJob`/`AlertaService`; sin migración (enum int).
-- **Etapa 3 (A) HECHA y verificada** (build 0w/0e, migración `NotificarCorreoRegla`, Domain 40 + Detectors
-  119, front limpio; Chrome: campana de regla pasa a azul y persiste). `DetectedAnomaly.NotificarCorreo`
-  estampado en `RuleBasedDetector` (built-in, un solo lugar) y `CustomRuleDetector`; el job manda correo
-  por regla marcada (`NotificarReglaPorCorreoAsync`); UI campana (motor) + casilla (custom).
-- **Etapa 4 (B) HECHA y verificada** (build 0w/0e, EF sin cambios, Domain 40 + Detectors 119, front
-  limpio; Chrome: "Grande" agranda el panel; tarjeta "Operación del sistema" carga nivel + cron de la
-  API). **Tamaño de letra** (Normal/Grande/Mayor en `SettingsContext`) + **Operación del sistema**
-  (solo Admin: nivel mínimo de correo + cron, en `config/operacion.json` vía `IParametrosOperacion`/
-  `ParametrosOperacionStore`/`ParametrosOperacionController`; el job lee el nivel y `Program.cs`/el
-  controller el cron). La conexión BD ya era solo-Admin. Sin migración.
-- **Etapa 5 (E) HECHA y verificada** (build 0w/0e, migración `AlertaVistaPorUsuario`, EF sin cambios,
-  Domain 40 + Detectors 119, front limpio; Chrome: abrí la #31 y su punto azul desapareció, la #30 lo
-  conserva). **Leído/no leído POR USUARIO**: entidad `AlertaVista` (único alerta×usuario) +
-  `POST /alertas/{id}/marcar-vista` + `GET /alertas/vistas` (usuario del token); `DetalleAlertaPage`
-  marca al abrir, `AlertasPage` pinta el punto azul "nueva para ti".
+**Última ronda — Asignación de alertas "al 1000%" (25-jun-2026), commiteado:**
+- Asignar una alerta ahora **avisa al asignado por correo** (`IEmailNotificacionService`, dirigido solo a
+  él) y por **SignalR** (evento nuevo `AlertaAsignada` → toast personalizado "Te asignaron una alerta" en
+  `NotificationProvider`), **registra quién la asignó** (`AsignacionAlerta.AsignadoPorId`, migración
+  `AsignacionAsignadoPor`) y **muestra a quién está/fue asignada**: en el **detalle** un banner
+  "Asignada a X (rol) · asignada por Y · fecha" + la tarjeta cambia a **"Reasignar"**, y en la **lista**
+  el responsable bajo el estado. `AlertaResponse` ganó 5 campos de asignación; `AsignarAsync` recibe el
+  asignador (claim → `ClaimsPrincipal.GetUsuarioId()`) y **devuelve 200** con la alerta actualizada.
+  4 pruebas nuevas (`AlertaServiceAsignacionTests`). Verificado en Chrome (asigné #32 a Maria Fernanda
+  Auditora; #33 histórica ya muestra su responsable). *(CAMBIOS §63)*
+- **Conteos de pruebas tras esta ronda:** Domain 40, Detectors 119, Monitor 2, **Api 73** (con Docker
+  arriba corren las de integración; +4 de asignación). Agente v2.3.0.
 
-**→ Lote de 6 mejoras del 25-jun (A–F) COMPLETO y verificado en Chrome. Commits `603f096`, `46894be`,
-`46643d6`, `1ad7a39` + el de E.** Stack levantado con `INICIAR_TODO.bat`.
-
-**Última ronda — preparación de producción (24-jun-2026), commiteado:**
+**Ronda previa — preparación de producción (24-jun-2026), commiteado:**
 - **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado` que el
   agente sincroniza desde Firebird (`VEND`/`EMPL`); `IEmpleadoDirectorio` resuelve `(estación,código)→
   nombre` en alertas, dashboard y reportes, sin tocar las 25 reglas. *(CAMBIOS §43–44)*
@@ -204,3 +187,4 @@ pestaña, (E) leído/no leído por usuario, (F) alertas de reglas personalizadas
 
 Hazlo todo seguido, en etapas, verificando (código + Chrome + pruebas) y commiteando cada una con mi
 identidad, sin tocar mis cambios sin guardar. **No espero menos que la perfección.**
+pero primero lee todos los scrips, .bats, archivos y cualquier cosa que este en mi proyecto de todas las carpetas para que armes un contexto completo y sepas que hacer cada cosa nates de que continues

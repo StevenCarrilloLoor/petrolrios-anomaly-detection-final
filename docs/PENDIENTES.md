@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 25 de junio de 2026.
+Última actualización: 25 de junio de 2026 (mejora de asignación de alertas).
 
 ---
 
@@ -21,6 +21,9 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 - [x] **HECHO** — detalle/clasificar (Tomar en Revisión → En Revisión) + comentar verificados; pipeline Firebird→agente→central confirmado. Sin bugs salvo el `window.confirm` (arreglado).
 
 > **Pase de QA del 25-jun COMPLETO. Único bug = `window.confirm` del botón Restablecer, ya arreglado.**
+
+## 🤝 Asignación de alertas "al 1000%" (25-jun)
+- [x] **HECHO + Chrome E2E** — asignar ahora **avisa al asignado por correo** y por **SignalR** (evento `AlertaAsignada`), **registra quién asignó** (`AsignadoPorId`, migración `AsignacionAsignadoPor`) y **muestra a quién está/fue asignada** en el **detalle** (banner "Asignada a X (rol) · por Y · fecha" + tarjeta "Reasignar") y en la **lista** (bajo el estado). `AlertaResponse` ampliado; `AsignarAsync` devuelve la alerta y recibe el asignador. 4 pruebas nuevas (`AlertaServiceAsignacionTests`). (CAMBIOS §63)
 
 ---
 

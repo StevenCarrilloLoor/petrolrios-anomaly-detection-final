@@ -21,5 +21,12 @@ public class AsignacionAlertaConfiguration : IEntityTypeConfiguration<Asignacion
             .WithMany(u => u.Asignaciones)
             .HasForeignKey(aa => aa.UsuarioId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Quién asignó (supervisor/admin). Relación opcional, sin colección inversa para no
+        // contaminar Usuario; Restrict para no borrar usuarios con asignaciones que hicieron.
+        builder.HasOne(aa => aa.AsignadoPor)
+            .WithMany()
+            .HasForeignKey(aa => aa.AsignadoPorId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

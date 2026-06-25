@@ -146,6 +146,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<int>("AlertaId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("AsignadoPorId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Comentario")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -165,6 +168,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AlertaId");
+
+                    b.HasIndex("AsignadoPorId");
 
                     b.HasIndex("UsuarioId");
 
@@ -961,6 +966,11 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("PetrolRios.Domain.Entities.Usuario", "AsignadoPor")
+                        .WithMany()
+                        .HasForeignKey("AsignadoPorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PetrolRios.Domain.Entities.Usuario", "Usuario")
                         .WithMany("Asignaciones")
                         .HasForeignKey("UsuarioId")
@@ -968,6 +978,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Alerta");
+
+                    b.Navigation("AsignadoPor");
 
                     b.Navigation("Usuario");
                 });

@@ -1681,3 +1681,47 @@ todo el pipeline del agente:
 
 **Bug cazado y arreglado:** el botón Restablecer usaba `window.confirm` y congelaba el renderer →
 reemplazado por confirmación en línea (CAMBIOS §61). Resto de funcionalidades sin bugs.
+
+---
+
+## 63. Asignación de alertas "al 1000%": correo al asignado + quién asignó + visible en detalle y lista + aviso en vivo
+
+**Motivación (pedido de Steven).** El botón "Asignar a auditor" antes solo guardaba un registro
+silencioso (`asignaciones_alerta`) y ponía la alerta En Revisión: **no avisaba a nadie, no se veía a
+quién quedó asignada, y no registraba quién la asignó**. Pedido: que se envíe un correo al
+supervisor/auditor asignado, que se muestre a quién está/fue asignada, "entre otras cosas, al 1000%".
+
+**Qué se hizo.**
+
+1. **Registrar quién asignó.** `AsignacionAlerta` gana `AsignadoPorId` (FK a `usuarios`, **nullable** para
+   no romper asignaciones históricas) + nav `AsignadoPor`. `Create(alertaId, usuarioId, asignadoPorId,
+   comentario)`. Migración **`AsignacionAsignadoPor`** (columna + índice + FK Restrict).
+2. **Mostrar la asignación en las respuestas.** `AlertaResponse` gana `AsignadoAId`, `AsignadoANombre`,
+   `AsignadoARol`, `AsignadoPorNombre`, `FechaAsignacion`. `AlertaService` carga la **última** asignación
+   por alerta (`CargarAsignacionesAsync`: una consulta con `Include(Usuario.Rol)` + `Include(AsignadoPor)`,
+   agrupada en memoria) y la inyecta en `MapToResponse` para la lista, el detalle y "Problemas de estación".
+3. **Correo al asignado.** `AlertaService` ahora inyecta `IEmailNotificacionService`: al asignar, si el
+   correo está habilitado y el usuario tiene email real (no `agent-`), se le envía un correo **dirigido
+   solo a él** ("Se te asignó la alerta #N…", con estación, detector, nivel, descripción y quién la asignó).
+4. **Aviso en tiempo real (SignalR).** Nuevo evento **`AlertaAsignada`** (a los grupos `auditores`/
+   `supervisores`/`administradores`) con `AsignadoAId`/`AsignadoANombre` en el payload. El frontend
+   (`NotificationProvider`) muestra un toast **personalizado al asignado** ("Te asignaron una alerta") y a
+   los demás una confirmación, y refresca las bandejas. `IAlertaService.AsignarAsync` recibe `asignadoPorId`
+   (claim `NameIdentifier`, helper nuevo `ClaimsPrincipal.GetUsuarioId()`) y **devuelve la alerta
+   actualizada** (200 en vez de 204), para que la UI refresque al instante.
+5. **Frontend.** Detalle: **banner** "Asignada a X (rol) · asignada por Y · fecha" + la tarjeta cambia a
+   **"Reasignar alerta"** cuando ya hay responsable. Lista de alertas: el asignado aparece **bajo el estado**
+   (ícono + nombre). Tipo `AlertaResponse` ampliado.
+
+**Pruebas nuevas.** `AlertaServiceAsignacionTests` (EF InMemory + Moq): registra `AsignadoPor` y pone En
+Revisión; **envía el correo solo al asignado** y emite el evento `AlertaAsignada` con su id; sin correo
+habilitado no envía pero igual asigna y emite; **reasignar** deja ver al último responsable (historial de 2).
+
+**Verificación.** Gate verde: Build Release **0w/0e**; migración generada y EF **"sin cambios pendientes"**;
+tests **Domain 40 · Detectors 119 · Monitor 2 · Api 73** (con los 4 nuevos, 0 fallos); `eslint` limpio;
+`tsc -b && vite build` OK. **En Chrome (E2E):** login por API como admin; alerta histórica #33 (sin
+`AsignadoPor`) ya muestra a su responsable "Leonardo Andrade"; asigné la #32 a **Maria Fernanda Auditora**
+→ 200 con `asignadoANombre`/`asignadoARol=Auditor`/`asignadoPorNombre="Administrador del Sistema"`/fecha;
+el **detalle** muestra el banner "Asignada a Maria Fernanda Auditora (Auditor) · asignada por Administrador
+del Sistema · …" y la tarjeta "Reasignar"; la **lista** muestra el asignado bajo el estado (#33 Leonardo
+Andrade, #32 Maria Fernanda Auditora).

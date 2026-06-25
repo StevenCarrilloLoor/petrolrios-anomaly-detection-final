@@ -23,7 +23,13 @@ public interface IAlertaService
 
     Task<AlertaResponse?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<AlertaResponse> CambiarEstadoAsync(int id, CambiarEstadoRequest request, CancellationToken ct = default);
-    Task AsignarAsync(int alertaId, AsignarAlertaRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Asigna la alerta a un usuario (auditor/supervisor) para revisión. Registra quién la asignó
+    /// (<paramref name="asignadoPorId"/>), pone la alerta En Revisión, avisa al asignado por correo
+    /// y en tiempo real (SignalR), y devuelve la alerta ya con los datos de asignación.
+    /// </summary>
+    Task<AlertaResponse> AsignarAsync(int alertaId, AsignarAlertaRequest request, int asignadoPorId, CancellationToken ct = default);
 
     // CU-07: comentarios de auditoría
     Task<IReadOnlyList<ComentarioResponse>> GetComentariosAsync(int alertaId, CancellationToken ct = default);

@@ -14,7 +14,7 @@ import {
   NIVEL_RIESGO_LABELS,
   ESTADO_ALERTA_LABELS,
 } from "@/types/alert";
-import { ChevronLeft, ChevronRight, FilterX, SearchX } from "lucide-react";
+import { ChevronLeft, ChevronRight, FilterX, SearchX, UserCheck } from "lucide-react";
 
 const selectClass =
   "rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -239,6 +239,19 @@ export function AlertasPage() {
                       <Badge variant="status" status={alerta.estado}>
                         {ESTADO_ALERTA_LABELS[alerta.estado]}
                       </Badge>
+                      {alerta.asignadoANombre && (
+                        <span
+                          className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"
+                          title={`Asignada a ${alerta.asignadoANombre}${
+                            alerta.asignadoARol ? ` (${alerta.asignadoARol})` : ""
+                          }`}
+                        >
+                          <UserCheck size={12} className="shrink-0" />
+                          <span className="max-w-[130px] truncate">
+                            {alerta.asignadoANombre}
+                          </span>
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">{alerta.estacionNombre}</td>
                     <td className="px-4 py-3">

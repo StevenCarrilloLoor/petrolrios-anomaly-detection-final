@@ -113,20 +113,21 @@ public sealed class AlertasController : ControllerBase
     /// </summary>
     [HttpPost("{id:int}/asignar")]
     [Authorize(Roles = "Supervisor,Administrador")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(AlertaResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Asignar(int id, [FromBody] AsignarAlertaRequest request, CancellationToken ct)
     {
         if (User.GetEstacionId().HasValue)
             return Forbid();
 
-        await _alertaService.AsignarAsync(id, request, ct);
+        // Quién asigna = el supervisor/admin autenticado (para registrar "asignada por …").
+        var actualizada = await _alertaService.AsignarAsync(id, request, User.GetUsuarioId(), ct);
 
         await this.RegistrarAuditoriaAsync(_logService,
             "Asignación de alerta a auditor", "Alerta", id,
-            new { request.AuditorId }, ct: ct);
+            new { request.AuditorId, AsignadaPor = User.GetUsuarioId() }, ct: ct);
 
-        return NoContent();
+        return Ok(actualizada);
     }
 
     /// <summary>

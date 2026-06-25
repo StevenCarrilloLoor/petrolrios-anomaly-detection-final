@@ -15,6 +15,13 @@ public static class ClaimsPrincipalExtensions
             : null;
     }
 
+    /// <summary>Id del usuario autenticado (claim NameIdentifier), o 0 si no se pudo resolver.</summary>
+    public static int GetUsuarioId(this ClaimsPrincipal user)
+    {
+        var value = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return int.TryParse(value, out var id) ? id : 0;
+    }
+
     /// <summary>
     /// Las cuentas del central (sin estación) pueden operar globalmente. Una cuenta técnica
     /// asignada solo puede informar o consultar el código de su propia estación.

@@ -18,7 +18,11 @@ public sealed record AlertaNotificacionPayload(
     string Descripcion,
     double Score,
     DateTime FechaDeteccion,
-    int EstacionId);
+    int EstacionId,
+    // Solo se usan en el evento "AlertaAsignada": a quién se asignó (para que el frontend muestre el
+    // aviso personalizado al asignado). Null en los eventos NuevaAlerta/ProblemaEstacion.
+    int? AsignadoAId = null,
+    string? AsignadoANombre = null);
 
 /// <summary>Un push de alerta: el evento SignalR, los grupos destino y el payload.</summary>
 public sealed record AlertaPush(
