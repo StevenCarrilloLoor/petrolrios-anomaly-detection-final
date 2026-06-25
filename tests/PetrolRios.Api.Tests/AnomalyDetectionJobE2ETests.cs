@@ -86,12 +86,17 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         var emailMock = new Mock<IEmailNotificacionService>();
         emailMock.SetupGet(e => e.Habilitado).Returns(false);
 
+        var parametrosMock = new Mock<IParametrosOperacion>();
+        parametrosMock.Setup(p => p.Actual())
+            .Returns(new PetrolRios.Application.DTOs.Configuracion.OperacionConfig("Critico", "*/5 * * * *"));
+
         _job = new AnomalyDetectionJob(
             detectors,
             unitOfWorkMock.Object,
             _dbContext,
             _broadcasterMock.Object,
             emailMock.Object,
+            parametrosMock.Object,
             sp.GetRequiredService<ILogger<AnomalyDetectionJob>>());
     }
 

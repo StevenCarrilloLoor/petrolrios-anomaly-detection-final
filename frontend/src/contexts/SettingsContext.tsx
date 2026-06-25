@@ -9,6 +9,7 @@ import {
 import type { ReactNode } from "react";
 
 export type Tema = "sistema" | "claro" | "oscuro";
+export type TamanoFuente = "normal" | "grande" | "mayor";
 
 export interface Ajustes {
   /** Tema de la interfaz: sigue el sistema operativo, o se fuerza claro/oscuro. */
@@ -17,12 +18,15 @@ export interface Ajustes {
   sonidoAlertas: boolean;
   /** Mostrar avisos emergentes (toasts) cuando llega una alerta o problema. */
   mostrarToasts: boolean;
+  /** Tamaño de la letra de toda la interfaz (accesibilidad para quien le cuesta ver). */
+  tamanoFuente: TamanoFuente;
 }
 
 const DEFAULTS: Ajustes = {
   tema: "sistema",
   sonidoAlertas: true,
   mostrarToasts: true,
+  tamanoFuente: "normal",
 };
 
 const STORAGE_KEY = "petrolrios.ajustes";
@@ -45,6 +49,12 @@ function aplicarTema(tema: Tema): void {
   else if (tema === "oscuro") el.classList.add("theme-oscuro");
 }
 
+/** Escala el tamaño base de la letra (rem) de toda la interfaz, para accesibilidad. */
+function aplicarTamanoFuente(t: TamanoFuente): void {
+  const px = t === "mayor" ? "19px" : t === "grande" ? "17px" : "16px";
+  document.documentElement.style.fontSize = px;
+}
+
 interface SettingsContextType {
   ajustes: Ajustes;
   actualizar: (cambios: Partial<Ajustes>) => void;
@@ -65,6 +75,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     aplicarTema(ajustes.tema);
   }, [ajustes.tema]);
+
+  useEffect(() => {
+    aplicarTamanoFuente(ajustes.tamanoFuente);
+  }, [ajustes.tamanoFuente]);
 
   const actualizar = useCallback((cambios: Partial<Ajustes>) => {
     setAjustes((prev) => {

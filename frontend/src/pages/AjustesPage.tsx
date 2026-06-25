@@ -13,10 +13,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useAjustes, type Tema } from "@/contexts/SettingsContext";
+import { useAjustes, type Tema, type TamanoFuente } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { conexionBaseService } from "@/services/conexionBase.service";
+import { operacionService, type OperacionConfig } from "@/services/operacion.service";
 import type {
   ConexionActiva,
   ProbarConexionRequest,
@@ -28,6 +29,12 @@ const TEMAS: { valor: Tema; label: string; icono: ReactNode; descripcion: string
   { valor: "sistema", label: "Sistema", icono: <Monitor size={20} />, descripcion: "Sigue tu equipo" },
   { valor: "claro", label: "Claro", icono: <Sun size={20} />, descripcion: "Siempre claro" },
   { valor: "oscuro", label: "Oscuro", icono: <Moon size={20} />, descripcion: "Siempre oscuro" },
+];
+
+const TAMANOS: { valor: TamanoFuente; label: string; descripcion: string; clase: string }[] = [
+  { valor: "normal", label: "Normal", descripcion: "Tamaño estándar", clase: "text-lg" },
+  { valor: "grande", label: "Grande", descripcion: "Un poco más grande", clase: "text-2xl" },
+  { valor: "mayor", label: "Mayor", descripcion: "El más grande", clase: "text-3xl" },
 ];
 
 export function AjustesPage() {
@@ -80,6 +87,35 @@ export function AjustesPage() {
 
       <Card>
         <CardHeader
+          title="Tamaño de letra"
+          subtitle="Agranda el texto de todo el panel si te cuesta leer. Se aplica al instante."
+        />
+        <CardContent>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {TAMANOS.map((t) => {
+              const activo = ajustes.tamanoFuente === t.valor;
+              return (
+                <button
+                  key={t.valor}
+                  onClick={() => actualizar({ tamanoFuente: t.valor })}
+                  className={`flex flex-col items-start gap-1 rounded-xl border p-4 text-left transition-colors ${
+                    activo
+                      ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                      : "border-border hover:border-primary/50 hover:bg-muted"
+                  }`}
+                >
+                  <span className={`font-bold leading-none text-foreground ${t.clase}`}>Aa</span>
+                  <span className="text-sm font-semibold text-foreground">{t.label}</span>
+                  <span className="text-xs text-muted-foreground">{t.descripcion}</span>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader
           title="Notificaciones"
           subtitle="Cómo avisarle cuando llegan alertas o problemas nuevos."
         />
@@ -103,6 +139,7 @@ export function AjustesPage() {
       </Card>
 
       {esAdmin && <SeccionConexionBase />}
+      {esAdmin && <SeccionOperacion />}
     </div>
   );
 }
@@ -323,6 +360,98 @@ function SeccionConexionBase() {
           />
         )}
         {guardado && <Resultado ok={guardado.ok} texto={guardado.mensaje} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Operación del sistema (solo Admin): nivel mínimo de correo + frecuencia (cron) del job. */
+function SeccionOperacion() {
+  const [config, setConfig] = useState<OperacionConfig>({
+    nivelMinimoCorreo: "Critico",
+    cronExpression: "*/5 * * * *",
+  });
+  const [guardado, setGuardado] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    let activo = true;
+    operacionService
+      .actual()
+      .then((c) => {
+        if (activo) setConfig(c);
+      })
+      .catch(() => {});
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  const onGuardar = async () => {
+    setCargando(true);
+    setGuardado(null);
+    try {
+      const c = await operacionService.guardar(config);
+      setConfig(c);
+      setGuardado({
+        ok: true,
+        texto: "Guardado. La frecuencia se aplicó al instante; el nivel de correo, en el próximo ciclo.",
+      });
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { mensaje?: string } } })?.response?.data?.mensaje;
+      setGuardado({ ok: false, texto: msg ?? "No se pudo guardar." });
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const inputCls =
+    "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30";
+
+  return (
+    <Card>
+      <CardHeader
+        title="Operación del sistema"
+        subtitle="Solo administrador: desde qué nivel avisar por correo y cada cuánto corre la detección."
+      />
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Campo label="Avisar por correo desde el nivel">
+            <select
+              className={inputCls}
+              value={config.nivelMinimoCorreo}
+              onChange={(e) => setConfig({ ...config, nivelMinimoCorreo: e.target.value })}
+            >
+              <option value="Bajo">Bajo (todas las alertas)</option>
+              <option value="Medio">Medio o superior</option>
+              <option value="Alto">Alto o superior</option>
+              <option value="Critico">Solo críticas</option>
+            </select>
+          </Campo>
+          <Campo label="Frecuencia del análisis (cron)">
+            <input
+              className={`${inputCls} font-mono`}
+              value={config.cronExpression}
+              onChange={(e) => setConfig({ ...config, cronExpression: e.target.value })}
+              placeholder="*/5 * * * *"
+            />
+          </Campo>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Cron de 5 campos (min hora día mes día-semana). Ejemplos:{" "}
+          <span className="font-mono">* * * * *</span> cada minuto,{" "}
+          <span className="font-mono">*/5 * * * *</span> cada 5 minutos,{" "}
+          <span className="font-mono">0 * * * *</span> cada hora.
+        </p>
+        <button
+          onClick={onGuardar}
+          disabled={cargando}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {cargando ? <Loader2 size={15} className="animate-spin" /> : null}
+          Guardar
+        </button>
+        {guardado && <Resultado ok={guardado.ok} texto={guardado.texto} />}
       </CardContent>
     </Card>
   );

@@ -110,7 +110,13 @@ pestaña, (E) leído/no leído por usuario, (F) alertas de reglas personalizadas
   119, front limpio; Chrome: campana de regla pasa a azul y persiste). `DetectedAnomaly.NotificarCorreo`
   estampado en `RuleBasedDetector` (built-in, un solo lugar) y `CustomRuleDetector`; el job manda correo
   por regla marcada (`NotificarReglaPorCorreoAsync`); UI campana (motor) + casilla (custom).
-  **Pendientes: B, E** (ver `docs/PENDIENTES.md`).
+- **Etapa 4 (B) HECHA y verificada** (build 0w/0e, EF sin cambios, Domain 40 + Detectors 119, front
+  limpio; Chrome: "Grande" agranda el panel; tarjeta "Operación del sistema" carga nivel + cron de la
+  API). **Tamaño de letra** (Normal/Grande/Mayor en `SettingsContext`) + **Operación del sistema**
+  (solo Admin: nivel mínimo de correo + cron, en `config/operacion.json` vía `IParametrosOperacion`/
+  `ParametrosOperacionStore`/`ParametrosOperacionController`; el job lee el nivel y `Program.cs`/el
+  controller el cron). La conexión BD ya era solo-Admin. Sin migración.
+  **Pendiente: E** (leído/no leído por usuario) — ver `docs/PENDIENTES.md`.
 
 **Última ronda — preparación de producción (24-jun-2026), commiteado:**
 - **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado` que el

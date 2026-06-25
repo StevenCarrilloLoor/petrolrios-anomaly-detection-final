@@ -1587,3 +1587,28 @@ apagado) junto al interruptor de activa. En "Reglas personalizadas", el formular
 "sin cambios pendientes al modelo"; Domain **40** + Detectors **119**; `tsc -b && vite build` limpio.
 En Chrome: la campana de "Transacciones duplicadas" pasó a **azul** (activada y persistida) y volví a
 apagarla (restaurado). Etapas B/E pendientes.
+
+---
+
+## 59. Lote del 25-jun — etapa 4 (B): tamaño de letra + operación del sistema (+ permisos)
+
+Los tres puntos del pedido de Ajustes:
+
+**Permisos.** La sección "Conexión a la base de datos" ya estaba **limitada al Administrador**
+(`{esAdmin && …}`); se confirma. La nueva sección de operación también es solo-Admin.
+
+**Tamaño de letra (todos, accesibilidad).** Nueva tarjeta "Tamaño de letra" con **Normal / Grande /
+Mayor**; escala el tamaño base (rem) de **toda** la interfaz vía `document.documentElement.style.fontSize`
+(16/17/19 px). Preferencia por navegador (`SettingsContext.tamanoFuente`), se aplica al instante.
+
+**Operación del sistema (solo Admin).** Nueva tarjeta para editar **desde qué nivel se avisa por correo**
+(Bajo/Medio/Alto/Crítico) y la **frecuencia (cron) del job** de detección, sin recompilar. Se persiste en
+`config/operacion.json` (mismo patrón que `ConexionStore`): `OperacionConfig` + `IParametrosOperacion` +
+`ParametrosOperacionStore` + `ParametrosOperacionController` (GET/PUT, Admin). El job lee el nivel mínimo
+cada ciclo (`NotificarNivelPorCorreoAsync` reemplaza el "solo críticas" fijo); el cron sale del store al
+arrancar (`Program.cs`) y se **re-registra en vivo** al guardar (`RecurringJob.AddOrUpdate`). Sin migración
+(es config en archivo, no entidad).
+
+**Verificación.** Build Release 0w/0e; EF "sin cambios al modelo"; Domain **40** + Detectors **119**;
+`tsc -b && vite build` limpio. En Chrome: "Grande" agranda todo el panel (restaurado a Normal); la tarjeta
+"Operación del sistema" cargó "Solo críticas" + cron "* * * * *" desde la API. **Etapa E pendiente.**

@@ -62,6 +62,12 @@ try
             "el archivo config/connection.json (Ajustes → Conexión a la base) o appsettings.");
     builder.Services.AddInfrastructure(connectionString, builder.Configuration);
     builder.Services.AddSingleton<PetrolRios.Application.Interfaces.IConexionStore>(conexionStore);
+
+    // Parámetros de operación editables sin recompilar (nivel mínimo de correo + cron del job),
+    // persistidos en config/operacion.json (Ajustes → Operación del sistema, solo Admin).
+    builder.Services.AddSingleton<PetrolRios.Application.Interfaces.IParametrosOperacion>(
+        new PetrolRios.Infrastructure.Configuracion.ParametrosOperacionStore(configDir, builder.Configuration));
+
     builder.Services.AddDetectors();
 
     // JWT Authentication
@@ -240,8 +246,11 @@ try
         Authorization = new[] { new PetrolRios.Api.Security.HangfireLocalAuthorizationFilter() }
     });
 
-    // Job recurrente de detección de anomalías
-    var cronExpression = builder.Configuration.GetValue<string>("Hangfire:CronExpression") ?? "*/5 * * * *";
+    // Job recurrente de detección de anomalías. La frecuencia (cron) sale de config/operacion.json
+    // (editable en Ajustes → Operación del sistema) y, en su defecto, de appsettings.
+    var cronExpression = app.Services
+        .GetRequiredService<PetrolRios.Application.Interfaces.IParametrosOperacion>()
+        .Actual().CronExpression;
     RecurringJob.AddOrUpdate<AnomalyDetectionJob>(
         "anomaly-detection",
         job => job.ExecuteAsync(CancellationToken.None),

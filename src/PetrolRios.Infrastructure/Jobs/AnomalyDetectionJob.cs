@@ -27,6 +27,7 @@ public sealed class AnomalyDetectionJob
     private readonly PetrolRiosDbContext _dbContext;
     private readonly IAlertaBroadcaster _broadcaster;
     private readonly IEmailNotificacionService _emailService;
+    private readonly IParametrosOperacion _parametros;
     private readonly ILogger<AnomalyDetectionJob> _logger;
 
     public AnomalyDetectionJob(
@@ -35,6 +36,7 @@ public sealed class AnomalyDetectionJob
         PetrolRiosDbContext dbContext,
         IAlertaBroadcaster broadcaster,
         IEmailNotificacionService emailService,
+        IParametrosOperacion parametros,
         ILogger<AnomalyDetectionJob> logger)
     {
         _detectors = detectors;
@@ -42,6 +44,7 @@ public sealed class AnomalyDetectionJob
         _dbContext = dbContext;
         _broadcaster = broadcaster;
         _emailService = emailService;
+        _parametros = parametros;
         _logger = logger;
     }
 
@@ -73,6 +76,12 @@ public sealed class AnomalyDetectionJob
                 .ToListAsync(ct);
             var totalAlertas = 0;
             var estacionesProcesadas = 0;
+
+            // Nivel mínimo de alerta que dispara aviso por correo (configurable en Ajustes → Operación
+            // del sistema). Por defecto Crítico; si baja a Alto, también avisará por correo las Altas.
+            var nivelMinCorreo = Enum.TryParse<NivelRiesgo>(_parametros.Actual().NivelMinimoCorreo, true, out var nm)
+                ? nm
+                : NivelRiesgo.Critico;
 
             foreach (var estacion in estaciones)
             {
@@ -113,10 +122,10 @@ public sealed class AnomalyDetectionJob
                         // Notificar por SignalR
                         await NotifyAlertAsync(alerta, estacion.Id);
 
-                        // Correo: siempre en críticas (como en la tesis); y si la regla que la generó
-                        // pidió aviso por correo (opt-in por regla, motor o personalizada).
-                        if (alerta.NivelRiesgo == NivelRiesgo.Critico)
-                            await NotificarCriticaPorCorreoAsync(alerta, estacion, ct);
+                        // Correo: si la alerta alcanza el nivel mínimo configurado (por defecto Crítico);
+                        // y si la regla que la generó pidió aviso por correo (opt-in, motor o personalizada).
+                        if ((int)alerta.NivelRiesgo >= (int)nivelMinCorreo)
+                            await NotificarNivelPorCorreoAsync(alerta, estacion, ct);
                         else if (anomaly.NotificarCorreo)
                             await NotificarReglaPorCorreoAsync(alerta, estacion, ct);
                     }
@@ -245,7 +254,7 @@ public sealed class AnomalyDetectionJob
     // Cache de destinatarios de correo por ciclo (supervisores y administradores activos).
     private IReadOnlyList<string>? _destinatariosCorreo;
 
-    private async Task NotificarCriticaPorCorreoAsync(Alerta alerta, Estacion estacion, CancellationToken ct)
+    private async Task NotificarNivelPorCorreoAsync(Alerta alerta, Estacion estacion, CancellationToken ct)
     {
         if (!_emailService.Habilitado) return;
 
@@ -259,9 +268,9 @@ public sealed class AnomalyDetectionJob
 
         if (_destinatariosCorreo.Count == 0) return;
 
-        var asunto = $"[PetrolRíos] Alerta CRÍTICA en {estacion.Nombre} (score {alerta.Score})";
+        var asunto = $"[PetrolRíos] Alerta {alerta.NivelRiesgo} en {estacion.Nombre} (score {alerta.Score})";
         var cuerpo =
-            $"<h2 style='color:#b91c1c'>Alerta crítica detectada</h2>" +
+            $"<h2 style='color:#b91c1c'>Alerta de nivel {alerta.NivelRiesgo} detectada</h2>" +
             $"<p><b>Estación:</b> {estacion.Nombre} ({estacion.Codigo})</p>" +
             $"<p><b>Detector:</b> {alerta.TipoDetector}</p>" +
             $"<p><b>Nivel de riesgo:</b> {alerta.NivelRiesgo} — score {alerta.Score}/100</p>" +

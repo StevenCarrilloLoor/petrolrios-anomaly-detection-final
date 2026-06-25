@@ -10,7 +10,7 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 - **F** [x] **HECHO + gate verde** — alertas de reglas personalizadas legibles: descripción de la regla + condición en lenguaje natural en la alerta (la condición técnica queda en la evidencia). (CAMBIOS §56)
 - **C** [x] **HECHO + Chrome** — unidad del umbral (horas/$/%/galones/veces/"1=activado") con tooltip + **doble carril** `AmbitoAlerta.Ambos` (el chip cicla Operativa→Auditoría→Ambos; routing en `AnomalyDetectionJob` + `AlertaService`). Sin migración (enum int + unidad derivada). (CAMBIOS §57)
 - **A** [x] **HECHO + Chrome** — correo por regla (motor + personalizadas): flag `NotificarCorreo` (migración `NotificarCorreoRegla`) estampado en `RuleBasedDetector`/`CustomRuleDetector` → el job llama `NotificarReglaPorCorreoAsync`; UI campana (motor) + casilla "Avisar por correo" (custom). (CAMBIOS §58)
-- **B** [ ] Ajustes: la conexión a BD ya es solo-admin; falta **sección de operación** (nivel que dispara correo + cron del job, persistidos como `ConexionStore`) y **tamaño de letra** accesible para todos.
+- **B** [x] **HECHO + Chrome** — Ajustes: conexión BD ya era solo-admin (confirmado); nueva sección **Operación del sistema** (nivel mínimo de correo + cron del job → `config/operacion.json`, re-registra el job en vivo) y **tamaño de letra** Normal/Grande/Mayor para todos. (CAMBIOS §59)
 - **E** [ ] **Leído/no leído por usuario**: entidad `AlertaVista` (alerta×usuario) + endpoint marcar-vista + indicador por cuenta (si el admin la ve, el auditor la sigue viendo nueva).
 
 ---
