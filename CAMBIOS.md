@@ -1497,3 +1497,42 @@ cerrar viene del vendedor del turno (`CierreTurnoDto.CodigoVendedor` ← `TURN.C
 como `EmpleadoNombre`.
 
 **Verificación.** `tsc -b && vite build` limpio.
+
+---
+
+## 56. Lote de 6 mejoras (revisión del ingeniero, 25-jun) — etapa 1: alertas legibles + navegación
+
+Ronda de **6 mejoras** pedidas en la revisión en vivo (capturas del 25-jun), a implementar en etapas
+verificadas (código + Chrome + commit):
+
+- **A** — Notificación por correo **por regla** (motor y personalizadas), no solo en críticas.
+- **B** — Ajustes: ocultar la conexión a BD a los no-admin, **sección de operación** (nivel de correo
+  + tiempo de disparo del job) y **tamaño de letra** accesible para todos.
+- **C** — Editar reglas del motor mostrando la **unidad del umbral** (horas/galones/$/%/conteo) con
+  tooltip + permitir el **doble carril** (Operativa **y** Auditoría a la vez).
+- **D** — Abrir el detalle desde "Problemas de estación" **sin perder la pestaña**.
+- **E** — **Leído/no leído por usuario** (si el admin ve una alerta, el auditor la sigue viendo nueva).
+- **F** — Alertas de **reglas personalizadas legibles** + que muestren la **descripción** de la regla.
+
+Esta sección cubre la **etapa 1 (D + F)**:
+
+**F — Alertas de reglas personalizadas legibles.** Antes la alerta mostraba la condición en código
+("`Cantidad >= '400'`") y **no** mostraba la descripción que el usuario escribió en la regla (solo se
+veía en Reglas). Ahora `CustomRuleDetector` arma la descripción **liderada por `regla.Descripcion`** +
+la condición en **lenguaje natural** (etiquetas del catálogo + operadores en palabras: "Despacho
+(detalle de factura): Galones mayor o igual a 400") + el monto. La condición técnica exacta sigue en la
+**evidencia** (`Condiciones`/`Expresion`) y se agrega `Qué detecta` = la descripción de la regla.
+Aplica al modo por registro y al agregado. Helpers nuevos: `DescripcionLegible`, `FrasearCondiciones`,
+`FrasearCondicion`, `OperadorEnPalabras`, `EtiquetaFuente`.
+
+**D — Abrir el detalle sin perder la pestaña.** Desde "Problemas de estación", al abrir un problema y
+volver, antes caías en `/alertas` (otra sección) y perdías el contexto. Ahora `ProblemasEstacionPage`
+guarda la **estación expandida y el rango de días en la URL** (`?dias&g`) y navega al detalle pasando
+`state.volverA` + `volverLabel`; `DetalleAlertaPage` usa ese origen, así el botón dice **"Volver a
+problemas de estación"** y regresa a la lista con la estación **aún expandida**. Si vienes de la bandeja
+de alertas, sigue diciendo "Volver a alertas".
+
+**Verificación.** Build Release 0 warnings/0 errores; **119/119** pruebas de Detectors; `tsc -b &&
+vite build` limpio. En Chrome (stack arriba): Problemas de estación → abrir "Turno 990001 sin cerrar"
+(Alerta #19) → el detalle muestra **"← Volver a problemas de estación"** → al pulsarlo regresa con
+"Estación Patricia Pilar" **aún expandida** (URL conserva `?g=…`). Etapas B/C/A/E pendientes.

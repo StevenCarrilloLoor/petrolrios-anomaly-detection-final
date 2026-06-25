@@ -94,7 +94,7 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         {
             // Modo por registro: una alerta por cada registro que cumple las condiciones
             foreach (var registro in filtrados)
-                anomalies.Add(CrearAlertaPorRegistro(context, regla, condiciones, registro));
+                anomalies.Add(CrearAlertaPorRegistro(context, regla, condiciones, configCondiciones.Combinador, registro));
         }
         else
         {
@@ -202,7 +202,7 @@ public sealed class CustomRuleDetector : IAnomalyDetector
 
     private DetectedAnomaly CrearAlertaPorRegistro(
         DetectionContext context, ReglaPersonalizada regla,
-        List<CondicionRegla> condiciones, object registro)
+        List<CondicionRegla> condiciones, string combinador, object registro)
     {
         var empleado = GetTexto(regla.FuenteDatos, CatalogoReglasPersonalizadas.CampoEmpleado(regla.FuenteDatos), registro);
         var monto = GetNumero(regla.FuenteDatos, CatalogoReglasPersonalizadas.CampoMonto(regla.FuenteDatos), registro);
@@ -217,12 +217,21 @@ public sealed class CustomRuleDetector : IAnomalyDetector
             ? regla.ExpresionAvanzada!
             : string.Join(" y ", condiciones.Select(c => $"{c.Campo} {c.Operador} {FormatearValor(c)}"));
 
+        // Frase en lenguaje natural para el auditor (etiquetas del catálogo + operadores en palabras),
+        // independiente del "detalle" técnico que queda guardado en la evidencia.
+        var fraseLegible = esAvanzada
+            ? $"{EtiquetaFuente(regla.FuenteDatos)} cumple la condición configurada"
+            : FrasearCondiciones(regla.FuenteDatos, condiciones, combinador);
+
         var metadata = new Dictionary<string, object>
         {
             ["ReglaPersonalizada"] = regla.Nombre,
             ["Fuente"] = regla.FuenteDatos,
             [esAvanzada ? "Expresion" : "Condiciones"] = detalle
         };
+        // La descripción que el usuario escribió en la regla, para que aparezca en la alerta (no solo en Reglas).
+        if (!string.IsNullOrWhiteSpace(regla.Descripcion))
+            metadata["Qué detecta"] = regla.Descripcion.Trim();
         AgregarValoresClave(regla.FuenteDatos, registro, condiciones, metadata);
 
         // Enriquecimiento: agrega a la evidencia los campos elegidos por el usuario, incluidos los de
@@ -232,8 +241,7 @@ public sealed class CustomRuleDetector : IAnomalyDetector
         return new DetectedAnomaly
         {
             TipoDetector = TipoDetector.Personalizada,
-            Descripcion = $"Regla '{regla.Nombre}': registro de {regla.FuenteDatos} cumple [{detalle}]" +
-                          (monto is not null ? $". Monto: ${monto:F2}" : ""),
+            Descripcion = DescripcionLegible(regla, fraseLegible, monto),
             Score = score,
             NivelRiesgo = nivel,
             Ambito = AmbitoDe(regla),
@@ -250,32 +258,38 @@ public sealed class CustomRuleDetector : IAnomalyDetector
     {
         var (score, nivel) = _scoring.Calculate(regla.RiesgoBase, montoInvolucrado: valorAgregado);
 
-        var descripcionFuncion = agregacion.Funcion == "Conteo"
-            ? $"conteo = {valorAgregado:F0}"
-            : $"{agregacion.Funcion.ToLowerInvariant()} de {agregacion.Campo} = {valorAgregado:F2}";
+        var funcionLegible = agregacion.Funcion == "Conteo"
+            ? $"{valorAgregado:F0} registros"
+            : $"{agregacion.Funcion.ToLowerInvariant()} de {EtiquetaCampo(regla.FuenteDatos, agregacion.Campo ?? "")} = {valorAgregado:F2}";
+        var fraseLegible =
+            $"{EtiquetaFuente(regla.FuenteDatos)} agrupado por {EtiquetaCampo(regla.FuenteDatos, agregacion.AgruparPor)} '{grupo}': " +
+            $"{funcionLegible} ({OperadorEnPalabras(agregacion.Operador)} {agregacion.Umbral}; {cantidadRegistros} registros)";
 
         var esEmpleado = agregacion.AgruparPor == CatalogoReglasPersonalizadas.CampoEmpleado(regla.FuenteDatos);
+
+        var metadata = new Dictionary<string, object>
+        {
+            ["ReglaPersonalizada"] = regla.Nombre,
+            ["Fuente"] = regla.FuenteDatos,
+            ["AgrupadoPor"] = $"{agregacion.AgruparPor} = {grupo}",
+            ["ValorAgregado"] = Math.Round(valorAgregado, 2),
+            ["Umbral"] = agregacion.Umbral,
+            ["RegistrosEnGrupo"] = cantidadRegistros
+        };
+        if (!string.IsNullOrWhiteSpace(regla.Descripcion))
+            metadata["Qué detecta"] = regla.Descripcion.Trim();
 
         return new DetectedAnomaly
         {
             TipoDetector = TipoDetector.Personalizada,
-            Descripcion = $"Regla '{regla.Nombre}': {agregacion.AgruparPor} '{grupo}' con {descripcionFuncion} " +
-                          $"{agregacion.Operador} {agregacion.Umbral} ({cantidadRegistros} registros de {regla.FuenteDatos})",
+            Descripcion = DescripcionLegible(regla, fraseLegible, null),
             Score = score,
             NivelRiesgo = nivel,
             Ambito = AmbitoDe(regla),
             EstacionId = context.EstacionId,
             EmpleadoCodigo = esEmpleado && !string.IsNullOrWhiteSpace(grupo) ? grupo : null,
             TransaccionReferencia = $"REGLA-{regla.Id}-{grupo}",
-            Metadata = new Dictionary<string, object>
-            {
-                ["ReglaPersonalizada"] = regla.Nombre,
-                ["Fuente"] = regla.FuenteDatos,
-                ["AgrupadoPor"] = $"{agregacion.AgruparPor} = {grupo}",
-                ["ValorAgregado"] = Math.Round(valorAgregado, 2),
-                ["Umbral"] = agregacion.Umbral,
-                ["RegistrosEnGrupo"] = cantidadRegistros
-            }
+            Metadata = metadata
         };
     }
 
@@ -346,6 +360,67 @@ public sealed class CustomRuleDetector : IAnomalyDetector
     /// <summary>Etiqueta legible de un campo (del catálogo) o el nombre crudo si no está catalogado.</summary>
     private static string EtiquetaCampo(string fuente, string campo) =>
         CatalogoReglasPersonalizadas.BuscarCampo(fuente, campo)?.Etiqueta ?? campo;
+
+    // ---- Descripción en lenguaje natural (para que un auditor entienda la alerta sin leer código) ----
+
+    /// <summary>
+    /// Arma la descripción de la alerta liderada por lo que el usuario escribió en la regla
+    /// (campo <c>Descripcion</c>), seguida de la condición en lenguaje natural y, si aplica, el monto.
+    /// Antes la alerta mostraba la condición en código ("Cantidad &gt;= '400'") sin la descripción.
+    /// </summary>
+    private static string DescripcionLegible(ReglaPersonalizada regla, string fraseLegible, double? monto)
+    {
+        var partes = new List<string>();
+        if (!string.IsNullOrWhiteSpace(regla.Descripcion))
+            partes.Add(regla.Descripcion.Trim().TrimEnd('.'));
+        partes.Add(fraseLegible);
+        if (monto is not null)
+            partes.Add($"monto ${monto.Value.ToString("N2", CultureInfo.InvariantCulture)}");
+        return $"[{regla.Nombre}] " + string.Join(" · ", partes);
+    }
+
+    /// <summary>Condiciones del modo básico en palabras: "Despacho: Galones mayor o igual a 400".</summary>
+    private static string FrasearCondiciones(string fuente, List<CondicionRegla> condiciones, string combinador)
+    {
+        if (condiciones.Count == 0) return $"{EtiquetaFuente(fuente)} (sin condiciones)";
+        var conector = string.Equals(combinador, "O", StringComparison.OrdinalIgnoreCase) ? " o " : " y ";
+        return $"{EtiquetaFuente(fuente)}: " +
+               string.Join(conector, condiciones.Select(c => FrasearCondicion(fuente, c)));
+    }
+
+    private static string FrasearCondicion(string fuente, CondicionRegla c)
+    {
+        var etiqueta = EtiquetaCampo(fuente, c.Campo);
+        var op = OperadorEnPalabras(c.Operador);
+        return c.Operador is "vacio" or "noVacio" ? $"{etiqueta} {op}" : $"{etiqueta} {op} {c.Valor}";
+    }
+
+    /// <summary>Operador (símbolo o palabra clave del builder) traducido a una frase legible en español.</summary>
+    private static string OperadorEnPalabras(string op) => op switch
+    {
+        ">" => "mayor que",
+        ">=" => "mayor o igual a",
+        "<" => "menor que",
+        "<=" => "menor o igual a",
+        "=" => "igual a",
+        "!=" => "distinto de",
+        "contiene" => "contiene",
+        "noContiene" => "no contiene",
+        "vacio" => "está vacío",
+        "noVacio" => "tiene valor",
+        _ => op
+    };
+
+    /// <summary>Nombre legible de la fuente de datos (para la descripción de la alerta).</summary>
+    private static string EtiquetaFuente(string fuente) => fuente switch
+    {
+        "Factura" => "Factura",
+        "DetalleFactura" => "Despacho (detalle de factura)",
+        "CierreTurno" => "Cierre de turno",
+        "Credito" => "Crédito",
+        "TarjetaTurno" => "Tarjeta de turno",
+        _ => fuente
+    };
 
     private static string? GetTexto(string fuente, string? campo, object registro) =>
         campo is null

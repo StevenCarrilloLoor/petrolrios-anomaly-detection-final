@@ -95,6 +95,14 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**Lote del 25-jun — 6 mejoras del ingeniero (en etapas; CAMBIOS §56):** (A) correo por regla, (B) Ajustes
+permisos+operación+tamaño de letra, (C) unidad del umbral + doble carril `Ambos`, (D) detalle sin perder
+pestaña, (E) leído/no leído por usuario, (F) alertas de reglas personalizadas legibles + con descripción.
+- **Etapa 1 (D + F) HECHA y verificada** (build Release 0w/0e, 119/119 Detectors, front limpio; Chrome:
+  "Volver a problemas de estación" regresa con la estación expandida). `CustomRuleDetector` ahora lidera la
+  descripción con `regla.Descripcion` + condición en lenguaje natural; `ProblemasEstacionPage`/`DetalleAlertaPage`
+  guardan el origen (`?dias&g` + `state.volverA`). **Pendientes: C, A, B, E** (ver `docs/PENDIENTES.md`).
+
 **Última ronda — preparación de producción (24-jun-2026), commiteado:**
 - **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado` que el
   agente sincroniza desde Firebird (`VEND`/`EMPL`); `IEmpleadoDirectorio` resuelve `(estación,código)→

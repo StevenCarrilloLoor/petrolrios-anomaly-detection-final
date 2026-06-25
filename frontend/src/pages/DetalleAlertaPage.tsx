@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { alertasService } from "@/services/alertas.service";
 import { usuariosService } from "@/services/usuarios.service";
@@ -91,7 +91,14 @@ const METADATA_LABELS: Record<string, string> = {
 export function DetalleAlertaPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+
+  // Origen de la navegación: si vinimos desde "Problemas de estación", el botón Volver regresa allí
+  // (con la estación aún expandida) en vez de mandar siempre a la bandeja de alertas.
+  const volver = (location.state as { volverA?: string; volverLabel?: string } | null) ?? null;
+  const volverA = volver?.volverA ?? "/alertas";
+  const volverLabel = volver?.volverLabel ?? "Volver a alertas";
   const { user } = useAuth();
   const [assignAuditorId, setAssignAuditorId] = useState("");
   const [nuevoComentario, setNuevoComentario] = useState("");
@@ -170,10 +177,10 @@ export function DetalleAlertaPage() {
         <FileWarning size={36} className="text-muted-foreground/50" />
         <p className="text-muted-foreground">Alerta no encontrada.</p>
         <button
-          onClick={() => navigate("/alertas")}
+          onClick={() => navigate(volverA)}
           className="text-primary hover:underline"
         >
-          Volver a alertas
+          {volverLabel}
         </button>
       </div>
     );
@@ -193,10 +200,10 @@ export function DetalleAlertaPage() {
   return (
     <div className="space-y-6">
       <button
-        onClick={() => navigate("/alertas")}
+        onClick={() => navigate(volverA)}
         className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft size={16} /> Volver a alertas
+        <ArrowLeft size={16} /> {volverLabel}
       </button>
 
       {/* Cabecera */}

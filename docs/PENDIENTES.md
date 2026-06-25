@@ -1,7 +1,17 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 24 de junio de 2026.
+Última actualización: 25 de junio de 2026.
+
+---
+
+## 🔵 Lote del 25-jun (revisión del ingeniero — 6 mejoras, en etapas)
+- **D** [x] **HECHO + Chrome** — abrir el detalle desde "Problemas de estación" sin perder la pestaña: la estación expandida + días viven en la URL (`?dias&g`) y el detalle vuelve a su origen con el botón "Volver a problemas de estación". (CAMBIOS §56)
+- **F** [x] **HECHO + gate verde** — alertas de reglas personalizadas legibles: descripción de la regla + condición en lenguaje natural en la alerta (la condición técnica queda en la evidencia). (CAMBIOS §56)
+- **C** [ ] Editar reglas del motor: mostrar la **unidad del umbral** (horas/galones/$/%/conteo) con tooltip + permitir **doble carril** (Operativa **y** Auditoría a la vez) → `AmbitoAlerta.Ambos`.
+- **A** [ ] **Notificación por correo por regla** (motor + personalizadas): flag por regla; el job envía correo cuando esa regla dispara (no solo en críticas).
+- **B** [ ] Ajustes: la conexión a BD ya es solo-admin; falta **sección de operación** (nivel que dispara correo + cron del job, persistidos como `ConexionStore`) y **tamaño de letra** accesible para todos.
+- **E** [ ] **Leído/no leído por usuario**: entidad `AlertaVista` (alerta×usuario) + endpoint marcar-vista + indicador por cuenta (si el admin la ve, el auditor la sigue viendo nueva).
 
 ---
 

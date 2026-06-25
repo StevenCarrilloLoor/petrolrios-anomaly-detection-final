@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { alertasService } from "@/services/alertas.service";
 import type { ProblemaEstacionGrupo } from "@/types/alert";
@@ -10,8 +9,33 @@ const DIAS_OPCIONES = [1, 7, 30];
 
 export function ProblemasEstacionPage() {
   const navigate = useNavigate();
-  const [dias, setDias] = useState(7);
-  const [abierto, setAbierto] = useState<string | null>(null);
+  // Estado de la vista en la URL: al abrir el detalle de un problema y volver, la estación sigue
+  // expandida y con el mismo rango de días, sin perder el contexto de revisión.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dias = Number(searchParams.get("dias")) || 7;
+  const abierto = searchParams.get("g");
+
+  const setDias = (d: number) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("dias", String(d));
+        next.delete("g");
+        return next;
+      },
+      { replace: true },
+    );
+
+  const alternarAbierto = (clave: string) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (next.get("g") === clave) next.delete("g");
+        else next.set("g", clave);
+        return next;
+      },
+      { replace: true },
+    );
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["problemas-estacion", dias],
@@ -93,7 +117,7 @@ export function ProblemasEstacionPage() {
                 >
                   <button
                     type="button"
-                    onClick={() => setAbierto(expandido ? null : clave)}
+                    onClick={() => alternarAbierto(clave)}
                     className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
                   >
                     <span className="flex items-center gap-2 font-medium text-foreground">
@@ -119,7 +143,14 @@ export function ProblemasEstacionPage() {
                         <li key={p.id}>
                           <button
                             type="button"
-                            onClick={() => navigate(`/alertas/${p.id}`)}
+                            onClick={() =>
+                              navigate(`/alertas/${p.id}`, {
+                                state: {
+                                  volverA: `/problemas-estacion?${searchParams.toString()}`,
+                                  volverLabel: "Volver a problemas de estación",
+                                },
+                              })
+                            }
                             title="Ver el detalle de este problema"
                             className="group block w-full px-4 py-2.5 pl-11 text-left transition-colors hover:bg-muted/40"
                           >
