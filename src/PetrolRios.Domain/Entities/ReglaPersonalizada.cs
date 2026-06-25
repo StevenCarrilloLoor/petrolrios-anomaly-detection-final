@@ -63,9 +63,12 @@ public class ReglaPersonalizada : BaseEntity
             CamposMostrarJson = string.IsNullOrWhiteSpace(camposMostrarJson) ? null : camposMostrarJson
         };
 
-    /// <summary>Acepta solo "Operativa" o "Auditoria" (por defecto Auditoría).</summary>
-    public static string NormalizarAmbito(string? ambito) =>
-        string.Equals(ambito?.Trim(), "Operativa", StringComparison.OrdinalIgnoreCase)
-            ? "Operativa"
-            : "Auditoria";
+    /// <summary>Acepta "Operativa", "Auditoria" o "Ambos" (doble carril); por defecto Auditoría.</summary>
+    public static string NormalizarAmbito(string? ambito)
+    {
+        var a = ambito?.Trim();
+        if (string.Equals(a, "Operativa", StringComparison.OrdinalIgnoreCase)) return "Operativa";
+        if (string.Equals(a, "Ambos", StringComparison.OrdinalIgnoreCase)) return "Ambos";
+        return "Auditoria";
+    }
 }

@@ -114,10 +114,13 @@ public sealed class CustomRuleDetector : IAnomalyDetector
     }
 
     /// <summary>Carril de la alerta según el ámbito configurado en la regla (por defecto Auditoría).</summary>
-    private static AmbitoAlerta AmbitoDe(ReglaPersonalizada regla) =>
-        string.Equals(regla.Ambito?.Trim(), "Operativa", StringComparison.OrdinalIgnoreCase)
-            ? AmbitoAlerta.Operativa
-            : AmbitoAlerta.Auditoria;
+    private static AmbitoAlerta AmbitoDe(ReglaPersonalizada regla)
+    {
+        var a = regla.Ambito?.Trim();
+        if (string.Equals(a, "Operativa", StringComparison.OrdinalIgnoreCase)) return AmbitoAlerta.Operativa;
+        if (string.Equals(a, "Ambos", StringComparison.OrdinalIgnoreCase)) return AmbitoAlerta.Ambos;
+        return AmbitoAlerta.Auditoria;
+    }
 
     private static List<object> ObtenerFuente(DetectionContext context, string fuente) => fuente switch
     {

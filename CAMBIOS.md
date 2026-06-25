@@ -1536,3 +1536,30 @@ de alertas, sigue diciendo "Volver a alertas".
 vite build` limpio. En Chrome (stack arriba): Problemas de estación → abrir "Turno 990001 sin cerrar"
 (Alerta #19) → el detalle muestra **"← Volver a problemas de estación"** → al pulsarlo regresa con
 "Estación Patricia Pilar" **aún expandida** (URL conserva `?g=…`). Etapas B/C/A/E pendientes.
+
+---
+
+## 57. Lote del 25-jun — etapa 2 (C): unidad del umbral + doble carril
+
+Mejora al editor de las reglas del **motor** (las predeterminadas):
+
+**Unidad del umbral.** Antes, al editar una regla solo se veía "umbral 18" sin saber si eran horas,
+dólares, % o galones. Ahora cada regla muestra su **unidad** junto al número ("umbral 18 horas",
+"umbral 50 USD ($)", "umbral 3 veces", "umbral 30 %", "1 = activado"…) y un **tooltip** que explica
+qué representa y el parámetro técnico. Es metadato **derivado del parámetro** en `ReglaService`
+(`UmbralMeta`, 20 entradas) → expuesto como `Unidad` + `AyudaUmbral` en `ReglaDeteccionResponse`;
+**sin columna nueva ni migración** (los parámetros del motor son fijos).
+
+**Doble carril (Operativa Y Auditoría).** Nuevo valor `AmbitoAlerta.Ambos`. El chip de carril en
+Reglas ahora **cicla** Operativa → Auditoría → **Ambos** (violeta). Una alerta "Ambos" aparece en
+"Problemas de estación" (se avisa a la estación) **y** en la bandeja del central: `AlertaService`
+incluye `Ambos` en la consulta de problemas, `AnomalyDetectionJob` la suma al digest operativo y
+emite los **dos** eventos SignalR (`ProblemaEstacion` + `NuevaAlerta`, cada uno con su NotificationId,
+vía el nuevo `PublicarPushAsync`). Los detectores ya lo respetan (`DetectionRuleBase.Carril` devuelve
+el ámbito; `CustomRuleDetector.AmbitoDe` y `ReglaPersonalizada.NormalizarAmbito` aceptan "Ambos"). El
+enum se guarda como int, así que **tampoco hubo migración** (EF: "No changes to the model").
+
+**Verificación.** Build Release 0w/0e; Domain **40** + Detectors **119**; `ef has-pending-model-changes`
+= sin cambios; `tsc -b && vite build` limpio. En Chrome: cada umbral muestra su unidad (50 USD, 3
+veces, 30 días, 30 %, 18 horas, 1 = activado); el chip de "Diferencia efectivo" cicló Auditoría →
+Ambos (violeta, contador "Ambos: 1") → Operativa → Auditoría (restaurado). Etapas A/B/E pendientes.

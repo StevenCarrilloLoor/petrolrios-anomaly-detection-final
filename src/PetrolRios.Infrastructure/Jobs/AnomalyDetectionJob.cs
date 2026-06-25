@@ -107,7 +107,7 @@ public sealed class AnomalyDetectionJob
 
                         await _dbContext.Alertas.AddAsync(alerta, ct);
                         totalAlertas++;
-                        if (alerta.Ambito == AmbitoAlerta.Operativa)
+                        if (alerta.Ambito is AmbitoAlerta.Operativa or AmbitoAlerta.Ambos)
                             operativasDeEstacion.Add(alerta);
 
                         // Notificar por SignalR
@@ -320,8 +320,27 @@ public sealed class AnomalyDetectionJob
         // a sus propios clientes SignalR). Así el tiempo real funciona con varias instancias
         // compartiendo una sola base, sin Redis.
         //
+        // Carriles: Auditoría/Ambos → bandeja del central (evento "NuevaAlerta"); Operativa/Ambos →
+        // problema de estación (evento "ProblemaEstacion", incluye el grupo de la estación). Una alerta
+        // de carril "Ambos" emite los DOS eventos (cada uno con su NotificationId) y aparece en ambos
+        // lados. Una Operativa NUNCA emite "NuevaAlerta", para no confundir a los auditores.
+        var esOperativa = alerta.Ambito is AmbitoAlerta.Operativa or AmbitoAlerta.Ambos;
+        var esAuditoria = alerta.Ambito is AmbitoAlerta.Auditoria or AmbitoAlerta.Ambos;
+
+        if (esAuditoria)
+            await PublicarPushAsync(alerta, estacionId, "NuevaAlerta",
+                "auditores", "supervisores", "administradores");
+
+        if (esOperativa)
+            await PublicarPushAsync(alerta, estacionId, "ProblemaEstacion",
+                "auditores", "supervisores", "administradores", $"estacion-{estacionId}");
+    }
+
+    private Task PublicarPushAsync(Alerta alerta, int estacionId, string evento, params string[] grupos)
+    {
         // La entidad todavía puede no tener Id (SaveChanges ocurre al finalizar el lote); el
-        // NotificationId permite al cliente deduplicar sin confundir dos alertas con Id = 0.
+        // NotificationId permite al cliente deduplicar sin confundir dos notificaciones (incluidos
+        // los dos eventos de una alerta "Ambos").
         var payload = new AlertaNotificacionPayload(
             NotificationId: Guid.NewGuid().ToString("N"),
             Id: alerta.Id,
@@ -333,12 +352,6 @@ public sealed class AnomalyDetectionJob
             FechaDeteccion: alerta.FechaDeteccion,
             EstacionId: estacionId);
 
-        // Operativa = problema de estación (pestaña "Problemas de estación" + Monitor de estación);
-        // NUNCA "NuevaAlerta", para no confundir a los auditores. Auditoría = bandeja del central.
-        var (evento, grupos) = alerta.Ambito == AmbitoAlerta.Operativa
-            ? ("ProblemaEstacion", new[] { "auditores", "supervisores", "administradores", $"estacion-{estacionId}" })
-            : ("NuevaAlerta", new[] { "auditores", "supervisores", "administradores" });
-
-        await _broadcaster.PublicarAsync(new AlertaPush(evento, grupos, payload));
+        return _broadcaster.PublicarAsync(new AlertaPush(evento, grupos, payload));
     }
 }

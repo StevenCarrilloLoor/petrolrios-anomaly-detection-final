@@ -66,15 +66,50 @@ public sealed class ReglaService : IReglaService
         await _unitOfWork.SaveChangesAsync(ct);
     }
 
-    private static ReglaDeteccionResponse MapToResponse(ReglaDeteccion r) => new()
+    /// <summary>
+    /// Unidad + ayuda del umbral por parámetro: para que el editor muestre qué significa cada número
+    /// (antes solo se veía "umbral 18" sin saber si eran horas, $, % o galones). Los parámetros del
+    /// motor son fijos, así que es metadato en código (no necesita columna en BD).
+    /// </summary>
+    private static readonly Dictionary<string, (string Unidad, string Ayuda)> UmbralMeta = new()
     {
-        Id = r.Id,
-        TipoDetector = r.TipoDetector.ToString(),
-        Nombre = r.Nombre,
-        Descripcion = r.Descripcion,
-        ParametroNombre = r.ParametroNombre,
-        ValorUmbral = r.ValorUmbral,
-        Activa = r.Activa,
-        Ambito = r.Ambito.ToString()
+        ["DiferenciaEfectivoUmbral"] = ("USD ($)", "Diferencia en dólares entre el efectivo reportado y el calculado por el sistema, por turno."),
+        ["FaltantesRecurrentesMaximo"] = ("veces", "Número de faltantes del mismo empleado en el período para considerarlo patrón (gineteo)."),
+        ["FaltantesRecurrentesDias"] = ("días", "Días hacia atrás para evaluar el patrón de faltantes recurrentes."),
+        ["CreditoSinClienteHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
+        ["EfectivoCorporativoPorcentajeUmbral"] = ("%", "Porcentaje de ventas en efectivo sobre clientes corporativos que dispara la alerta."),
+        ["AnulacionesPorcentajeUmbral"] = ("%", "Porcentaje de anulaciones sobre las transacciones del día (lo normal es <2%)."),
+        ["PrecioFueraListaHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
+        ["CamposObligatoriosHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
+        ["DescuentoPorcentajeMaximo"] = ("%", "Porcentaje máximo de descuento permitido por la política comercial."),
+        ["TotalInconsistenteHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
+        ["ReversionTarjetaMinutosUmbral"] = ("minutos", "Minutos tras la venta a partir de los cuales una reversión de tarjeta es sospechosa."),
+        ["CreditoSinAutorizacionHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
+        ["DuplicadaMinutosUmbral"] = ("minutos", "Ventana en minutos para considerar dos cobros (misma tarjeta y monto) como duplicados."),
+        ["DespachosRapidosMinutosUmbral"] = ("minutos", "Minutos máximos entre despachos consecutivos del mismo cliente para marcarlos como sospechosos."),
+        ["PlacaGenericaGalonesMaximo"] = ("galones", "Galones máximos permitidos a la placa genérica ZZZ999949 (regulación ARCERNNR)."),
+        ["MultipleCombustibleHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
+        ["VentaSinPlacaMontoMinimo"] = ("USD ($)", "Monto en dólares a partir del cual se exige placa registrada (trazabilidad)."),
+        ["TurnoSinCerrarHorasUmbral"] = ("horas", "Horas que un turno puede seguir abierto antes de generar el aviso operativo."),
+        ["DespachoNoFacturadoHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
+        ["FueraHorarioHabilitado"] = ("1 = activado", "Interruptor: 1 activa la regla, 0 la desactiva."),
     };
+
+    private static ReglaDeteccionResponse MapToResponse(ReglaDeteccion r)
+    {
+        var (unidad, ayuda) = UmbralMeta.TryGetValue(r.ParametroNombre, out var m) ? m : ("valor", "");
+        return new()
+        {
+            Id = r.Id,
+            TipoDetector = r.TipoDetector.ToString(),
+            Nombre = r.Nombre,
+            Descripcion = r.Descripcion,
+            ParametroNombre = r.ParametroNombre,
+            ValorUmbral = r.ValorUmbral,
+            Unidad = unidad,
+            AyudaUmbral = ayuda,
+            Activa = r.Activa,
+            Ambito = r.Ambito.ToString()
+        };
+    }
 }

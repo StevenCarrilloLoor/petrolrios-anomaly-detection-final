@@ -20,6 +20,7 @@ import {
   Wand2,
   Building2,
   ShieldCheck,
+  Layers,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -116,6 +117,8 @@ export function ReglasPage() {
   const totalReglas = reglas?.length ?? 0;
   const activas = (reglas ?? []).filter((r) => r.activa).length;
   const operativas = (reglas ?? []).filter((r) => r.ambito === "Operativa").length;
+  const ambos = (reglas ?? []).filter((r) => r.ambito === "Ambos").length;
+  const auditoria = totalReglas - operativas - ambos;
 
   return (
     <div className="space-y-6">
@@ -134,7 +137,7 @@ export function ReglasPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ResumenCard label="Reglas del motor" valor={totalReglas} />
         <ResumenCard label="Activas" valor={activas} acento="ok" />
-        <ResumenCard label="Operativa / Auditoría" valor={`${operativas} / ${totalReglas - operativas}`} />
+        <ResumenCard label="Oper. / Audit. / Ambos" valor={`${operativas} / ${auditoria} / ${ambos}`} />
         <ResumenCard label="Detectores" valor={ORDEN_DETECTORES.length} />
       </div>
 
@@ -236,7 +239,10 @@ export function ReglasPage() {
 
                         <div className="flex shrink-0 items-center gap-3">
                           {editingId === regla.id ? (
-                            <div className="flex items-center gap-1.5">
+                            <div
+                              className="flex items-center gap-1.5"
+                              title={regla.ayudaUmbral || undefined}
+                            >
                               <input
                                 type="number"
                                 value={editValue}
@@ -249,6 +255,11 @@ export function ReglasPage() {
                                 className="w-20 rounded-md border border-primary bg-background px-2 py-1 text-sm outline-none"
                                 step="0.01"
                               />
+                              {regla.unidad && regla.unidad !== "valor" && (
+                                <span className="whitespace-nowrap text-[11px] font-medium text-muted-foreground">
+                                  {regla.unidad}
+                                </span>
+                              )}
                               <button
                                 onClick={() => saveEdit(regla.id)}
                                 disabled={updateMutation.isPending}
@@ -269,10 +280,15 @@ export function ReglasPage() {
                             <button
                               onClick={() => startEdit(regla)}
                               className="group flex items-center gap-2 rounded-md px-2.5 py-1.5 hover:bg-muted"
-                              title={`Editar umbral · parámetro: ${regla.parametroNombre}`}
+                              title={`${regla.ayudaUmbral ? regla.ayudaUmbral + " " : ""}(unidad: ${regla.unidad}) · parámetro técnico: ${regla.parametroNombre}`}
                             >
                               <span className="text-xs text-muted-foreground">umbral</span>
                               <span className="font-mono text-sm font-semibold text-foreground">{regla.valorUmbral}</span>
+                              {regla.unidad && regla.unidad !== "valor" && (
+                                <span className="whitespace-nowrap text-[11px] font-medium text-muted-foreground">
+                                  {regla.unidad}
+                                </span>
+                              )}
                               <Pencil size={11} className="text-muted-foreground/40 group-hover:text-primary" />
                             </button>
                           )}
@@ -306,7 +322,27 @@ export function ReglasPage() {
   );
 }
 
-/** Chip del carril, clicable para alternar Operativa ↔ Auditoría. */
+type Carril = "Operativa" | "Auditoria" | "Ambos";
+
+const CARRIL_ESTILO: Record<Carril, { label: string; icon: ReactNode; clase: string }> = {
+  Operativa: {
+    label: "Operativa",
+    icon: <Building2 size={11} />,
+    clase: "bg-amber-500/10 text-amber-600 ring-amber-500/30 hover:bg-amber-500/20 dark:text-amber-400",
+  },
+  Auditoria: {
+    label: "Auditoría",
+    icon: <ShieldCheck size={11} />,
+    clase: "bg-primary/10 text-primary ring-primary/30 hover:bg-primary/20",
+  },
+  Ambos: {
+    label: "Ambos",
+    icon: <Layers size={11} />,
+    clase: "bg-violet-500/10 text-violet-600 ring-violet-500/30 hover:bg-violet-500/20 dark:text-violet-400",
+  },
+};
+
+/** Chip del carril, clicable para ciclar Operativa → Auditoría → Ambos. */
 function CarrilChip({
   regla,
   pendiente,
@@ -314,23 +350,30 @@ function CarrilChip({
 }: {
   regla: ReglaDeteccionResponse;
   pendiente: boolean;
-  onCambiar: (ambito: "Operativa" | "Auditoria") => void;
+  onCambiar: (ambito: Carril) => void;
 }) {
-  const esOperativa = regla.ambito === "Operativa";
-  const destino = esOperativa ? "Auditoria" : "Operativa";
+  const siguiente: Record<Carril, Carril> = {
+    Operativa: "Auditoria",
+    Auditoria: "Ambos",
+    Ambos: "Operativa",
+  };
+  const actual: Carril = (["Operativa", "Auditoria", "Ambos"] as Carril[]).includes(
+    regla.ambito as Carril,
+  )
+    ? (regla.ambito as Carril)
+    : "Auditoria";
+  const e = CARRIL_ESTILO[actual];
+  const destino = siguiente[actual];
+  const destinoLabel = CARRIL_ESTILO[destino].label;
   return (
     <button
       onClick={() => onCambiar(destino)}
       disabled={pendiente}
-      title={`Carril ${esOperativa ? "Operativa" : "Auditoría"} · clic para cambiar a ${destino === "Auditoria" ? "Auditoría" : "Operativa"}`}
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset transition-colors disabled:opacity-50 ${
-        esOperativa
-          ? "bg-amber-500/10 text-amber-600 ring-amber-500/30 hover:bg-amber-500/20 dark:text-amber-400"
-          : "bg-primary/10 text-primary ring-primary/30 hover:bg-primary/20"
-      }`}
+      title={`Carril ${e.label} · clic para cambiar a ${destinoLabel}. Operativa = avisa a la estación; Auditoría = bandeja del central; Ambos = los dos a la vez.`}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset transition-colors disabled:opacity-50 ${e.clase}`}
     >
-      {esOperativa ? <Building2 size={11} /> : <ShieldCheck size={11} />}
-      {esOperativa ? "Operativa" : "Auditoría"}
+      {e.icon}
+      {e.label}
     </button>
   );
 }

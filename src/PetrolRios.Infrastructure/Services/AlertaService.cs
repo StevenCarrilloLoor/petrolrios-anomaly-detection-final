@@ -63,7 +63,8 @@ public sealed class AlertaService : IAlertaService
 
         var query = _dbContext.Alertas
             .Include(a => a.Estacion)
-            .Where(a => a.Ambito == AmbitoAlerta.Operativa && a.FechaDeteccion >= desde);
+            .Where(a => (a.Ambito == AmbitoAlerta.Operativa || a.Ambito == AmbitoAlerta.Ambos)
+                        && a.FechaDeteccion >= desde);
 
         if (estacionId is not null)
             query = query.Where(a => a.EstacionId == estacionId);

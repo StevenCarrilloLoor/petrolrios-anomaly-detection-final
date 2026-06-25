@@ -19,5 +19,13 @@ public enum AmbitoAlerta
     /// autorizados, cuadre forzado). Queda en la bandeja de auditoría del central; NO se envía
     /// al administrador de la estación. Es una anomalía a auditar, no un fraude confirmado.
     /// </summary>
-    Auditoria = 2
+    Auditoria = 2,
+
+    /// <summary>
+    /// Doble carril: la alerta es a la vez problema operativo de la estación Y anomalía a auditar.
+    /// Aparece en "Problemas de estación" (y se avisa al administrador de la estación) Y en la
+    /// bandeja del central. Útil para reglas que importan a ambos (p. ej. un despacho irregular que
+    /// la estación debe corregir y el central debe auditar).
+    /// </summary>
+    Ambos = 3
 }

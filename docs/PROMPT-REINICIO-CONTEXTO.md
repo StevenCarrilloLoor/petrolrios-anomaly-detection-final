@@ -101,7 +101,12 @@ pestaña, (E) leído/no leído por usuario, (F) alertas de reglas personalizadas
 - **Etapa 1 (D + F) HECHA y verificada** (build Release 0w/0e, 119/119 Detectors, front limpio; Chrome:
   "Volver a problemas de estación" regresa con la estación expandida). `CustomRuleDetector` ahora lidera la
   descripción con `regla.Descripcion` + condición en lenguaje natural; `ProblemasEstacionPage`/`DetalleAlertaPage`
-  guardan el origen (`?dias&g` + `state.volverA`). **Pendientes: C, A, B, E** (ver `docs/PENDIENTES.md`).
+  guardan el origen (`?dias&g` + `state.volverA`).
+- **Etapa 2 (C) HECHA y verificada** (Domain 40 + Detectors 119, EF "sin cambios al modelo", front limpio;
+  Chrome: cada umbral muestra su unidad —50 USD, 18 horas, 30 %, 1=activado—; el chip de carril cicla a
+  `Ambos` violeta y se restauró). Unidad derivada en `ReglaService.UmbralMeta` (sin columna) + nuevo
+  `AmbitoAlerta.Ambos` con routing en `AnomalyDetectionJob`/`AlertaService`; sin migración (enum int).
+  **Pendientes: A, B, E** (ver `docs/PENDIENTES.md`).
 
 **Última ronda — preparación de producción (24-jun-2026), commiteado:**
 - **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado` que el

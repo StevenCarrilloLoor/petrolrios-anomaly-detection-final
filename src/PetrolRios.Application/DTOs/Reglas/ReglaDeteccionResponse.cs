@@ -8,6 +8,16 @@ public sealed record ReglaDeteccionResponse
     public string Descripcion { get; init; } = string.Empty;
     public string ParametroNombre { get; init; } = string.Empty;
     public double ValorUmbral { get; init; }
+
+    /// <summary>
+    /// Unidad del umbral para que el usuario sepa qué está editando: "horas", "minutos", "días",
+    /// "%", "USD ($)", "galones", "veces" o "1 = activado / 0 = desactivado". Derivada del parámetro.
+    /// </summary>
+    public string Unidad { get; init; } = "";
+
+    /// <summary>Explicación corta de qué representa el umbral (para el tooltip del editor).</summary>
+    public string AyudaUmbral { get; init; } = "";
+
     public bool Activa { get; init; }
 
     /// <summary>
