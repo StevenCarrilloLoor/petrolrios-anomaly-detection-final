@@ -11,7 +11,9 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 - **C** [x] **HECHO + Chrome** — unidad del umbral (horas/$/%/galones/veces/"1=activado") con tooltip + **doble carril** `AmbitoAlerta.Ambos` (el chip cicla Operativa→Auditoría→Ambos; routing en `AnomalyDetectionJob` + `AlertaService`). Sin migración (enum int + unidad derivada). (CAMBIOS §57)
 - **A** [x] **HECHO + Chrome** — correo por regla (motor + personalizadas): flag `NotificarCorreo` (migración `NotificarCorreoRegla`) estampado en `RuleBasedDetector`/`CustomRuleDetector` → el job llama `NotificarReglaPorCorreoAsync`; UI campana (motor) + casilla "Avisar por correo" (custom). (CAMBIOS §58)
 - **B** [x] **HECHO + Chrome** — Ajustes: conexión BD ya era solo-admin (confirmado); nueva sección **Operación del sistema** (nivel mínimo de correo + cron del job → `config/operacion.json`, re-registra el job en vivo) y **tamaño de letra** Normal/Grande/Mayor para todos. (CAMBIOS §59)
-- **E** [ ] **Leído/no leído por usuario**: entidad `AlertaVista` (alerta×usuario) + endpoint marcar-vista + indicador por cuenta (si el admin la ve, el auditor la sigue viendo nueva).
+- **E** [x] **HECHO + Chrome** — leído/no leído por usuario: entidad `AlertaVista` (índice único alerta×usuario) + migración `AlertaVistaPorUsuario` + `POST /alertas/{id}/marcar-vista` + `GET /alertas/vistas`; el detalle marca al abrir, la lista muestra punto azul "nueva para ti". (CAMBIOS §60)
+
+> **Lote del 25-jun COMPLETO: A, B, C, D, E, F hechos y verificados en Chrome.**
 
 ---
 

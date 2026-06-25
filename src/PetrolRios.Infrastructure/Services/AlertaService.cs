@@ -195,6 +195,25 @@ public sealed class AlertaService : IAlertaService
         };
     }
 
+    public async Task MarcarVistaAsync(int alertaId, int usuarioId, CancellationToken ct = default)
+    {
+        // Idempotente: si este usuario ya marcó la alerta como vista, no hace nada.
+        var yaVista = await _dbContext.AlertasVistas
+            .AnyAsync(v => v.AlertaId == alertaId && v.UsuarioId == usuarioId, ct);
+        if (yaVista) return;
+
+        await _dbContext.AlertasVistas.AddAsync(AlertaVista.Create(alertaId, usuarioId), ct);
+        await _dbContext.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<int>> GetVistasAsync(int usuarioId, CancellationToken ct = default)
+    {
+        return await _dbContext.AlertasVistas
+            .Where(v => v.UsuarioId == usuarioId)
+            .Select(v => v.AlertaId)
+            .ToListAsync(ct);
+    }
+
     private static AlertaResponse MapToResponse(
         Alerta a, Dictionary<int, string> estaciones, DirectorioEmpleados empleados) => new()
     {

@@ -54,6 +54,15 @@ export function AlertasPage() {
     refetchInterval: 15_000,
   });
 
+  // Estado leído/no leído POR USUARIO: los ids de alertas que YO ya abrí (independiente de los demás:
+  // si el admin ya vio una, el auditor la sigue viendo como "nueva para él" hasta que él la abra).
+  const { data: vistas } = useQuery({
+    queryKey: ["alertas", "vistas"],
+    queryFn: alertasService.getVistas,
+    refetchInterval: 30_000,
+  });
+  const vistasSet = new Set(vistas ?? []);
+
   const hayFiltros =
     tipoDetector || nivelRiesgo || estado || estacionId || fechaDesde || fechaHasta;
 
@@ -200,7 +209,15 @@ export function AlertasPage() {
                     className="cursor-pointer border-t border-border transition-colors hover:bg-muted/50"
                   >
                     <td className="px-4 py-3 font-mono text-muted-foreground">
-                      #{alerta.id}
+                      <span className="inline-flex items-center gap-1.5">
+                        {!vistasSet.has(alerta.id) && (
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full bg-primary"
+                            title="Nueva para ti (aún no la has abierto)"
+                          />
+                        )}
+                        #{alerta.id}
+                      </span>
                     </td>
                     <td className="max-w-md px-4 py-3">
                       <p className="font-medium">

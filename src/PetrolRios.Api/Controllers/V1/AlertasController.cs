@@ -166,4 +166,35 @@ public sealed class AlertasController : ControllerBase
 
         return CreatedAtAction(nameof(GetComentarios), new { id }, result);
     }
+
+    /// <summary>
+    /// Marca esta alerta como vista por el usuario actual (estado leído/no leído POR USUARIO; no
+    /// afecta a lo que ven los demás). Idempotente.
+    /// </summary>
+    [HttpPost("{id:int}/marcar-vista")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> MarcarVista(int id, CancellationToken ct)
+    {
+        var usuarioIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(usuarioIdClaim, out var usuarioId))
+            return Unauthorized();
+
+        await _alertaService.MarcarVistaAsync(id, usuarioId, ct);
+        return NoContent();
+    }
+
+    /// <summary>IDs de las alertas que el usuario actual ya vio (para resaltar las "nuevas para ti").</summary>
+    [HttpGet("vistas")]
+    [ProducesResponseType(typeof(IReadOnlyList<int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetVistas(CancellationToken ct)
+    {
+        var usuarioIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(usuarioIdClaim, out var usuarioId))
+            return Unauthorized();
+
+        var vistas = await _alertaService.GetVistasAsync(usuarioId, ct);
+        return Ok(vistas);
+    }
 }

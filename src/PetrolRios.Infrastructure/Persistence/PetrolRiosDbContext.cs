@@ -8,6 +8,7 @@ public class PetrolRiosDbContext : DbContext
     public PetrolRiosDbContext(DbContextOptions<PetrolRiosDbContext> options) : base(options) { }
 
     public DbSet<Alerta> Alertas => Set<Alerta>();
+    public DbSet<AlertaVista> AlertasVistas => Set<AlertaVista>();
     public DbSet<AsignacionAlerta> AsignacionesAlerta => Set<AsignacionAlerta>();
     public DbSet<ComentarioAlerta> ComentariosAlerta => Set<ComentarioAlerta>();
     public DbSet<EjecucionJob> EjecucionesJob => Set<EjecucionJob>();

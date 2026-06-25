@@ -102,6 +102,39 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.ToTable("alertas", (string)null);
                 });
 
+            modelBuilder.Entity("PetrolRios.Domain.Entities.AlertaVista", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AlertaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaVista")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.HasIndex("AlertaId", "UsuarioId")
+                        .IsUnique();
+
+                    b.ToTable("alertas_vistas", (string)null);
+                });
+
             modelBuilder.Entity("PetrolRios.Domain.Entities.AsignacionAlerta", b =>
                 {
                     b.Property<int>("Id")

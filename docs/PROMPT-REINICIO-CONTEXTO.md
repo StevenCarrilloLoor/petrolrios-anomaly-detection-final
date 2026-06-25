@@ -116,7 +116,14 @@ pestaña, (E) leído/no leído por usuario, (F) alertas de reglas personalizadas
   (solo Admin: nivel mínimo de correo + cron, en `config/operacion.json` vía `IParametrosOperacion`/
   `ParametrosOperacionStore`/`ParametrosOperacionController`; el job lee el nivel y `Program.cs`/el
   controller el cron). La conexión BD ya era solo-Admin. Sin migración.
-  **Pendiente: E** (leído/no leído por usuario) — ver `docs/PENDIENTES.md`.
+- **Etapa 5 (E) HECHA y verificada** (build 0w/0e, migración `AlertaVistaPorUsuario`, EF sin cambios,
+  Domain 40 + Detectors 119, front limpio; Chrome: abrí la #31 y su punto azul desapareció, la #30 lo
+  conserva). **Leído/no leído POR USUARIO**: entidad `AlertaVista` (único alerta×usuario) +
+  `POST /alertas/{id}/marcar-vista` + `GET /alertas/vistas` (usuario del token); `DetalleAlertaPage`
+  marca al abrir, `AlertasPage` pinta el punto azul "nueva para ti".
+
+**→ Lote de 6 mejoras del 25-jun (A–F) COMPLETO y verificado en Chrome. Commits `603f096`, `46894be`,
+`46643d6`, `1ad7a39` + el de E.** Stack levantado con `INICIAR_TODO.bat`.
 
 **Última ronda — preparación de producción (24-jun-2026), commiteado:**
 - **Nombre del empleado en las alertas** (no solo el código): catálogo central `Empleado` que el

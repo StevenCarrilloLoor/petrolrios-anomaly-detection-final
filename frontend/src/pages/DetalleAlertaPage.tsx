@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -105,6 +105,16 @@ export function DetalleAlertaPage() {
 
   const alertaId = Number(id);
   const canAssign = user?.rol === "Supervisor" || user?.rol === "Administrador";
+
+  // Al abrir el detalle, marcar la alerta como vista POR ESTE usuario (no afecta a lo que ven los
+  // demás) y refrescar el set de vistas para que la lista la deje de marcar como "nueva para ti".
+  useEffect(() => {
+    if (!id) return;
+    alertasService
+      .marcarVista(alertaId)
+      .then(() => queryClient.invalidateQueries({ queryKey: ["alertas", "vistas"] }))
+      .catch(() => {});
+  }, [alertaId, id, queryClient]);
 
   const { data: alerta, isLoading } = useQuery({
     queryKey: ["alertas", alertaId],

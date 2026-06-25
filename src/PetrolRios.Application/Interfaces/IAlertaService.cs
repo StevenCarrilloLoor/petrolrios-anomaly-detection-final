@@ -29,4 +29,10 @@ public interface IAlertaService
     Task<IReadOnlyList<ComentarioResponse>> GetComentariosAsync(int alertaId, CancellationToken ct = default);
     Task<ComentarioResponse> AgregarComentarioAsync(
         int alertaId, int usuarioId, AgregarComentarioRequest request, CancellationToken ct = default);
+
+    /// <summary>Marca una alerta como vista por un usuario concreto (leído/no leído POR USUARIO).</summary>
+    Task MarcarVistaAsync(int alertaId, int usuarioId, CancellationToken ct = default);
+
+    /// <summary>IDs de las alertas que el usuario ya vio (para marcar "nuevas para ti" en la lista).</summary>
+    Task<IReadOnlyList<int>> GetVistasAsync(int usuarioId, CancellationToken ct = default);
 }

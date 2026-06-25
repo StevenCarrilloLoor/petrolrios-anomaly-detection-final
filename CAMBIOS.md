@@ -1612,3 +1612,25 @@ arrancar (`Program.cs`) y se **re-registra en vivo** al guardar (`RecurringJob.A
 **Verificación.** Build Release 0w/0e; EF "sin cambios al modelo"; Domain **40** + Detectors **119**;
 `tsc -b && vite build` limpio. En Chrome: "Grande" agranda todo el panel (restaurado a Normal); la tarjeta
 "Operación del sistema" cargó "Solo críticas" + cron "* * * * *" desde la API. **Etapa E pendiente.**
+
+---
+
+## 60. Lote del 25-jun — etapa 5 (E): estado leído/no leído POR USUARIO
+
+Cierra el lote de 6 mejoras. Antes, "Nueva" era el estado **global** de la alerta; no había forma de
+saber **qué he visto YO** sin alterar lo que ven los demás. Ahora cada usuario tiene su propio
+leído/no leído, independiente del resto.
+
+**Backend.** Entidad `AlertaVista` (AlertaId, UsuarioId, FechaVista) + config con índice **único**
+(AlertaId, UsuarioId) + migración `AlertaVistaPorUsuario`. `IAlertaService`/`AlertaService`:
+`MarcarVistaAsync` (idempotente) + `GetVistasAsync`. `AlertasController`: `POST /alertas/{id}/marcar-vista`
+y `GET /alertas/vistas`, ambos con el usuario del token (claim `NameIdentifier`).
+
+**Frontend.** Al abrir el detalle, `DetalleAlertaPage` llama `marcar-vista` (me la marca a MÍ) e invalida
+el set de vistas. La lista (`AlertasPage`) consulta `GET /vistas` y muestra un **punto azul "nueva para
+ti"** en las alertas que aún no he abierto.
+
+**Verificación.** Build Release 0w/0e; migración `20260625181924_AlertaVistaPorUsuario` + EF "sin cambios
+al modelo"; Domain **40** + Detectors **119**; `tsc -b && vite build` limpio. En Chrome: todas las
+alertas con punto azul; abrí la **#31** y al volver su punto **desapareció**, mientras la **#30** (no
+abierta) lo conserva. **Lote de 6 mejoras (A–F) COMPLETO y verificado.**

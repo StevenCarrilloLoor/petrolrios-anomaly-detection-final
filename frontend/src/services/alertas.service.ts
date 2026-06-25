@@ -59,4 +59,11 @@ export const alertasService = {
 
   agregarComentario: (id: number, data: AgregarComentarioRequest) =>
     api.post<ComentarioResponse>(`/alertas/${id}/comentarios`, data).then((r) => r.data),
+
+  /** Marca una alerta como vista por el usuario actual (estado leído/no leído por usuario). */
+  marcarVista: (id: number) =>
+    api.post<void>(`/alertas/${id}/marcar-vista`).then((r) => r.data),
+
+  /** IDs de las alertas que el usuario actual ya vio. */
+  getVistas: () => api.get<number[]>("/alertas/vistas").then((r) => r.data),
 };
