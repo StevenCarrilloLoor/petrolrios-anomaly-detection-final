@@ -23,6 +23,8 @@ export interface ReglaPersonalizadaResponse {
   expresionAvanzada: string | null;
   riesgoBase: number;
   ambito: "Operativa" | "Auditoria";
+  /** Campos a mostrar en la alerta ("Campo" propio o "Fuente.Campo" relacionado). */
+  camposMostrar: string[];
   activa: boolean;
 }
 
@@ -36,6 +38,8 @@ export interface GuardarReglaPersonalizadaRequest {
   expresionAvanzada: string | null;
   riesgoBase: number;
   ambito: "Operativa" | "Auditoria";
+  /** Campos a mostrar en la alerta ("Campo" propio o "Fuente.Campo" relacionado). */
+  camposMostrar: string[];
   activa: boolean;
 }
 
@@ -86,6 +90,8 @@ export interface FuenteCatalogo {
   nombre: string;
   etiqueta: string;
   campos: CampoCatalogo[];
+  /** Campos de tablas relacionadas (nombre "Fuente.Campo") para mostrar en la alerta o filtrar. */
+  camposRelacionados?: CampoCatalogo[];
 }
 
 export interface CatalogoReglasResponse {

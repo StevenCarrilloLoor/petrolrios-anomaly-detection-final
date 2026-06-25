@@ -60,6 +60,8 @@ interface FormularioRegla {
   agregacion: AgregacionRegla;
   riesgoBase: number;
   ambito: "Operativa" | "Auditoria";
+  /** Campos a mostrar en la alerta ("Campo" propio o "Fuente.Campo" relacionado). */
+  camposMostrar: string[];
 }
 
 const formularioVacio = (fuente: string): FormularioRegla => ({
@@ -74,6 +76,7 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
   agregacion: { agruparPor: "", funcion: "Conteo", campo: null, operador: ">", umbral: 1 },
   riesgoBase: 50,
   ambito: "Auditoria",
+  camposMostrar: [],
 });
 
 interface Plantilla {
@@ -187,6 +190,7 @@ export function ReglasPersonalizadasSection() {
         expresionAvanzada: regla.expresionAvanzada,
         riesgoBase: regla.riesgoBase,
         ambito: regla.ambito,
+        camposMostrar: regla.camposMostrar ?? [],
         activa: !regla.activa,
       }),
     onSuccess: invalidar,
@@ -238,6 +242,7 @@ export function ReglasPersonalizadasSection() {
       agregacion: { agruparPor: "", funcion: "Conteo", campo: null, operador: ">", umbral: 1 },
       riesgoBase: p.riesgoBase,
       ambito: p.ambito,
+      camposMostrar: [],
     });
     setEditando(0);
     setErrores([]);
@@ -263,6 +268,7 @@ export function ReglasPersonalizadasSection() {
       },
       riesgoBase: regla.riesgoBase,
       ambito: regla.ambito ?? "Auditoria",
+      camposMostrar: regla.camposMostrar ?? [],
     });
     setEditando(regla.id);
     setErrores([]);
@@ -287,6 +293,7 @@ export function ReglasPersonalizadasSection() {
       expresionAvanzada: f.modoAvanzado ? f.expresion : null,
       riesgoBase: f.riesgoBase,
       ambito: f.ambito,
+      camposMostrar: f.camposMostrar,
       activa: true,
     };
   }
@@ -342,6 +349,22 @@ export function ReglasPersonalizadasSection() {
 
   const camposFuente = (fuente: string) =>
     catalogo?.fuentes.find((f) => f.nombre === fuente)?.campos ?? [];
+
+  /** Campos de tablas relacionadas (nombre "Fuente.Campo") disponibles para esta fuente. */
+  const relacionadosFuente = (fuente: string) =>
+    catalogo?.fuentes.find((f) => f.nombre === fuente)?.camposRelacionados ?? [];
+
+  /** Alterna un campo en la lista "mostrar en la alerta". */
+  function toggleCampoMostrar(nombre: string) {
+    if (!form) return;
+    const ya = form.camposMostrar.includes(nombre);
+    setForm({
+      ...form,
+      camposMostrar: ya
+        ? form.camposMostrar.filter((c) => c !== nombre)
+        : [...form.camposMostrar, nombre],
+    });
+  }
 
   const operadoresPara = (fuente: string, campo: string) => {
     const info = camposFuente(fuente).find((c) => c.nombre === campo);
@@ -755,6 +778,45 @@ export function ReglasPersonalizadasSection() {
                   />
                 </div>
               )}
+            </div>
+
+            {/* Información a mostrar en la alerta (campos propios + relacionados) */}
+            <div className="mt-5 rounded-lg border border-border bg-background p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Información a mostrar en la alerta{" "}
+                <span className="font-normal normal-case text-muted-foreground/70">(opcional)</span>
+              </p>
+              <p className="mb-2.5 mt-0.5 text-[11px] text-muted-foreground">
+                Elige qué datos aparecen en la evidencia de la alerta. Puedes incluir campos de tablas{" "}
+                <span className="text-foreground">relacionadas</span> (placa, vendedor, cliente, N° de
+                factura) para tener más contexto de quién y qué.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[...camposFuente(form.fuenteDatos), ...relacionadosFuente(form.fuenteDatos)].map((c) => {
+                  const activo = form.camposMostrar.includes(c.nombre);
+                  return (
+                    <button
+                      key={c.nombre}
+                      type="button"
+                      onClick={() => toggleCampoMostrar(c.nombre)}
+                      title={c.descripcion}
+                      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                        activo
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {c.icono && <span className="not-italic">{c.icono}</span>}
+                      {c.etiqueta}
+                    </button>
+                  );
+                })}
+                {camposFuente(form.fuenteDatos).length === 0 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Elige una fuente de datos para ver sus campos.
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Riesgo base */}

@@ -1369,3 +1369,38 @@ junto al código y la descripción al pasar el mouse. El usuario ya no ve códig
 Api 69); `tsc -b && vite build` limpio. Sin migración (no toca la BD).
 
 *(Parte 2 — juntar tablas y enriquecer la alerta con campos relacionados — va aparte.)*
+
+---
+
+## 51. Creador de reglas más usable (2/2): juntar tablas + enriquecer la alerta
+
+**Motivación (pedido del ingeniero).** Una regla sobre despachos mostraba el dato del despacho pero no
+"quién, qué placa, qué cliente, qué factura" — eso vive en la Factura, y el creador de reglas no podía
+cruzar tablas (las reglas predefinidas sí, pero por código). Ahora el usuario trae campos de tablas
+relacionadas y elige cuáles aparecen en la alerta, **sin tocar código**.
+
+**Relaciones entre tablas (estilo lookup/linked fields).** Nueva entidad `RelacionTabla`
+(origen→destino por un par de campos + etiqueta), migración `EnriquecimientoReglasYRelaciones`, y un
+seed de la relación clave **Despacho (DetalleFactura) → Factura por código de cliente** (y la inversa).
+El Admin gestiona más vía `GET/POST/PUT/DELETE /api/v1/relaciones-tabla` (`RelacionesTablaController`).
+
+**Campos a mostrar en la alerta.** Nueva columna `CamposMostrarJson` en `ReglaPersonalizada` (lista de
+"Campo" propio o "Fuente.Campo" relacionado). El `/catalogo` adjunta a cada fuente sus
+`CamposRelacionados` (con el rol/ícono/descripción de la Parte 1). En la UI, un selector
+**"Información a mostrar en la alerta"** (chips toggle) deja elegir placa, vendedor, cliente, N° de
+factura, etc., además de los campos propios.
+
+**Enriquecimiento en el detector.** `CustomRuleDetector`, al generar la alerta por registro, resuelve
+los campos elegidos: para los relacionados busca la relación, **cruza en memoria** (el ciclo ya tiene
+todas las tablas cargadas, igual que las reglas predefinidas) por la llave, y agrega el valor a la
+evidencia con etiqueta legible (p. ej. "Placa (Factura)"). Tolerante: lo que no resuelve se omite y
+nunca tumba el ciclo. El job carga las relaciones activas una vez por ciclo (`DetectionContext.Relaciones`).
+
+**Escalable:** una relación nueva = una fila (seed o, a futuro, pantalla de Admin); el motor no cambia.
+
+**Verificación.** Backend: build Debug+Release **0/0**, **migración generada sin cambios pendientes**,
+**tests en verde** (Domain 40, Detectors 119, Monitor 2, Api 69). Frontend: `tsc -b && vite build`
+limpio. *(commit backend `74b84f9`; frontend en este commit.)*
+
+*(Mejora opcional pendiente: pantalla de Admin para el CRUD de relaciones desde la UI; la API ya existe
+y las relaciones clave vienen sembradas, así que el feature funciona de punta a punta sin ella.)*
