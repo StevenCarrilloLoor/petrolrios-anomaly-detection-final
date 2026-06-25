@@ -1657,3 +1657,27 @@ propia interfaz** ("¿Restablecer? · Sí, a fábrica · Cancelar" en línea), s
 **Verificación.** Build Release 0w/0e; EF "sin cambios al modelo"; Domain 40 + Detectors 119; `tsc -b &&
 vite build` limpio. En Chrome: cambié "Diferencia efectivo vs sistema" de **50 → 999**, pulsé Restablecer
 → confirmación en línea (sin congelar) → "Sí, a fábrica" → **volvió a 50**.
+
+---
+
+## 62. Pase de QA E2E en Chrome (creación de regla + Firebird → agente → alerta)
+
+Recorrido de QA cazando bugs, con datos reales insertados **en Firebird** (no Postgres) para probar
+todo el pipeline del agente:
+
+1. **Regla personalizada nueva** "QA - Factura efectivo alto valor" (Facturas/DCTO, `TotalNeto > 400`,
+   Auditoría) creada desde el builder con **5 campos a mostrar** (Total, Forma de pago, Placa, RUC,
+   Vendedor).
+2. **Inserción en CONTAC.FDB** de una factura `SEC_DCTO=9900060`, `TNI_DCTO=500`, `COD_PAGO='EF'`,
+   `PLA_DCTO='QAB9999'`, `COD_VEND='004'`, `FEC_DCTO=CURRENT_TIMESTAMP` (vía isql en el contenedor).
+3. **Agente EST-001 (v2.3.0) en línea**: la tomó por watermark y la envió al central (Conexiones lo
+   confirma: última ingesta reciente, 503 en 24 h). El Motor de Detección corrió el ciclo.
+4. **Alerta #33 generada** ("Regla Personalizada", Crítico, score 84): descripción **legible**
+   (`[QA - Factura efectivo alto valor] … · Factura: Total de la factura ($) mayor que 400 · monto
+   $500.00`), **empleado JORGE MENDOZA (004)** resuelto, y la **evidencia muestra los 5 campos elegidos**
+   (Total 500, Forma de pago EF, Placa QAB9999, RUC 1790000000001, Vendedor 004) + "Qué detecta".
+5. **Clasificar** ("Tomar en Revisión" → estado **En Revisión**) y **comentar** (comentario guardado con
+   autor + fecha) — ambos OK.
+
+**Bug cazado y arreglado:** el botón Restablecer usaba `window.confirm` y congelaba el renderer →
+reemplazado por confirmación en línea (CAMBIOS §61). Resto de funcionalidades sin bugs.

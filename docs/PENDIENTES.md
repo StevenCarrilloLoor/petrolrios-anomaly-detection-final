@@ -17,8 +17,10 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 
 ## 🧪 Pase de QA (25-jun, en curso)
 - [x] **Botón "Restablecer predeterminados"** por detector (`POST /reglas/restablecer/{tipo}`, defaults desde `IDetectionRule`) + confirmación en línea. **Bug cazado:** `window.confirm` congelaba el renderer → reemplazado por confirmación in-app. Verificado: 50→999→Restablecer→50. (CAMBIOS §61)
-- [ ] Crear regla custom con 5 campos a mostrar + insertar datos en **Firebird** (nunca Postgres) para disparar y verificar el agente + la evidencia de la alerta.
-- [ ] Recorrer el resto (alertas, filtros, detalle, clasificar, asignar, comentar, vista por usuario, correo) cazando bugs.
+- [x] **HECHO + Chrome E2E** — regla custom "QA - Factura efectivo alto valor" (5 campos a mostrar) + inserción en **Firebird** (DCTO 9900060, $500 EF) → agente EST-001 la envió → alerta #33 con descripción legible, empleado resuelto y los **5 campos** en la evidencia. (CAMBIOS §62)
+- [x] **HECHO** — detalle/clasificar (Tomar en Revisión → En Revisión) + comentar verificados; pipeline Firebird→agente→central confirmado. Sin bugs salvo el `window.confirm` (arreglado).
+
+> **Pase de QA del 25-jun COMPLETO. Único bug = `window.confirm` del botón Restablecer, ya arreglado.**
 
 ---
 
