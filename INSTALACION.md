@@ -34,7 +34,7 @@ Sistema de detección de anomalías transaccionales. Consta de **dos aplicacione
 Desde el repositorio, en una máquina con el **SDK de .NET 9** y **Node.js**:
 
 ```bat
-ejecutables\4-PUBLICACION\publicar.bat
+ejecutables\5-PUBLICACION-Y-DESPLIEGUE\publicar-servidor-agente-y-monitor.bat
 ```
 
 Esto genera, sin necesidad de .NET en las máquinas destino:
@@ -165,10 +165,10 @@ Para publicar una nueva versión:
 
 | Acción | Comando |
 |---|---|
-| Publicar todo | `ejecutables\4-PUBLICACION\publicar.bat` |
+| Publicar todo | `ejecutables\5-PUBLICACION-Y-DESPLIEGUE\publicar-servidor-agente-y-monitor.bat` |
 | Publicar solo el agente | `scripts\publicar_agente.bat` |
-| Arrancar todo (desarrollo) | `ejecutables\1-INICIO\INICIAR_TODO.bat` |
-| Detener todo (desarrollo) | `ejecutables\1-INICIO\DETENER_TODO.bat` |
+| Arrancar todo (desarrollo) | `ejecutables\1-INICIAR-Y-DETENER\iniciar-todo-el-sistema.bat` |
+| Detener todo (desarrollo) | `ejecutables\1-INICIO\detener-todo-el-sistema.bat` |
 
 ---
 

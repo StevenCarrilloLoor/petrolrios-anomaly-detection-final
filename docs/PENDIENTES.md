@@ -22,6 +22,9 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 
 > **Pase de QA del 25-jun COMPLETO. Único bug = `window.confirm` del botón Restablecer, ya arreglado.**
 
+## 🗂️ Reorganización de scripts (25-jun)
+- [x] **HECHO + gate verde** — todos los `.bat`/`.ps1`/`.sh` movidos (con `git mv`) a `ejecutables/` en 6 carpetas por tipo, con nombres descriptivos y un **resumen al inicio** de cada uno; obsoletos borrados (`verificar_2fa`, `verificar_ronda_fuentes`, 3 wrappers); rutas/cross-refs arregladas; `.gitignore` cubre `firebird_data/` + `*.FDB`; docs e índice `ejecutables/LEEME.md` actualizados. El gate ahora es `ejecutables/4-VERIFICACION-Y-PRUEBAS/verificar-todo-gate-oficial.bat`. (CAMBIOS §64)
+
 ## 🤝 Asignación de alertas "al 1000%" (25-jun)
 - [x] **HECHO + Chrome E2E** — asignar ahora **avisa al asignado por correo** y por **SignalR** (evento `AlertaAsignada`), **registra quién asignó** (`AsignadoPorId`, migración `AsignacionAsignadoPor`) y **muestra a quién está/fue asignada** en el **detalle** (banner "Asignada a X (rol) · por Y · fecha" + tarjeta "Reasignar") y en la **lista** (bajo el estado). `AlertaResponse` ampliado; `AsignarAsync` devuelve la alerta y recibe el asignador. 4 pruebas nuevas (`AlertaServiceAsignacionTests`). (CAMBIOS §63)
 

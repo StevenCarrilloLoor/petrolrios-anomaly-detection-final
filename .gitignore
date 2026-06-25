@@ -70,10 +70,13 @@ coverage*.json
 coverage-results/
 coverage-report/
 
-# Firebird backups grandes
+# Firebird: backups grandes y la BD restaurada (datos, no van al repo)
+firebird_data/
 _arranque/firebird_data/
 *.FBK
 *.fbk
+*.FDB
+*.fdb
 
 # Configuracion real del agente por estacion (contiene contrasenas) — nunca al repo
 agent-config.json

@@ -30,7 +30,7 @@ puertos del router.
 
 1. Asegúrate de que **PostgreSQL** esté corriendo. (En una máquina nueva la base de datos se
    **crea sola** en el primer arranque, gracias a las migraciones de EF Core.)
-2. Ejecuta **como Administrador**: `ejecutables\1-INICIO\INICIAR_CENTRAL_RED.bat`
+2. Ejecuta **como Administrador**: `ejecutables\1-INICIO\iniciar-central-accesible-por-red.bat`
    - Abre el puerto **5170** en el Firewall de Windows.
    - Arranca la API escuchando en **0.0.0.0:5170** (accesible por la red).
    - Te muestra tus IPs: usa la de **ZeroTier** (10.x.x.x).
@@ -50,7 +50,7 @@ puertos del router.
 
 - Desde la PC de la estación, en un navegador: `http://TU-IP-DE-ZEROTIER:5170/api/v1/agente/version`
   debe responder (confirma que el central es alcanzable por la red).
-- Si no responde: revisa que el central se arrancó con `INICIAR_CENTRAL_RED.bat`, que el
+- Si no responde: revisa que el central se arrancó con `iniciar-central-accesible-por-red.bat`, que el
   puerto 5170 está abierto (ejecutar el .bat como Administrador) y que ambas PCs están
   autorizadas (**Auth**) en la misma red de ZeroTier.
 

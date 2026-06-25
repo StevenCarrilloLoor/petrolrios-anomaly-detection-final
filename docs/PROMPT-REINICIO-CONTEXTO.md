@@ -46,16 +46,17 @@ Eres mi compañero de ingeniería en mi **proyecto de tesis** PetrolRíos. Traba
   direcciones del Explorador de archivos** (clic en la barra → escribe la ruta del `.bat` → Enter);
   luego **lee el `.log`** de salida con la herramienta `Read`. (Si el clic no entra en modo edición,
   clic en una zona vacía a la derecha de la barra y reintenta.)
-- **Gate de verificación oficial:** `scripts/verificar-mejoras.bat` (build Release + todos los tests +
-  chequeo de migración EF + lint frontend + build frontend). Úsalo antes de commitear.
+- **Gate de verificación oficial:** `ejecutables/4-VERIFICACION-Y-PRUEBAS/verificar-todo-gate-oficial.bat`
+  (build Release + todos los tests + chequeo de migración EF + lint frontend + build frontend). Úsalo antes de commitear.
+  *(TODOS los scripts viven ahora bajo `ejecutables/`, ordenados por tipo y con un resumen al inicio; ver `ejecutables/LEEME.md`.)*
 - **ANTES de compilar, DETÉN los servicios en ejecución** (bloquean los binarios y el build falla
   con `MSB3027`):
   `taskkill /F /IM PetrolRios.Api.exe` · `PetrolRios.StationAgent.exe` · `PetrolRios.StationMonitor.exe`.
 - **Genera migraciones EF solo con build fresco** (nunca `--no-build` sobre binarios bloqueados/viejos:
   salen **vacías** y rompen el arranque por desajuste modelo↔esquema). El nombre del archivo de
   migración lleva timestamp nuevo: úsalo exacto al hacer `git add`.
-- **Reinicia todo el sistema** con `ejecutables/1-INICIO/INICIAR_TODO.bat` (Docker, PostgreSQL,
-  Firebird, API, agente, monitor, frontend). Para solo el API: `ejecutables/3-DIAGNOSTICO/reiniciar_api.bat`.
+- **Reinicia todo el sistema** con `ejecutables/1-INICIAR-Y-DETENER/iniciar-todo-el-sistema.bat` (Docker, PostgreSQL,
+  Firebird, API, agente, monitor, frontend). Para solo el API: `ejecutables/1-INICIAR-Y-DETENER/reiniciar-solo-la-api.bat`.
 - **Commits con mi identidad:**
   `git -c user.name="StevenCarrilloLoor" -c user.email="stevencarrilloloor@gmail.com" commit`.
   Haz `git add` **por ruta, solo de tus archivos**. **NUNCA** toques mis cambios sin commitear.
@@ -94,6 +95,15 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   (`POST /api/v1/auth/login` y guarda el token en `localStorage`).
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
+
+**Última ronda — Reorganización de scripts (25-jun-2026), commiteado:**
+- **TODOS** los scripts (`.bat`/`.ps1`/`.sh`) viven ahora bajo `ejecutables/` en 6 carpetas por tipo
+  (`1-INICIAR-Y-DETENER`, `2-BASE-DE-DATOS-Y-DEMO`, `3-DIAGNOSTICO`, `4-VERIFICACION-Y-PRUEBAS`,
+  `5-PUBLICACION-Y-DESPLIEGUE`, `6-INSTALAR-EN-NUEVO-PC`), con **nombres descriptivos** y un **bloque
+  RESUMEN** al inicio de cada uno. Se vaciaron `scripts/`, `_arranque/` e `INSTALACION/`. Se borraron
+  obsoletos (`verificar_2fa`, `verificar_ronda_fuentes` y 3 wrappers). `dist/` y `firebird_data/`
+  quedan ignorados (build/datos). El **gate** ahora es
+  `ejecutables/4-VERIFICACION-Y-PRUEBAS/verificar-todo-gate-oficial.bat`. Índice en `ejecutables/LEEME.md`. *(CAMBIOS §64)*
 
 **Última ronda — Asignación de alertas "al 1000%" (25-jun-2026), commiteado:**
 - Asignar una alerta ahora **avisa al asignado por correo** (`IEmailNotificacionService`, dirigido solo a

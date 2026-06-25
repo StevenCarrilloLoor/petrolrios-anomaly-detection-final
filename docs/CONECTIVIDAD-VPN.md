@@ -59,7 +59,7 @@ Para una red de POS hostil, **Tailscale es notablemente más confiable** que Zer
 1. Descarga Tailscale de `https://tailscale.com/download/windows` e instálalo.
 2. Inicia sesión (crea el *tailnet* con tu cuenta Google/Microsoft).
 3. Anota la IP que te asigna: algo como `100.x.y.z` (con `tailscale ip -4` o en la app).
-4. Deja el central escuchando en `0.0.0.0:5170` (ya lo hace con `REINICIAR_CENTRAL_RED.bat`).
+4. Deja el central escuchando en `0.0.0.0:5170` (ya lo hace con `reiniciar-central-accesible-por-red.bat`).
 
 **En el servidor del POS (donde está el agente + Firebird):**
 1. Instala Tailscale.

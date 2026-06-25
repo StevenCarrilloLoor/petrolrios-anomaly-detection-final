@@ -143,7 +143,7 @@ instancias del central se conectan a la misma.
 
 ## Inicio rápido (desarrollo)
 
-**Lo más fácil (Windows):** doble clic en `ejecutables/1-INICIO/INICIAR_TODO.bat` — arranca Docker,
+**Lo más fácil (Windows):** doble clic en `ejecutables/1-INICIAR-Y-DETENER/iniciar-todo-el-sistema.bat` — arranca Docker,
 PostgreSQL, Firebird, la API, el frontend, el agente y el monitor, y abre el navegador.
 Ver `ejecutables/LEEME.md` para el detalle de cada script.
 
@@ -219,7 +219,7 @@ PetrolRios.sln
 ├── _arranque/                       Solo recursos de la BD Firebird de demo (ver _arranque/LEEME.md)
 ├── docs/                            tesis.md, contac-schema.sql, ARQUITECTURA.md, OPERACION.md,
 │                                    DESPLIEGUE.md, ANALISIS-SEGURIDAD.md, investigación
-├── scripts/                         verificar-mejoras.bat, coverage.ps1/.sh
+├── scripts/                         verificar-todo-gate-oficial.bat, coverage.ps1/.sh
 ├── docker-compose*.yml              dev / prod / db / central
 ├── CLAUDE.md · CAMBIOS.md · README.md
 ```

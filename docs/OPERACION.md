@@ -40,7 +40,7 @@ la baja, verifica el checksum, intercambia su `.exe` y reinicia su servicio — 
 Pasos para publicar una versión:
 
 1. Sube el número en `Directory.Build.props` (`<Version>`).
-2. Corre `ejecutables/4-PUBLICACION/publicar.bat` → genera los `.exe` en `dist/`.
+2. Corre `ejecutables/5-PUBLICACION-Y-DESPLIEGUE/publicar-servidor-agente-y-monitor.bat` → genera los `.exe` en `dist/`.
 3. Publica el **manifiesto** y el binario en el feed. El agente lee por defecto
    `{central}/api/v1/agente/version`; usa `agente-version.example.json` como plantilla:
    ```json

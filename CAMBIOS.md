@@ -1725,3 +1725,39 @@ tests **Domain 40 · Detectors 119 · Monitor 2 · Api 73** (con los 4 nuevos, 0
 el **detalle** muestra el banner "Asignada a Maria Fernanda Auditora (Auditor) · asignada por Administrador
 del Sistema · …" y la tarjeta "Reasignar"; la **lista** muestra el asignado bajo el estado (#33 Leonardo
 Andrade, #32 Maria Fernanda Auditora).
+
+---
+
+## 64. Reorganización total de scripts: todo bajo `ejecutables/`, por tipo, con nombres descriptivos y resumen
+
+**Motivación (pedido de Steven).** Los scripts estaban dispersos (`scripts/`, `_arranque/`, `INSTALACION/`,
+`frontend/`) con nombres crípticos (`05_firebird_demo.bat`, `paso.bat`), sin saber cuáles seguían vigentes.
+Pedido: juntarlos **todos** en `ejecutables/`, ordenarlos por tipo, **renombrarlos descriptivamente**, poner
+un **resumen al inicio de cada uno** y **limpiar los obsoletos**.
+
+**Qué se hizo.**
+
+1. **6 carpetas por tipo** bajo `ejecutables/`: `1-INICIAR-Y-DETENER`, `2-BASE-DE-DATOS-Y-DEMO`,
+   `3-DIAGNOSTICO`, `4-VERIFICACION-Y-PRUEBAS`, `5-PUBLICACION-Y-DESPLIEGUE`, `6-INSTALAR-EN-NUEVO-PC`.
+2. **Todo movido con `git mv`** (historial preservado): se vaciaron y eliminaron `scripts/`, `_arranque/` e
+   `INSTALACION/`, y `frontend/start_dev.bat`. Nombres nuevos descriptivos (p. ej. `INICIAR_TODO.bat` →
+   `iniciar-todo-el-sistema.bat`; `scripts/verificar-mejoras.bat` → `4-VERIFICACION-Y-PRUEBAS/verificar-todo-gate-oficial.bat`;
+   `05_firebird_demo.bat` → `levantar-firebird-y-restaurar-contaplus.bat`).
+3. **Resumen (cabecera) al inicio de cada script** (`REM`/`#` con bloque "RESUMEN (que hace este script)").
+4. **Obsoletos eliminados:** `verificar_2fa.bat` y `verificar_ronda_fuentes.bat` (verificadores de rondas
+   puntuales ya cubiertos por el gate) y 3 *wrappers* que solo llamaban a otro script
+   (`2_insertar_ventas_anomalas`, `reparar_auth_firebird`, `verificar_build_y_tests`).
+5. **Rutas relativas y cross-refs arregladas:** scripts que subían un nivel ahora suben dos (`%~dp0..` →
+   `%~dp0..\..`, `Split-Path -Parent` → doble); `publicar-solo-el-agente` copia las fuentes desde la nueva
+   ubicación; la cadena de Firebird (`restaurar-firebird-desde-cero`) llama a sus hermanos renombrados; etc.
+6. **`.gitignore`:** se amplió para ignorar cualquier `firebird_data/` y la BD restaurada (`*.FDB`/`*.fdb`);
+   se quitó del control la `CONTAC.FDB` que se había versionado por error. `dist/` (build) sigue ignorado y
+   se regenera al publicar.
+7. **Docs actualizados:** `ejecutables/LEEME.md` reescrito como índice (con mapa "antes → ahora");
+   `README.md`, `INSTALACION.md`, `CONEXION_RED.md`, `docs/OPERACION.md`, `docs/CONECTIVIDAD-VPN.md` y el
+   prompt de reinicio apuntan a las rutas nuevas.
+
+**Verificación.** Movimiento confirmado por `git status` de Windows (todo como *renames* `R`, sin tocar
+otros archivos); el PowerShell de cabeceras/rutas reportó **todos los reemplazos encontrados** (0
+"NO-ENCONTRADO"); y el **gate oficial corrido desde su nueva ruta** quedó verde (build Release 0w/0e,
+EF sin cambios pendientes, Domain 40 / Detectors 119 / Monitor 2 / Api 73, lint + frontend build OK).
