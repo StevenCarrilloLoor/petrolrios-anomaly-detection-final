@@ -1477,3 +1477,23 @@ Con esto el usuario controla el ruido del autodescubridor: ve todas las relacion
 quiera, y encuentra cualquier campo en el selector aunque haya cientos.
 
 **Verificación.** `tsc -b && vite build` limpio.
+
+---
+
+## 55. Problemas de estación: nombre del empleado + detalle clicable
+
+Dos mejoras a la pestaña **"Problemas de estación"** (carril Operativa):
+- **Nombre del empleado** (no solo el código): la lista ahora muestra **`👤 Nombre (código)`** resolviendo
+  el nombre con el catálogo de empleados. El backend ya lo traía (`AlertaResponse.EmpleadoNombre`, resuelto
+  por `IEmpleadoDirectorio` en `GetProblemasEstacionAsync`); faltaba mostrarlo en la UI (mostraba solo el
+  código). Si no hay match, cae al código como antes.
+- **Detalle clicable:** cada problema ahora abre su **detalle completo** (la misma vista de alerta,
+  `/alertas/{id}`) al hacer clic, con un "Ver detalle →" al pasar el mouse.
+
+*Nota técnica (la variable del empleado):* el código es **`Alerta.EmpleadoCodigo`**, que para un turno sin
+cerrar viene del vendedor del turno (`CierreTurnoDto.CodigoVendedor` ← `TURN.COD_VEND` en Firebird). El
+**nombre** se resuelve con `IEmpleadoDirectorio.Nombre(estación, código)` contra el catálogo central
+`Empleado` (sincronizado por el agente desde `VEND.NOM_VEND`, con respaldo `EMPL.NOM_EMPL`), y se expone
+como `EmpleadoNombre`.
+
+**Verificación.** `tsc -b && vite build` limpio.

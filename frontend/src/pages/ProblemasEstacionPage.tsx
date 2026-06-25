@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { alertasService } from "@/services/alertas.service";
 import type { ProblemaEstacionGrupo } from "@/types/alert";
@@ -8,6 +9,7 @@ import { Spinner } from "@/components/ui/Spinner";
 const DIAS_OPCIONES = [1, 7, 30];
 
 export function ProblemasEstacionPage() {
+  const navigate = useNavigate();
   const [dias, setDias] = useState(7);
   const [abierto, setAbierto] = useState<string | null>(null);
 
@@ -114,13 +116,27 @@ export function ProblemasEstacionPage() {
                   {expandido && (
                     <ul className="divide-y divide-border border-t border-border">
                       {g.problemas.map((p) => (
-                        <li key={p.id} className="px-4 py-2.5 pl-11">
-                          <p className="text-sm text-foreground">{p.descripcion}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {new Date(p.fechaDeteccion).toLocaleString()}
-                            {p.empleadoCodigo ? ` · empleado ${p.empleadoCodigo}` : ""}
-                            {p.transaccionReferencia ? ` · ${p.transaccionReferencia}` : ""}
-                          </p>
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/alertas/${p.id}`)}
+                            title="Ver el detalle de este problema"
+                            className="group block w-full px-4 py-2.5 pl-11 text-left transition-colors hover:bg-muted/40"
+                          >
+                            <p className="text-sm text-foreground">{p.descripcion}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {new Date(p.fechaDeteccion).toLocaleString()}
+                              {p.empleadoNombre
+                                ? ` · 👤 ${p.empleadoNombre}${p.empleadoCodigo ? ` (${p.empleadoCodigo})` : ""}`
+                                : p.empleadoCodigo
+                                  ? ` · empleado ${p.empleadoCodigo}`
+                                  : ""}
+                              {p.transaccionReferencia ? ` · ${p.transaccionReferencia}` : ""}
+                              <span className="ml-1.5 text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                                Ver detalle →
+                              </span>
+                            </p>
+                          </button>
                         </li>
                       ))}
                     </ul>
