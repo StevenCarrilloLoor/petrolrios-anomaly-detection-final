@@ -15,6 +15,11 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 
 > **Lote del 25-jun COMPLETO: A, B, C, D, E, F hechos y verificados en Chrome.**
 
+## 🧪 Pase de QA (25-jun, en curso)
+- [x] **Botón "Restablecer predeterminados"** por detector (`POST /reglas/restablecer/{tipo}`, defaults desde `IDetectionRule`) + confirmación en línea. **Bug cazado:** `window.confirm` congelaba el renderer → reemplazado por confirmación in-app. Verificado: 50→999→Restablecer→50. (CAMBIOS §61)
+- [ ] Crear regla custom con 5 campos a mostrar + insertar datos en **Firebird** (nunca Postgres) para disparar y verificar el agente + la evidencia de la alerta.
+- [ ] Recorrer el resto (alertas, filtros, detalle, clasificar, asignar, comentar, vista por usuario, correo) cazando bugs.
+
 ---
 
 ## 🔴 Feedback del 18-jun (revisión en vivo de Steven)

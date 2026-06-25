@@ -15,4 +15,10 @@ export const reglasService = {
 
   update: (id: number, data: ActualizarReglaRequest) =>
     api.put<ReglaDeteccionResponse>(`/reglas/${id}`, data).then((r) => r.data),
+
+  /** Restablece todas las reglas de un detector a sus valores predeterminados de fábrica. */
+  restablecerDetector: (tipoDetector: string) =>
+    api
+      .post<ReglaDeteccionResponse[]>(`/reglas/restablecer/${tipoDetector}`)
+      .then((r) => r.data),
 };

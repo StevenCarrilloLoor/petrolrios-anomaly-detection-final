@@ -9,9 +9,14 @@ public sealed class ReglaService : IReglaService
 {
     private readonly IUnitOfWork _unitOfWork;
 
-    public ReglaService(IUnitOfWork unitOfWork)
+    // Reglas del motor (IDetectionRule): traen los valores predeterminados de fábrica (umbral y carril)
+    // como fuente única de verdad, para poder restablecer una regla a su default sin duplicar valores.
+    private readonly IReadOnlyList<IDetectionRule> _reglasMotor;
+
+    public ReglaService(IUnitOfWork unitOfWork, IEnumerable<IDetectionRule> reglasMotor)
     {
         _unitOfWork = unitOfWork;
+        _reglasMotor = reglasMotor as IReadOnlyList<IDetectionRule> ?? reglasMotor.ToList();
     }
 
     public async Task<IReadOnlyList<ReglaDeteccionResponse>> GetAllAsync(CancellationToken ct = default)
@@ -66,6 +71,49 @@ public sealed class ReglaService : IReglaService
 
         _unitOfWork.ReglasDeteccion.Remove(regla);
         await _unitOfWork.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Defaults de parámetros que no son una IDetectionRule propia (sub-parámetro de otra regla).</summary>
+    private static readonly Dictionary<string, double> UmbralesHuerfanos = new()
+    {
+        ["FaltantesRecurrentesDias"] = 30.0,
+    };
+
+    public async Task<IReadOnlyList<ReglaDeteccionResponse>> RestablecerDetectorAsync(
+        string tipoDetector, CancellationToken ct = default)
+    {
+        if (!Enum.TryParse<TipoDetector>(tipoDetector, true, out var tipo))
+            throw new ArgumentException($"TipoDetector '{tipoDetector}' no es válido.");
+
+        var todas = await _unitOfWork.ReglasDeteccion.GetAllAsync(ct);
+        var ids = todas.Where(r => r.TipoDetector == tipo).Select(r => r.Id).ToList();
+
+        var actualizadas = new List<ReglaDeteccion>();
+        foreach (var id in ids)
+        {
+            // GetByIdAsync devuelve la entidad rastreada (igual que UpdateAsync), para que persista.
+            var regla = await _unitOfWork.ReglasDeteccion.GetByIdAsync(id, ct);
+            if (regla is null) continue;
+
+            var motor = _reglasMotor.FirstOrDefault(m => m.Parametro == regla.ParametroNombre);
+            if (motor is not null)
+            {
+                regla.ValorUmbral = motor.UmbralPorDefecto;
+                regla.Ambito = motor.AmbitoPorDefecto;
+            }
+            else if (UmbralesHuerfanos.TryGetValue(regla.ParametroNombre, out var umbral))
+            {
+                regla.ValorUmbral = umbral;
+            }
+
+            // De fábrica todas están activas salvo "fuera de horario" (estaciones 24/7) y sin aviso por correo.
+            regla.Activa = regla.ParametroNombre != "FueraHorarioHabilitado";
+            regla.NotificarCorreo = false;
+            actualizadas.Add(regla);
+        }
+
+        await _unitOfWork.SaveChangesAsync(ct);
+        return actualizadas.Select(MapToResponse).ToList();
     }
 
     /// <summary>

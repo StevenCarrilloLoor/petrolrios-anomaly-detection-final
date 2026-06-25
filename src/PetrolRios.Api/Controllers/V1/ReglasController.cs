@@ -65,4 +65,30 @@ public sealed class ReglasController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Restablece todas las reglas de un detector a sus valores predeterminados de fábrica (umbral,
+    /// carril, activa y aviso por correo). Útil para deshacer ajustes manuales.
+    /// </summary>
+    [HttpPost("restablecer/{tipoDetector}")]
+    [ProducesResponseType(typeof(IReadOnlyList<ReglaDeteccionResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Restablecer(string tipoDetector, CancellationToken ct)
+    {
+        IReadOnlyList<ReglaDeteccionResponse> result;
+        try
+        {
+            result = await _reglaService.RestablecerDetectorAsync(tipoDetector, ct);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+
+        await this.RegistrarAuditoriaAsync(_logService,
+            "Restablecer reglas del detector a predeterminados", "ReglaDeteccion", 0,
+            new { tipoDetector, reglas = result.Count }, ct: ct);
+
+        return Ok(result);
+    }
 }

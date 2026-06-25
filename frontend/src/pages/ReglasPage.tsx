@@ -23,6 +23,7 @@ import {
   Layers,
   Bell,
   BellOff,
+  RotateCcw,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -79,6 +80,18 @@ export function ReglasPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["reglas"] });
       setEditingId(null);
+    },
+  });
+
+  // Confirmación en la propia interfaz (no window.confirm, que congela la página): guarda el
+  // detector pendiente de confirmar para mostrar "¿Restablecer? Sí / No" en línea.
+  const [confirmReset, setConfirmReset] = useState<string | null>(null);
+
+  const restablecerMutation = useMutation({
+    mutationFn: (detector: string) => reglasService.restablecerDetector(detector),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["reglas"] });
+      setConfirmReset(null);
     },
   });
 
@@ -196,25 +209,53 @@ export function ReglasPage() {
             const colapsado = colapsados.has(detector) && q === "";
             return (
               <div key={detector} className="overflow-hidden rounded-xl border border-border bg-background">
-                <button
-                  onClick={() => toggleGrupo(detector)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
-                >
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${meta.color}`}>
-                    {meta.icono}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-foreground">{TIPO_DETECTOR_LABELS[detector]}</p>
-                    <p className="truncate text-xs text-muted-foreground">{meta.descripcion}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                    {activasGrupo}/{reglasGrupo.length} activas
-                  </span>
-                  <ChevronDown
-                    size={18}
-                    className={`shrink-0 text-muted-foreground transition-transform ${colapsado ? "-rotate-90" : ""}`}
-                  />
-                </button>
+                <div className="flex w-full items-center gap-1 pr-3">
+                  <button
+                    onClick={() => toggleGrupo(detector)}
+                    className="flex flex-1 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                  >
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${meta.color}`}>
+                      {meta.icono}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-foreground">{TIPO_DETECTOR_LABELS[detector]}</p>
+                      <p className="truncate text-xs text-muted-foreground">{meta.descripcion}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                      {activasGrupo}/{reglasGrupo.length} activas
+                    </span>
+                    <ChevronDown
+                      size={18}
+                      className={`shrink-0 text-muted-foreground transition-transform ${colapsado ? "-rotate-90" : ""}`}
+                    />
+                  </button>
+                  {confirmReset === detector ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">¿Restablecer?</span>
+                      <button
+                        onClick={() => restablecerMutation.mutate(detector)}
+                        disabled={restablecerMutation.isPending}
+                        className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        Sí, a fábrica
+                      </button>
+                      <button
+                        onClick={() => setConfirmReset(null)}
+                        className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmReset(detector)}
+                      title="Restablecer todas las reglas de este detector a sus valores predeterminados de fábrica (descarta los cambios manuales)"
+                      className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <RotateCcw size={13} /> Restablecer
+                    </button>
+                  )}
+                </div>
 
                 {!colapsado && (
                   <div className="divide-y divide-border border-t border-border">

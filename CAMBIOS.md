@@ -1634,3 +1634,26 @@ ti"** en las alertas que aún no he abierto.
 al modelo"; Domain **40** + Detectors **119**; `tsc -b && vite build` limpio. En Chrome: todas las
 alertas con punto azul; abrí la **#31** y al volver su punto **desapareció**, mientras la **#30** (no
 abierta) lo conserva. **Lote de 6 mejoras (A–F) COMPLETO y verificado.**
+
+---
+
+## 61. Restablecer reglas del motor a predeterminados (+ fix de confirmación que congelaba la página)
+
+Pedido en el pase de QA: un botón para **deshacer** los cambios de umbral/carril de un detector y
+volver a los valores de fábrica.
+
+**Backend.** `IReglaService.RestablecerDetectorAsync(tipoDetector)` + `POST /api/v1/reglas/restablecer/{tipoDetector}`.
+La fuente de verdad de los defaults son las **propias reglas del motor** (`IDetectionRule.UmbralPorDefecto`
+y `AmbitoPorDefecto`), inyectadas en `ReglaService` — sin duplicar valores ni migración. Resetea umbral +
+carril + activa (todas salvo "fuera de horario") + `NotificarCorreo=false`. Para el único parámetro sin
+clase propia (`FaltantesRecurrentesDias`) hay un default suelto.
+
+**Frontend.** Botón **"Restablecer"** en la cabecera de cada grupo de detector (Reglas → Motor).
+
+**Bug cazado y arreglado en el QA:** el botón usaba `window.confirm`, que **congela el renderer**
+(la página quedó bloqueada y el CDP de Chrome dio timeout). Se reemplazó por una **confirmación en la
+propia interfaz** ("¿Restablecer? · Sí, a fábrica · Cancelar" en línea), sin diálogo nativo.
+
+**Verificación.** Build Release 0w/0e; EF "sin cambios al modelo"; Domain 40 + Detectors 119; `tsc -b &&
+vite build` limpio. En Chrome: cambié "Diferencia efectivo vs sistema" de **50 → 999**, pulsé Restablecer
+→ confirmación en línea (sin congelar) → "Sí, a fábrica" → **volvió a 50**.
