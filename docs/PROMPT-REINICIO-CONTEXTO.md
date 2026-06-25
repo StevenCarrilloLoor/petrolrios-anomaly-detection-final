@@ -126,7 +126,14 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
     `CamposMostrarJson` + enriquecimiento en `CustomRuleDetector` (cruza en memoria) + `/catalogo` con
     campos relacionados + CRUD `/api/v1/relaciones-tabla` + selector en el builder. Verificado en vivo
     (migración aplicada, relación sembrada, selector muestra 🚗 Placa / vendedor / cliente de "Factura
-    del despacho"). Opcional pendiente: pantalla Admin de relaciones (API ya existe) y E2E de inserción.
+    del despacho").
+  - **Pulido (CAMBIOS §52, commit `fe725a7`):** tooltip con el código técnico del campo + filtro por
+    tipo en el modo avanzado + glosario ampliado (sin inventar códigos opacos de Contaplus).
+  - **Autodescubridor de relaciones (CAMBIOS §53, commit `4135873`):** `ConceptosRelacion` +
+    `DescubridorRelacionesService` emparejan llaves compartidas (concepto + nombre) y validan por
+    solapamiento de valores en staging; corre al arrancar el central y por `POST /relaciones-tabla/descubrir`;
+    flag `EsAutomatica` + migración `RelacionAutomatica`. Verificado en vivo: crea las relaciones solo.
+    Opcional pendiente: pantalla Admin de relaciones y botón "Descubrir" en la UI.
 - **Conteos de pruebas actuales:** Domain 40, Detectors 119, Monitor 2, Api 53 (+16 de integración
   saltadas sin Docker). Cobertura de `PetrolRios.Detectors` ≈ 96% líneas (OE5). Agente v2.3.0.
 - **Pendiente para go-live:** republicar dist del Servidor y Monitor; prueba física en otra PC con la

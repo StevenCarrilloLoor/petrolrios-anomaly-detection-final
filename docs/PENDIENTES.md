@@ -175,6 +175,13 @@ relacionados — 🚗 Placa, Código de vendedor, Código de cliente, etc. — d
 Falta opcional: pantalla de **Admin** para CRUD de relaciones desde la UI (la API ya existe) y un E2E
 de inserción real (despacho+factura en Firebird) para ver la alerta ya enriquecida.
 
+**Autodescubrimiento de relaciones: [x] HECHO (CAMBIOS §53, commit `4135873`).** `ConceptosRelacion` +
+`DescubridorRelacionesService`: empareja llaves compartidas (concepto + nombre) y valida por solapamiento
+de valores en staging; corre al arrancar el central y por `POST /api/v1/relaciones-tabla/descubrir`;
+relaciones marcadas `EsAutomatica`; migración `RelacionAutomatica`. **Verificado en vivo:** al arrancar
+creó las relaciones solo y "Cierres de turno" ahora ofrece campos relacionados de Factura y TarjetaTurno
+(por turno) sin definir nada a mano. Opcional: botón "Descubrir" en la UI (hoy corre al arrancar / por API).
+
 Diseño original (referencia):
 1. **Entidad `RelacionTabla`** (Domain) + EF config + DbSet + **migración** + seed de relaciones clave
    (Despacho→Factura por cliente/manguera; Factura→Cliente por COD_CLIE; Factura→Vendedor por COD_VEND…).
