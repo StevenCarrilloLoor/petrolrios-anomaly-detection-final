@@ -620,8 +620,12 @@ export function ReglasPersonalizadasSection() {
                         className={inputClass}
                       >
                         {camposFuente(form.fuenteDatos).map((c) => (
-                          <option key={c.nombre} value={c.nombre} title={c.descripcion}>
-                            {c.icono ? `${c.icono} ` : ""}{c.etiqueta}
+                          <option
+                            key={c.nombre}
+                            value={c.nombre}
+                            title={`${c.nombre}${c.descripcion ? ` · ${c.descripcion}` : ""}`}
+                          >
+                            {c.icono ? `${c.icono} ` : ""}{c.etiqueta} ({c.nombre})
                           </option>
                         ))}
                       </select>
@@ -799,7 +803,7 @@ export function ReglasPersonalizadasSection() {
                       key={c.nombre}
                       type="button"
                       onClick={() => toggleCampoMostrar(c.nombre)}
-                      title={c.descripcion}
+                      title={`${c.nombre}${c.descripcion ? ` · ${c.descripcion}` : ""}`}
                       className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
                         activo
                           ? "border-primary bg-primary/15 text-foreground"
@@ -1087,6 +1091,26 @@ function EditorExpresion({
     errores: string[];
   } | null>(null);
   const [validando, setValidando] = useState(false);
+  const [filtroRol, setFiltroRol] = useState<string>("Todos");
+
+  // Roles presentes entre los campos de esta fuente (para los botones de filtro).
+  const ROL_ICONO: Record<string, string> = {
+    Fecha: "📅",
+    Monto: "💲",
+    Cantidad: "⛽",
+    Numero: "🔢",
+    Codigo: "🏷️",
+    Nombre: "🔤",
+    Identificacion: "🪪",
+    Placa: "🚗",
+    Estado: "🔘",
+    Texto: "📝",
+  };
+  const rolesDisponibles = Array.from(
+    new Set(campos.map((c) => c.rol).filter((r): r is string => !!r)),
+  );
+  const camposFiltrados =
+    filtroRol === "Todos" ? campos : campos.filter((c) => c.rol === filtroRol);
 
   async function validar() {
     if (!expresion.trim()) return;
@@ -1161,12 +1185,44 @@ function EditorExpresion({
           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Campos ({fuente})
           </p>
+          {/* Filtro por tipo: muestra solo los campos del rol elegido (fechas, montos, códigos…) */}
+          {rolesDisponibles.length > 1 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setFiltroRol("Todos")}
+                className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                  filtroRol === "Todos"
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                Todos
+              </button>
+              {rolesDisponibles.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setFiltroRol(r)}
+                  title={`Mostrar solo campos de tipo ${r}`}
+                  className={`flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] ${
+                    filtroRol === r
+                      ? "border-primary bg-primary/15 text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <span className="not-italic">{ROL_ICONO[r] ?? "📝"}</span>
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1">
-            {campos.map((c) => (
+            {camposFiltrados.map((c) => (
               <button
                 key={c.nombre}
                 onClick={() => insertar(c.nombre)}
-                title={`${c.etiqueta}${c.descripcion ? ` — ${c.descripcion}` : ""}`}
+                title={`${c.nombre}${c.etiqueta && c.etiqueta !== c.nombre ? ` · ${c.etiqueta}` : ""}${c.descripcion ? ` — ${c.descripcion}` : ""}`}
                 className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground hover:bg-primary hover:text-primary-foreground"
               >
                 {c.icono && <span className="not-italic">{c.icono}</span>}

@@ -1404,3 +1404,25 @@ limpio. *(commit backend `74b84f9`; frontend en este commit.)*
 
 *(Mejora opcional pendiente: pantalla de Admin para el CRUD de relaciones desde la UI; la API ya existe
 y las relaciones clave vienen sembradas, así que el feature funciona de punta a punta sin ella.)*
+
+---
+
+## 52. Creador de reglas: pulido del diccionario y filtros (feedback del ingeniero)
+
+Tres ajustes sobre el creador de reglas:
+
+- **Tooltip con el nombre técnico.** Los chips de "Información a mostrar en la alerta" y el selector de
+  campos del modo básico muestran el nombre natural y ahora incluyen el **código real de la tabla**
+  (p. ej. `FEC_DCTO`) —en el tooltip y, en el dropdown, también inline— para ver a la vez la palabra
+  natural y la técnica. Así los campos sin nombre natural igual son entendibles.
+- **Filtro por tipo en el modo avanzado.** La paleta de campos del modo avanzado tiene botones para
+  filtrar por rol (📅 Fecha, 💲 Monto, 🏷️ Código, ⛽ Cantidad…), para encontrar rápido los campos de un
+  tipo. Su tooltip muestra código + etiqueta + descripción.
+- **Glosario ampliado.** Se agregaron los campos de DCTO con significado claro/estándar (importe, serie,
+  guía, orden, dirección, bodega, grupo, voucher, liquidación, fecha de modificación, usuario que
+  registró…) y prefijos nuevos (AUT/GUI/ORD/LIQ/VAU/SER). **No se inventan** los códigos internos opacos
+  de Contaplus (ANE/AUG/BPA…): el esquema es propietario y no está documentado públicamente (verificado
+  por búsqueda web), y un nombre incorrecto sería peor que el código; para esos, el tooltip técnico
+  cubre la necesidad, y se agregan al glosario en cuanto se conozca su significado real.
+
+**Verificación.** Build Release **0/0**; tests en verde; `tsc -b && vite build` limpio.
