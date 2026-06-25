@@ -1334,3 +1334,38 @@ definitiva es en el servidor con CET: redeploy del `.exe` y arranque sin el asse
 servidor, en PowerShell como administrador —
 `Set-ProcessMitigation -Name PetrolRios.StationAgent.exe -Disable UserShadowStack,UserShadowStackStrictMode`
 (desactiva el shadow stack solo para ese proceso). El fix permanente es el `.exe` recompilado.
+
+---
+
+## 50. Creador de reglas más usable (1/2): documentación automática de campos
+
+**Motivación (pedido del ingeniero).** En el creador de reglas, los campos se mostraban con su código
+crudo de Contaplus (`AUG_DCTO`, `FEC_DCTO`, `CAN_DESP`…), así que un usuario no técnico no sabía qué
+era cada uno ni cuál era fecha, monto o cantidad. En las reglas predefinidas no hay problema (el código
+ya sabe qué es cada campo), pero el creador no daba esa ayuda.
+
+**Solución — diccionario de datos + glosario de negocio, automático.** Cada campo ahora se documenta
+solo, combinando tres fuentes en orden de prioridad (todo por datos, nada cableado por campo):
+1. **Glosario curado** (`DiccionarioCamposContaplus`): los campos comunes y de más valor de Contaplus
+   con etiqueta legible, rol y descripción exactos (DCTO, DESP, TURN, CRED, ANUL, CLIE/VEND, TANQ_REPO).
+2. **Comentario del campo en Firebird** (`RDB$DESCRIPTION`) si la base lo trae (plomería lista en
+   `ColumnaEsquemaRaw`; el agente puede enviarlo a futuro).
+3. **Inferencia por prefijo** de Contaplus (`FEC_`/`FIN_` = fecha, `COD_` = código, `VAL_`/`VTO_`/`TNI_`
+   = monto, `CAN_` = cantidad, `NOM_` = nombre, `PLA_` = placa, `RUC_` = identificación…).
+
+Cada campo expone ahora **rol semántico** (Fecha, Monto, Cantidad, Código, Placa, Identificación,
+Nombre, Estado, Número, Texto), una **descripción en español** y un **ícono** (📅 fecha, 💲 monto,
+⛽ cantidad, 🏷️ código, 🚗 placa…). El endpoint `/reglas-personalizadas/catalogo` los devuelve por campo,
+para las 5 fuentes conocidas (campos lógicos, rol inferido por palabras clave) y para cualquier **tabla
+configurable** (campos crudos vía glosario + inferencia).
+
+**Frontend.** En el builder, el selector de campos del modo básico muestra `📅 Fecha del documento`
+(ícono + nombre legible) con la descripción en el tooltip; la paleta del modo avanzado muestra el ícono
+junto al código y la descripción al pasar el mouse. El usuario ya no ve códigos crípticos.
+
+**Escalable:** cubrir un campo nuevo = una entrada de glosario o un prefijo; el motor no cambia.
+
+**Verificación.** Build Release **0/0**; **tests en verde** (Domain 40, Detectors 119, Monitor 2,
+Api 69); `tsc -b && vite build` limpio. Sin migración (no toca la BD).
+
+*(Parte 2 — juntar tablas y enriquecer la alerta con campos relacionados — va aparte.)*

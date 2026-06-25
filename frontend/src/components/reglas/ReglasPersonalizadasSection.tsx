@@ -597,8 +597,8 @@ export function ReglasPersonalizadasSection() {
                         className={inputClass}
                       >
                         {camposFuente(form.fuenteDatos).map((c) => (
-                          <option key={c.nombre} value={c.nombre}>
-                            {c.etiqueta}
+                          <option key={c.nombre} value={c.nombre} title={c.descripcion}>
+                            {c.icono ? `${c.icono} ` : ""}{c.etiqueta}
                           </option>
                         ))}
                       </select>
@@ -1009,7 +1009,14 @@ function EditorExpresion({
   onChange,
 }: {
   fuente: string;
-  campos: { nombre: string; etiqueta: string; tipo: string }[];
+  campos: {
+    nombre: string;
+    etiqueta: string;
+    tipo: string;
+    rol?: string;
+    descripcion?: string;
+    icono?: string;
+  }[];
   expresion: string;
   onChange: (expr: string) => void;
 }) {
@@ -1097,9 +1104,10 @@ function EditorExpresion({
               <button
                 key={c.nombre}
                 onClick={() => insertar(c.nombre)}
-                title={c.etiqueta}
-                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground hover:bg-primary hover:text-primary-foreground"
+                title={`${c.etiqueta}${c.descripcion ? ` — ${c.descripcion}` : ""}`}
+                className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground hover:bg-primary hover:text-primary-foreground"
               >
+                {c.icono && <span className="not-italic">{c.icono}</span>}
                 {c.nombre}
               </button>
             ))}

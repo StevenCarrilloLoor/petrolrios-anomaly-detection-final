@@ -68,7 +68,18 @@ public sealed record FuenteCatalogo(
     string Etiqueta,
     IReadOnlyList<CampoCatalogo> Campos);
 
-public sealed record CampoCatalogo(string Nombre, string Etiqueta, string Tipo);
+/// <summary>
+/// Un campo de una fuente, documentado para el builder. Además del nombre/etiqueta/tipo, trae el
+/// <see cref="Rol"/> semántico (Fecha, Monto, Cantidad, Código…), una <see cref="Descripcion"/> en
+/// español y un <see cref="Icono"/>, para que un usuario no técnico sepa qué es cada campo.
+/// </summary>
+public sealed record CampoCatalogo(
+    string Nombre,
+    string Etiqueta,
+    string Tipo,
+    string Rol = "Texto",
+    string Descripcion = "",
+    string Icono = "📝");
 
 /// <summary>
 /// Solicitud de backtest (vista previa): prueba una regla <b>borrador</b> contra los datos reales

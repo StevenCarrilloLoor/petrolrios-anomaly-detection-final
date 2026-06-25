@@ -56,7 +56,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             .Select(kv => new FuenteCatalogo(
                 kv.Key,
                 etiquetasFuente.GetValueOrDefault(kv.Key, kv.Key),
-                kv.Value.Select(c => new CampoCatalogo(c.Nombre, c.Etiqueta, c.Tipo)).ToList()))
+                kv.Value.Select(DocumentarLogico).ToList()))
             .ToList();
 
         // Fuentes configurables (tablas arbitrarias del agente): se descubren del staging y se
@@ -129,17 +129,29 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         try
         {
             var columnas = JsonSerializer.Deserialize<List<ColumnaEsquemaRaw>>(fila.ColumnasJson, JsonOpts) ?? [];
-            return columnas.Select(c => new CampoCatalogo(
+            return columnas.Select(c => DocumentarCrudo(
                 c.Nombre,
-                c.Nombre,
-                EsTipoNumerico(c.Tipo)
-                    ? CatalogoReglasPersonalizadas.TipoNumero
-                    : CatalogoReglasPersonalizadas.TipoTexto)).ToList();
+                EsTipoNumerico(c.Tipo) ? CatalogoReglasPersonalizadas.TipoNumero : CatalogoReglasPersonalizadas.TipoTexto,
+                c.Descripcion)).ToList();
         }
         catch
         {
             return [];
         }
+    }
+
+    /// <summary>Documenta un campo lógico (fuente conocida): rol/descripción/ícono desde el diccionario.</summary>
+    private static CampoCatalogo DocumentarLogico(CatalogoReglasPersonalizadas.CampoInfo c)
+    {
+        var d = DiccionarioCamposContaplus.ConstruirLogico(c.Nombre, c.Etiqueta, c.Tipo);
+        return new CampoCatalogo(c.Nombre, c.Etiqueta, c.Tipo, d.Rol, d.Descripcion, d.Icono);
+    }
+
+    /// <summary>Documenta un campo crudo de Firebird (código tipo FEC_DCTO) vía glosario + inferencia.</summary>
+    private static CampoCatalogo DocumentarCrudo(string nombre, string tipo, string? descripcionFirebird = null)
+    {
+        var d = DiccionarioCamposContaplus.Construir(nombre, tipo, descripcionFirebird);
+        return new CampoCatalogo(d.Nombre, d.Etiqueta, d.Tipo, d.Rol, d.Descripcion, d.Icono);
     }
 
     /// <summary>true si el tipo de Firebird es numérico (para clasificar el campo en el builder).</summary>
@@ -150,8 +162,8 @@ public sealed class ReglasPersonalizadasController : ControllerBase
                || t.Contains("NUMERIC") || t.Contains("DECIMAL");
     }
 
-    /// <summary>Forma de una columna en el JSON del esquema reportado.</summary>
-    private sealed record ColumnaEsquemaRaw(string Nombre, string Tipo, int Longitud, bool Nullable);
+    /// <summary>Forma de una columna en el JSON del esquema reportado (Descripcion = RDB$DESCRIPTION si la trae).</summary>
+    private sealed record ColumnaEsquemaRaw(string Nombre, string Tipo, int Longitud, bool Nullable, string? Descripcion = null);
 
     /// <summary>Infiere los campos (nombre + tipo) de una fuente configurable desde una fila JSON.</summary>
     private static List<CampoCatalogo> InferirCampos(string? json)
@@ -161,8 +173,7 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         {
             var raw = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
             if (raw is null) return [];
-            return raw.Select(kv => new CampoCatalogo(
-                kv.Key,
+            return raw.Select(kv => DocumentarCrudo(
                 kv.Key,
                 kv.Value.ValueKind == JsonValueKind.Number
                     ? CatalogoReglasPersonalizadas.TipoNumero

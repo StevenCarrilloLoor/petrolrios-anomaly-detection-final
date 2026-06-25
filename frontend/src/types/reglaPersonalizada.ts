@@ -74,6 +74,12 @@ export interface CampoCatalogo {
   nombre: string;
   etiqueta: string;
   tipo: "numero" | "texto";
+  /** Rol semántico para documentar el campo: Fecha, Monto, Cantidad, Codigo, Placa… */
+  rol?: string;
+  /** Descripción en español de qué es el campo (documentación automática). */
+  descripcion?: string;
+  /** Ícono (emoji) representativo del rol del campo. */
+  icono?: string;
 }
 
 export interface FuenteCatalogo {
