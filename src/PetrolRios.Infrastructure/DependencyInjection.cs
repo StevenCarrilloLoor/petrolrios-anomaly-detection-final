@@ -49,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IReglaService, ReglaService>();
         services.AddScoped<IReglaBacktestService, ReglaBacktestService>();
+        services.AddScoped<IDescubridorRelaciones, DescubridorRelacionesService>();
         services.AddScoped<IUsuarioService, UsuarioService>();
         services.AddScoped<ILogService, LogService>();
         services.AddScoped<IIngestaService, IngestaService>();

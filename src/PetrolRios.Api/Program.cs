@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using PetrolRios.Api.Middleware;
 using PetrolRios.Application;
+using PetrolRios.Application.Interfaces;
 using PetrolRios.Detectors;
 using PetrolRios.Infrastructure;
 using PetrolRios.Infrastructure.Hubs;
@@ -258,6 +259,21 @@ try
 
     // Migraciones y seed data
     await SeedData.InitializeAsync(app.Services);
+
+    // Autodescubrimiento de relaciones entre tablas (best-effort, no bloquea el arranque): cruza las
+    // llaves compartidas entre las fuentes y las valida con el solapamiento de valores en staging, para
+    // que el creador de reglas ofrezca campos relacionados sin definir nada a mano.
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var descubridor = scope.ServiceProvider.GetRequiredService<IDescubridorRelaciones>();
+        var nuevas = await descubridor.DescubrirAsync(CancellationToken.None);
+        if (nuevas > 0) Log.Information("Autodescubridor: {Nuevas} relación(es) entre tablas creada(s).", nuevas);
+    }
+    catch (Exception exDesc)
+    {
+        Log.Warning(exDesc, "El autodescubridor de relaciones falló al arrancar; se omite.");
+    }
 
     app.Run();
 }

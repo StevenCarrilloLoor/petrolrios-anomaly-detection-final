@@ -29,10 +29,18 @@ public class RelacionTabla : BaseEntity
     /// <summary>Etiqueta legible de la relación, en lenguaje natural (p. ej. "Factura del despacho").</summary>
     public string Etiqueta { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// true si la relación la propuso el autodescubridor (cruzando nombres de llave + solapamiento de
+    /// valores en staging), false si fue sembrada o creada a mano por el Admin. Sirve para distinguir
+    /// las sugeridas de las confirmadas en la interfaz.
+    /// </summary>
+    public bool EsAutomatica { get; private set; }
+
     public bool Activa { get; set; } = true;
 
     public static RelacionTabla Create(
-        string fuenteOrigen, string fuenteDestino, string campoOrigen, string campoDestino, string etiqueta) =>
+        string fuenteOrigen, string fuenteDestino, string campoOrigen, string campoDestino,
+        string etiqueta, bool esAutomatica = false) =>
         new()
         {
             FuenteOrigen = fuenteOrigen.Trim(),
@@ -40,6 +48,7 @@ public class RelacionTabla : BaseEntity
             CampoOrigen = campoOrigen.Trim(),
             CampoDestino = campoDestino.Trim(),
             Etiqueta = string.IsNullOrWhiteSpace(etiqueta) ? $"{fuenteDestino} relacionada" : etiqueta.Trim(),
+            EsAutomatica = esAutomatica,
             Activa = true
         };
 

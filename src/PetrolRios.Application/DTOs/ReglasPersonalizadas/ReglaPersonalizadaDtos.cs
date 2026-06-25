@@ -94,7 +94,11 @@ public sealed record RelacionTablaResponse(
     string CampoOrigen,
     string CampoDestino,
     string Etiqueta,
-    bool Activa);
+    bool Activa,
+    bool EsAutomatica = false);
+
+/// <summary>Resultado de ejecutar el autodescubridor de relaciones.</summary>
+public sealed record DescubrirRelacionesResponse(int Creadas, string Mensaje);
 
 public sealed record GuardarRelacionTablaRequest
 {

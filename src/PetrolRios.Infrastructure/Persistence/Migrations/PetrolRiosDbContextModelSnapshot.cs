@@ -711,6 +711,9 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("EsAutomatica")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Etiqueta")
                         .IsRequired()
                         .HasMaxLength(150)

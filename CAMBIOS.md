@@ -1426,3 +1426,33 @@ Tres ajustes sobre el creador de reglas:
   cubre la necesidad, y se agregan al glosario en cuanto se conozca su significado real.
 
 **Verificación.** Build Release **0/0**; tests en verde; `tsc -b && vite build` limpio.
+
+---
+
+## 53. Autodescubridor de relaciones entre tablas (lo automático de verdad)
+
+**Motivación (pedido del ingeniero).** Las relaciones entre fuentes estaban sembradas a mano (solo
+Despacho↔Factura), así que al registrar una **tabla nueva no aparecían campos relacionados** para
+enriquecer las alertas. El descubrimiento debía ser automático.
+
+**Método — el estándar de *data profiling* para detectar claves foráneas** (verificado por investigación):
+combina las tres señales que usa la literatura — **similitud de nombre de columna + inclusión/solapamiento
+de valores + columna llave**:
+- **`ConceptosRelacion`** (Application): catálogo de conceptos de llave (cliente, vendedor, turno,
+  producto, banco, manguera, documento, tanque, placa, estación…) con sus variantes **lógicas y crudas**
+  (`CodigoCliente` ↔ `COD_CLIE`), para cruzar fuentes que le llaman distinto a la misma llave.
+- **`DescubridorRelacionesService`** (Infrastructure): arma candidatos (a) por **concepto compartido** y
+  (b) por **nombre de columna llave idéntico** —lo que cubre tablas nuevas con códigos propios—, y los
+  **valida con el solapamiento de valores reales en staging**: si dos columnas no comparten ningún valor,
+  descarta el falso positivo. Crea las relaciones nuevas marcadas como **automáticas**
+  (`RelacionTabla.EsAutomatica`); idempotente (no duplica). Migración `RelacionAutomatica`.
+- **Disparadores:** corre **al arrancar el central** (best-effort, no bloquea el arranque) y por endpoint
+  `POST /api/v1/relaciones-tabla/descubrir` (Admin) para re-ejecutar cuando lleguen datos nuevos.
+
+**Resultado.** Una tabla nueva que comparte una llave con otra (cliente, turno, etc.) obtiene su relación
+**sola**, y el creador de reglas ofrece sus campos relacionados sin que nadie defina nada. (Tanques sigue
+sin empleado/factura porque no tiene esos campos — es correcto, no todo se relaciona con todo.)
+
+**Verificación.** Build Debug+Release **0/0**; **tests en verde** (Domain 40, Detectors 119, Monitor 2,
+Api 69); migración `RelacionAutomatica` sin cambios pendientes. *Base sublime:* el método de
+inclusión de valores es el que recomienda la literatura de detección de FKs (SPIDER/Metanome).

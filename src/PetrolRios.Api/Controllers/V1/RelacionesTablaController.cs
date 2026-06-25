@@ -22,11 +22,33 @@ public sealed class RelacionesTablaController : ControllerBase
 {
     private readonly PetrolRiosDbContext _dbContext;
     private readonly ILogService _logService;
+    private readonly IDescubridorRelaciones _descubridor;
 
-    public RelacionesTablaController(PetrolRiosDbContext dbContext, ILogService logService)
+    public RelacionesTablaController(
+        PetrolRiosDbContext dbContext, ILogService logService, IDescubridorRelaciones descubridor)
     {
         _dbContext = dbContext;
         _logService = logService;
+        _descubridor = descubridor;
+    }
+
+    /// <summary>
+    /// Autodescubre relaciones nuevas cruzando las llaves de negocio compartidas entre las fuentes y
+    /// validándolas con el solapamiento de valores reales en staging. Idempotente. Solo Administrador.
+    /// </summary>
+    [HttpPost("descubrir")]
+    [Authorize(Roles = "Administrador")]
+    [ProducesResponseType(typeof(DescubrirRelacionesResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Descubrir(CancellationToken ct)
+    {
+        var creadas = await _descubridor.DescubrirAsync(ct);
+        if (creadas > 0)
+            await this.RegistrarAuditoriaAsync(_logService, "Autodescubrimiento de relaciones",
+                "RelacionTabla", 0, new { creadas }, ct: ct);
+        return Ok(new DescubrirRelacionesResponse(creadas,
+            creadas == 0
+                ? "No se encontraron relaciones nuevas (ya están todas o no hay llaves compartidas con datos)."
+                : $"Se descubrieron y crearon {creadas} relación(es) nueva(s)."));
     }
 
     /// <summary>Listar todas las relaciones (visible para los roles del central).</summary>
@@ -38,7 +60,8 @@ public sealed class RelacionesTablaController : ControllerBase
             .AsNoTracking()
             .OrderBy(r => r.FuenteOrigen).ThenBy(r => r.FuenteDestino)
             .Select(r => new RelacionTablaResponse(
-                r.Id, r.FuenteOrigen, r.FuenteDestino, r.CampoOrigen, r.CampoDestino, r.Etiqueta, r.Activa))
+                r.Id, r.FuenteOrigen, r.FuenteDestino, r.CampoOrigen, r.CampoDestino, r.Etiqueta,
+                r.Activa, r.EsAutomatica))
             .ToListAsync(ct);
         return Ok(relaciones);
     }
@@ -122,5 +145,6 @@ public sealed class RelacionesTablaController : ControllerBase
     }
 
     private static RelacionTablaResponse MapToResponse(RelacionTabla r) =>
-        new(r.Id, r.FuenteOrigen, r.FuenteDestino, r.CampoOrigen, r.CampoDestino, r.Etiqueta, r.Activa);
+        new(r.Id, r.FuenteOrigen, r.FuenteDestino, r.CampoOrigen, r.CampoDestino, r.Etiqueta,
+            r.Activa, r.EsAutomatica);
 }
