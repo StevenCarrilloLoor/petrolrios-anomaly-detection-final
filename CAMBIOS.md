@@ -1456,3 +1456,24 @@ sin empleado/factura porque no tiene esos campos — es correcto, no todo se rel
 **Verificación.** Build Debug+Release **0/0**; **tests en verde** (Domain 40, Detectors 119, Monitor 2,
 Api 69); migración `RelacionAutomatica` sin cambios pendientes. *Base sublime:* el método de
 inclusión de valores es el que recomienda la literatura de detección de FKs (SPIDER/Metanome).
+
+---
+
+## 54. Creador de reglas: buscador y filtro en el selector + gestión de relaciones
+
+Tras el autodescubrimiento, el selector **"Información a mostrar en la alerta"** puede tener **cientos**
+de campos (todos los relacionados de varias tablas). Para que siga siendo usable:
+
+- **Buscador + filtro por tipo** en el selector: una caja de **búsqueda por texto**
+  (nombre/etiqueta/descripción) y los botones de **rol** (📅 Fecha, 💲 Monto, 🏷️ Código, ⛽ Cantidad…),
+  con la lista en un contenedor con **scroll** y un contador de "elegidos". Aparecen cuando hay más de 8
+  campos, para no estorbar en fuentes chicas.
+- **Panel "Relaciones entre tablas"** (colapsable, arriba de la sección) con un botón **"Descubrir
+  relaciones"** que ejecuta el autodescubridor **on-demand** (sin reiniciar el central) y una lista de
+  las relaciones (origen→destino, etiqueta, badge **auto**) con un botón para **podar** las que sobren.
+  Usa `relacionesService` (`GET` / `POST descubrir` / `DELETE` de `/api/v1/relaciones-tabla`).
+
+Con esto el usuario controla el ruido del autodescubridor: ve todas las relaciones, quita las que no
+quiera, y encuentra cualquier campo en el selector aunque haya cientos.
+
+**Verificación.** `tsc -b && vite build` limpio.

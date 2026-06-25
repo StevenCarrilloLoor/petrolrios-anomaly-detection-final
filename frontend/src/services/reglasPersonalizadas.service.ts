@@ -44,3 +44,28 @@ export const reglasPersonalizadasService = {
       .post<BacktestReglaResponse>("/reglas-personalizadas/backtest", data)
       .then((r) => r.data),
 };
+
+/** Relación entre dos tablas/fuentes para enriquecer alertas. */
+export interface RelacionTablaResponse {
+  id: number;
+  fuenteOrigen: string;
+  fuenteDestino: string;
+  campoOrigen: string;
+  campoDestino: string;
+  etiqueta: string;
+  activa: boolean;
+  esAutomatica: boolean;
+}
+
+export const relacionesService = {
+  getAll: () =>
+    api.get<RelacionTablaResponse[]>("/relaciones-tabla").then((r) => r.data),
+
+  /** Ejecuta el autodescubridor (cruza llaves compartidas + valida por solapamiento de valores). */
+  descubrir: () =>
+    api
+      .post<{ creadas: number; mensaje: string }>("/relaciones-tabla/descubrir")
+      .then((r) => r.data),
+
+  delete: (id: number) => api.delete(`/relaciones-tabla/${id}`),
+};

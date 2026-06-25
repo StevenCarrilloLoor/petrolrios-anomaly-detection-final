@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { reglasPersonalizadasService } from "@/services/reglasPersonalizadas.service";
+import {
+  reglasPersonalizadasService,
+  relacionesService,
+} from "@/services/reglasPersonalizadas.service";
 import type {
   CondicionRegla,
   AgregacionRegla,
@@ -146,6 +149,10 @@ export function ReglasPersonalizadasSection() {
   const [form, setForm] = useState<FormularioRegla | null>(null);
   const [errores, setErrores] = useState<string[]>([]);
   const [backtest, setBacktest] = useState<BacktestReglaResponse | null>(null);
+  // Filtro/búsqueda del selector "Información a mostrar en la alerta" (puede tener cientos de campos
+  // tras el autodescubrimiento de relaciones).
+  const [busquedaMostrar, setBusquedaMostrar] = useState("");
+  const [rolMostrar, setRolMostrar] = useState("Todos");
 
   const { data: catalogo } = useQuery({
     queryKey: ["reglas-personalizadas", "catalogo"],
@@ -161,6 +168,33 @@ export function ReglasPersonalizadasSection() {
   const invalidar = () => {
     void queryClient.invalidateQueries({ queryKey: ["reglas-personalizadas"] });
   };
+
+  // Gestión de relaciones entre tablas (autodescubridor + poda manual).
+  const [mostrarRelaciones, setMostrarRelaciones] = useState(false);
+  const [avisoRelaciones, setAvisoRelaciones] = useState<string | null>(null);
+
+  const { data: relaciones } = useQuery({
+    queryKey: ["relaciones-tabla"],
+    queryFn: relacionesService.getAll,
+  });
+
+  const descubrirMutation = useMutation({
+    mutationFn: relacionesService.descubrir,
+    onSuccess: (r) => {
+      setAvisoRelaciones(r.mensaje);
+      void queryClient.invalidateQueries({ queryKey: ["relaciones-tabla"] });
+      invalidar(); // refresca el catálogo para que aparezcan los nuevos campos relacionados
+    },
+    onError: () => setAvisoRelaciones("No se pudo ejecutar el descubrimiento."),
+  });
+
+  const eliminarRelacionMutation = useMutation({
+    mutationFn: (id: number) => relacionesService.delete(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["relaciones-tabla"] });
+      invalidar();
+    },
+  });
 
   const guardarMutation = useMutation({
     mutationFn: (payload: { id: number; data: GuardarReglaPersonalizadaRequest }) =>
@@ -393,6 +427,67 @@ export function ReglasPersonalizadasSection() {
         }
       />
       <CardContent className="p-0">
+        {/* Relaciones entre tablas: autodescubridor + poda manual (Admin) */}
+        <div className="border-b border-border px-6 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setMostrarRelaciones((v) => !v)}
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            >
+              <SlidersHorizontal size={13} />
+              Relaciones entre tablas ({relaciones?.length ?? 0})
+              <span className="text-[10px] normal-case text-muted-foreground/70">
+                {mostrarRelaciones ? "▲ ocultar" : "▼ ver / podar"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => descubrirMutation.mutate()}
+              disabled={descubrirMutation.isPending}
+              title="Busca relaciones nuevas cruzando llaves compartidas y validándolas con datos reales"
+              className="flex items-center gap-1.5 rounded-md border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+            >
+              <Sparkles size={13} /> {descubrirMutation.isPending ? "Descubriendo…" : "Descubrir relaciones"}
+            </button>
+          </div>
+          {avisoRelaciones && <p className="mt-1.5 text-[11px] text-risk-low">{avisoRelaciones}</p>}
+          {mostrarRelaciones && (
+            <div className="mt-2 max-h-60 space-y-1 overflow-y-auto">
+              {(relaciones ?? []).length === 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Aún no hay relaciones. Usa "Descubrir relaciones" para que el sistema las arme solo.
+                </p>
+              )}
+              {(relaciones ?? []).map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1 text-[11px]"
+                >
+                  <span className="text-foreground">
+                    <span className="font-medium">{r.fuenteOrigen}</span> →{" "}
+                    <span className="font-medium">{r.fuenteDestino}</span>
+                    <span className="text-muted-foreground"> · {r.etiqueta}</span>
+                    {r.esAutomatica && (
+                      <span className="ml-1.5 rounded-full bg-violet-500/20 px-1.5 text-[9px] text-violet-300">
+                        auto
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => eliminarRelacionMutation.mutate(r.id)}
+                    title="Quitar esta relación"
+                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-risk-critical/10 hover:text-risk-critical"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Plantillas rápidas (solo cuando no hay un formulario abierto) */}
         {!form && catalogo && (
           <div className="border-b border-border px-6 py-4">
@@ -784,44 +879,121 @@ export function ReglasPersonalizadasSection() {
               )}
             </div>
 
-            {/* Información a mostrar en la alerta (campos propios + relacionados) */}
-            <div className="mt-5 rounded-lg border border-border bg-background p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Información a mostrar en la alerta{" "}
-                <span className="font-normal normal-case text-muted-foreground/70">(opcional)</span>
-              </p>
-              <p className="mb-2.5 mt-0.5 text-[11px] text-muted-foreground">
-                Elige qué datos aparecen en la evidencia de la alerta. Puedes incluir campos de tablas{" "}
-                <span className="text-foreground">relacionadas</span> (placa, vendedor, cliente, N° de
-                factura) para tener más contexto de quién y qué.
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {[...camposFuente(form.fuenteDatos), ...relacionadosFuente(form.fuenteDatos)].map((c) => {
-                  const activo = form.camposMostrar.includes(c.nombre);
-                  return (
-                    <button
-                      key={c.nombre}
-                      type="button"
-                      onClick={() => toggleCampoMostrar(c.nombre)}
-                      title={`${c.nombre}${c.descripcion ? ` · ${c.descripcion}` : ""}`}
-                      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
-                        activo
-                          ? "border-primary bg-primary/15 text-foreground"
-                          : "border-border text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {c.icono && <span className="not-italic">{c.icono}</span>}
-                      {c.etiqueta}
-                    </button>
-                  );
-                })}
-                {camposFuente(form.fuenteDatos).length === 0 && (
-                  <span className="text-[11px] text-muted-foreground">
-                    Elige una fuente de datos para ver sus campos.
-                  </span>
-                )}
-              </div>
-            </div>
+            {/* Información a mostrar en la alerta (campos propios + relacionados, con búsqueda y filtro) */}
+            {(() => {
+              const todos = [
+                ...camposFuente(form.fuenteDatos),
+                ...relacionadosFuente(form.fuenteDatos),
+              ];
+              const iconoRol: Record<string, string> = {
+                Fecha: "📅", Monto: "💲", Cantidad: "⛽", Numero: "🔢", Codigo: "🏷️",
+                Nombre: "🔤", Identificacion: "🪪", Placa: "🚗", Estado: "🔘", Texto: "📝",
+              };
+              const rolesMostrar = Array.from(
+                new Set(todos.map((c) => c.rol).filter((r): r is string => !!r)),
+              );
+              const q = busquedaMostrar.trim().toLowerCase();
+              const filtrados = todos.filter(
+                (c) =>
+                  (rolMostrar === "Todos" || c.rol === rolMostrar) &&
+                  (q === "" ||
+                    c.nombre.toLowerCase().includes(q) ||
+                    c.etiqueta.toLowerCase().includes(q) ||
+                    (c.descripcion ?? "").toLowerCase().includes(q)),
+              );
+              return (
+                <div className="mt-5 rounded-lg border border-border bg-background p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Información a mostrar en la alerta{" "}
+                    <span className="font-normal normal-case text-muted-foreground/70">(opcional)</span>
+                    {form.camposMostrar.length > 0 && (
+                      <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-normal text-foreground">
+                        {form.camposMostrar.length} elegido(s)
+                      </span>
+                    )}
+                  </p>
+                  <p className="mb-2 mt-0.5 text-[11px] text-muted-foreground">
+                    Elige qué datos aparecen en la evidencia de la alerta. Puedes incluir campos de tablas{" "}
+                    <span className="text-foreground">relacionadas</span> (placa, vendedor, cliente, N° de factura).
+                  </p>
+
+                  {/* Buscador + filtro por tipo: imprescindibles porque tras el autodescubrimiento la
+                      lista de campos relacionados puede ser enorme. */}
+                  {todos.length > 8 && (
+                    <div className="mb-2 space-y-1.5">
+                      <input
+                        value={busquedaMostrar}
+                        onChange={(e) => setBusquedaMostrar(e.target.value)}
+                        placeholder="🔎 Buscar un campo… (placa, total, vendedor, factura…)"
+                        className="w-full rounded-md border border-border bg-[#0a0f1c] px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                      />
+                      {rolesMostrar.length > 1 && (
+                        <div className="flex flex-wrap gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setRolMostrar("Todos")}
+                            className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                              rolMostrar === "Todos"
+                                ? "border-primary bg-primary/15 text-foreground"
+                                : "border-border text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            Todos
+                          </button>
+                          {rolesMostrar.map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => setRolMostrar(r)}
+                              className={`flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] ${
+                                rolMostrar === r
+                                  ? "border-primary bg-primary/15 text-foreground"
+                                  : "border-border text-muted-foreground hover:bg-muted"
+                              }`}
+                            >
+                              <span className="not-italic">{iconoRol[r] ?? "📝"}</span>
+                              {r}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex max-h-56 flex-wrap gap-1.5 overflow-y-auto">
+                    {filtrados.map((c) => {
+                      const activo = form.camposMostrar.includes(c.nombre);
+                      return (
+                        <button
+                          key={c.nombre}
+                          type="button"
+                          onClick={() => toggleCampoMostrar(c.nombre)}
+                          title={`${c.nombre}${c.descripcion ? ` · ${c.descripcion}` : ""}`}
+                          className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
+                            activo
+                              ? "border-primary bg-primary/15 text-foreground"
+                              : "border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {c.icono && <span className="not-italic">{c.icono}</span>}
+                          {c.etiqueta}
+                        </button>
+                      );
+                    })}
+                    {todos.length === 0 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        Elige una fuente de datos para ver sus campos.
+                      </span>
+                    )}
+                    {todos.length > 0 && filtrados.length === 0 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        Ningún campo coincide con la búsqueda o el filtro.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Riesgo base */}
             <div className="mt-5 flex items-center gap-3">
