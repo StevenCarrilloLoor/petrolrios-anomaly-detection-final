@@ -96,7 +96,7 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Frecuencia/calendario por regla, Etapas 1-3 (26-jun-2026) — EN PROGRESO (faltan 4-5):**
+**Última ronda — Frecuencia/calendario por regla, Etapas 1-4 (26-jun-2026) — EN PROGRESO (falta la 5: UI):**
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de
   **doble modo** validado. **Cronos** (NuGet) calcula próximas fechas con `L`=último día, bisiestos, TZ →
   se usa para el modo Calendario (no reinventar la matemática).
@@ -115,7 +115,13 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   Avance de `ProximaEjecucion`/`UltimaEjecucion` una vez por ciclo (zona EC UTC-5 vía Cronos, normalizado a
   UTC). **Con todo en "cada ciclo" = idéntico al comportamiento previo** (feature opt-in). +2 pruebas E2E →
   Api 77. *(CAMBIOS §77)*
-- **Faltan Etapas 4-5** (DTOs/API leer-escribir programación + validación; UI con selector reutilizable y
+- **Etapa 4 (hecha + gate verde):** `ProgramacionDto` (enums como texto + `TryConvertir` que valida listas
+  cerradas y rangos → 400 limpio, nunca 500). Respuestas de **motor** (`ReglaDeteccionResponse`/`ReglaService`)
+  y **personalizadas** (`ReglaPersonalizadaResponse`/`ReglasPersonalizadasController`) devuelven `Programacion`
+  + `ProximaEjecucion` + `UltimaEjecucion`; `PUT`/`POST` aceptan `Programacion` y al cambiarla reinician
+  `ProximaEjecucion=null` (el job ancla). En custom, `null` en update conserva la previa. +12 pruebas
+  (`ProgramacionDtoTests` → Detectors 177). *(CAMBIOS §78)*
+- **Falta Etapa 5** (UI: selector reutilizable modo+unidad+calendario en reglas del motor y personalizadas +
   "próxima ejecución"). Plan en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md` y `docs/PENDIENTES.md`.
 
 **Ronda — Documentación: frecuencia por regla (anotada) + guía de relanzamiento (26-jun-2026):**

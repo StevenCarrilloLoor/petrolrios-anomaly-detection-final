@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using PetrolRios.Api.Extensions;
 using PetrolRios.Application.DTOs.ReglasPersonalizadas;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.Programacion;
 using PetrolRios.Application.ReglasPersonalizadas;
 using PetrolRios.Application.ReglasPersonalizadas.Expresiones;
 using PetrolRios.Domain.Entities;
@@ -271,6 +272,15 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         if (await _dbContext.ReglasPersonalizadas.AnyAsync(r => r.Nombre == nombre, ct))
             return BadRequest(new { errores = new[] { $"Ya existe una regla llamada '{nombre}'." } });
 
+        // Programación (cadencia): validar contra lista cerrada antes de construir. null = cada ciclo.
+        string? programacionJson = null;
+        if (request.Programacion is not null)
+        {
+            if (!request.Programacion.TryConvertir(out var prog, out var errProg))
+                return BadRequest(new { errores = new[] { errProg } });
+            programacionJson = prog.Serializar();
+        }
+
         var regla = ReglaPersonalizada.Create(
             nombre,
             request.Descripcion.Trim(),
@@ -284,6 +294,8 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             ? null : request.ExpresionAvanzada.Trim();
         regla.CamposMostrarJson = SerializarCamposMostrar(request.CamposMostrar);
         regla.NotificarCorreo = request.NotificarCorreo;
+        if (programacionJson is not null)
+            regla.ProgramacionJson = programacionJson;   // si null, queda "" = cada ciclo
 
         await _dbContext.ReglasPersonalizadas.AddAsync(regla, ct);
         await _dbContext.SaveChangesAsync(ct);
@@ -311,6 +323,15 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         if (await _dbContext.ReglasPersonalizadas.AnyAsync(r => r.Nombre == nombre && r.Id != id, ct))
             return BadRequest(new { errores = new[] { $"Ya existe otra regla llamada '{nombre}'." } });
 
+        // Programación (cadencia): validar contra lista cerrada. null = sin cambios (conserva la previa).
+        string? programacionJson = null;
+        if (request.Programacion is not null)
+        {
+            if (!request.Programacion.TryConvertir(out var prog, out var errProg))
+                return BadRequest(new { errores = new[] { errProg } });
+            programacionJson = prog.Serializar();
+        }
+
         regla.Nombre = nombre;
         regla.Descripcion = request.Descripcion.Trim();
         regla.FuenteDatos = request.FuenteDatos;
@@ -323,6 +344,11 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         regla.Activa = request.Activa;
         regla.CamposMostrarJson = SerializarCamposMostrar(request.CamposMostrar);
         regla.NotificarCorreo = request.NotificarCorreo;
+        if (programacionJson is not null)
+        {
+            regla.ProgramacionJson = programacionJson;
+            regla.ProximaEjecucion = null;   // re-anclar al cambiar la cadencia (no dispara al instante)
+        }
         await _dbContext.SaveChangesAsync(ct);
 
         await this.RegistrarAuditoriaAsync(_logService,
@@ -419,7 +445,10 @@ public sealed class ReglasPersonalizadasController : ControllerBase
             Ambito = regla.Ambito,
             CamposMostrar = DeserializarCamposMostrar(regla.CamposMostrarJson),
             NotificarCorreo = regla.NotificarCorreo,
-            Activa = regla.Activa
+            Activa = regla.Activa,
+            Programacion = ProgramacionDto.DeJson(regla.ProgramacionJson),
+            ProximaEjecucion = regla.ProximaEjecucion,
+            UltimaEjecucion = regla.UltimaEjecucion
         };
     }
 

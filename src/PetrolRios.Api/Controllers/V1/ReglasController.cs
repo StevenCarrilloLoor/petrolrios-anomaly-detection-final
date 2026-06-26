@@ -54,10 +54,20 @@ public sealed class ReglasController : ControllerBase
     /// </summary>
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(ReglaDeteccionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] ActualizarReglaRequest request, CancellationToken ct)
     {
-        var result = await _reglaService.UpdateAsync(id, request, ct);
+        ReglaDeteccionResponse result;
+        try
+        {
+            result = await _reglaService.UpdateAsync(id, request, ct);
+        }
+        catch (ArgumentException ex)
+        {
+            // Programación inválida (modo/unidad/rango fuera de la lista cerrada) → 400 limpio, no 500.
+            return BadRequest(new { mensaje = ex.Message });
+        }
 
         await this.RegistrarAuditoriaAsync(_logService,
             "Actualización de regla de detección", "ReglaDeteccion", id,

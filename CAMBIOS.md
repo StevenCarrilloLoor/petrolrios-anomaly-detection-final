@@ -2160,3 +2160,33 @@ Detectors 165 / Monitor 2 / **Api 77** (+2 pruebas nuevas del camino programado:
 "le toca → evalúa por ventana y avanza la próxima"; los 7 E2E previos siguen verdes = carril incremental
 intacto), **EF sin cambios pendientes** (Etapa 3 no toca el esquema), eslint + vite OK. Faltan Etapas 4 (API/DTOs)
 y 5 (UI).
+
+---
+
+## 78. Frecuencia/calendario por regla — Etapa 4: la API lee y escribe la programación
+
+**Motivación.** Que la cadencia de cada regla se pueda **configurar y consultar por la API** (lo que la UI
+de la Etapa 5 usará). Hasta ahora la programación vivía en la BD y la respetaba el job, pero no había forma
+de fijarla ni de ver la próxima ejecución desde fuera.
+
+**Qué se hizo.**
+
+- **`ProgramacionDto`** (Application/Programacion): DTO de entrada/salida con los enums como **texto**
+  (`Modo`, `IntervaloUnidad`, `CalendarioTipo`) para validarlos contra **listas cerradas** y ser robusto ante
+  cualquier configuración de JSON. Trae `De`/`DeJson` (proyectar) y `TryConvertir` (validar + convertir a
+  `ProgramacionEjecucion`): rechaza modo/unidad/tipo desconocidos y rangos inválidos (N≥1, hora 0–23, minuto
+  0–59, día-semana 0–6, día-mes 1–31) con un mensaje en español → **400 limpio, nunca 500**.
+- **Reglas del motor** (`ReglaDeteccionResponse` + `ActualizarReglaRequest` + `ReglaService`): la respuesta
+  ahora incluye `Programacion` + `ProximaEjecucion` + `UltimaEjecucion`; el `PUT` acepta `Programacion`
+  (opcional). Al cambiarla se guarda el JSON y se **reinicia `ProximaEjecucion = null`** para que el job la
+  ancle (el "día 29" empieza el día 29, no al instante). `ReglasController.Update` captura la validación como
+  **400**.
+- **Reglas personalizadas** (`ReglaPersonalizadaResponse` + `GuardarReglaPersonalizadaRequest` + controlador):
+  mismos 3 campos en la respuesta; `Create`/`Update` aceptan `Programacion` (opcional, validada). Semántica
+  segura: en `Create` `null` = "cada ciclo"; en `Update` `null` = **conserva la previa** (un cliente que no la
+  envía no la borra por accidente). Al cambiarla se reinicia `ProximaEjecucion = null`.
+
+**Verificación.** Gate oficial verde a la primera: build Release **0w/0e**, Domain 40 / **Detectors 177**
+(+12 pruebas de `ProgramacionDto`: ida-y-vuelta de intervalo y de "mensual día 29", y rechazo de modo/unidad/
+hora/minuto/día-mes fuera de rango, incl. mayúsculas y "último día") / Monitor 2 / **Api 77** (integración
+intacta), **EF sin cambios pendientes** (Etapa 4 no toca el esquema), eslint + vite OK. Falta la **Etapa 5** (UI).

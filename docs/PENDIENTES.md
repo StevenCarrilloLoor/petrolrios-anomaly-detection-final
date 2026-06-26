@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — Etapas 1-3 hechas: modelo+Cronos, columnas+migración, e integración en el job con dos pasadas + ventana; Api 77).
+Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — Etapas 1-4 hechas: modelo+Cronos, columnas+migración, job con dos pasadas+ventana, y API lee/escribe la programación con validación; Detectors 177 / Api 77).
 
 ## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
 Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +
@@ -19,10 +19,15 @@ Calendario anclado vía **Cronos**: día-D, "último día", semanal, diario). Va
   para cada regla programada a la que le toca, evaluando solo esa regla. Ventana no solapada → sin duplicados
   (sin tocar el modelo de Alerta). Avance de `ProximaEjecucion`/`UltimaEjecucion` una vez por ciclo (zona EC
   UTC-5 vía Cronos). Con todo en "cada ciclo" = comportamiento idéntico. +2 pruebas E2E. (CAMBIOS §77)
-- [ ] **Etapa 4:** DTOs + controladores (motor y personalizadas) leer/escribir programación + devolver
-  `ProximaEjecucion`; validación.
-- [ ] **Etapa 5:** UI — selector de programación reutilizable (modo + unidad + calendario) en reglas del
-  motor y personalizadas; mostrar "próxima ejecución".
+- [x] **Etapa 4 — HECHO + gate verde:** `ProgramacionDto` (enums como texto + `TryConvertir` que valida
+  listas cerradas y rangos → 400 limpio). Respuestas de motor y personalizadas devuelven `Programacion` +
+  `ProximaEjecucion` + `UltimaEjecucion`; `PUT`/`POST` aceptan `Programacion` y al cambiarla reinician
+  `ProximaEjecucion=null` (el job la ancla). En custom, `null` en update conserva la previa. +12 pruebas
+  (`ProgramacionDtoTests`, Detectors 177). (CAMBIOS §78)
+- [ ] **Etapa 5:** UI — selector de programación reutilizable (modo + unidad seg/h/d/sem/mes + calendario
+  día-D/"último día"/semanal/diario) en reglas del motor y personalizadas; mostrar "próxima ejecución".
+  Servicios/tipos TS: `reglas.service.ts`, `reglasPersonalizadas.service.ts`, `types/regla.ts`,
+  `types/reglaPersonalizada.ts`; el componente reutilizable puede vivir en `components/reglas/`.
 
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)

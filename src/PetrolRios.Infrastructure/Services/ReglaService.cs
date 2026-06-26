@@ -1,5 +1,6 @@
 using PetrolRios.Application.DTOs.Reglas;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.Programacion;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
@@ -59,6 +60,15 @@ public sealed class ReglaService : IReglaService
             regla.Ambito = ambito;
         if (request.NotificarCorreo.HasValue)
             regla.NotificarCorreo = request.NotificarCorreo.Value;
+        if (request.Programacion is not null)
+        {
+            if (!request.Programacion.TryConvertir(out var prog, out var error))
+                throw new ArgumentException(error);
+            regla.ProgramacionJson = prog.Serializar();
+            // Al cambiar la cadencia, el job recalcula y ancla la próxima ejecución (no dispara al
+            // instante): "el día 29" empezará el día 29, no ahora.
+            regla.ProximaEjecucion = null;
+        }
 
         await _unitOfWork.SaveChangesAsync(ct);
         return MapToResponse(regla);
@@ -160,7 +170,10 @@ public sealed class ReglaService : IReglaService
             AyudaUmbral = ayuda,
             Activa = r.Activa,
             Ambito = r.Ambito.ToString(),
-            NotificarCorreo = r.NotificarCorreo
+            NotificarCorreo = r.NotificarCorreo,
+            Programacion = ProgramacionDto.DeJson(r.ProgramacionJson),
+            ProximaEjecucion = r.ProximaEjecucion,
+            UltimaEjecucion = r.UltimaEjecucion
         };
     }
 }

@@ -1,3 +1,5 @@
+using PetrolRios.Application.Programacion;
+
 namespace PetrolRios.Application.DTOs.Reglas;
 
 public sealed record ReglaDeteccionResponse
@@ -29,6 +31,15 @@ public sealed record ReglaDeteccionResponse
 
     /// <summary>Si true, esta regla envía correo a supervisores/administradores cuando se dispara.</summary>
     public bool NotificarCorreo { get; init; }
+
+    /// <summary>Cadencia de ejecución de la regla (cada ciclo / intervalo / calendario).</summary>
+    public ProgramacionDto Programacion { get; init; } = ProgramacionDto.CadaCiclo;
+
+    /// <summary>Próxima ejecución programada (UTC); null en reglas "cada ciclo" o recién configuradas.</summary>
+    public DateTime? ProximaEjecucion { get; init; }
+
+    /// <summary>Última vez que la regla corrió por programación (UTC); null si nunca o si es "cada ciclo".</summary>
+    public DateTime? UltimaEjecucion { get; init; }
 }
 
 public sealed record CrearReglaRequest(
@@ -42,4 +53,5 @@ public sealed record ActualizarReglaRequest(
     double? ValorUmbral,
     bool? Activa,
     string? Ambito = null,
-    bool? NotificarCorreo = null);
+    bool? NotificarCorreo = null,
+    ProgramacionDto? Programacion = null);

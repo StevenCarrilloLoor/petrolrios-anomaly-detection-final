@@ -1,3 +1,4 @@
+using PetrolRios.Application.Programacion;
 using PetrolRios.Application.ReglasPersonalizadas;
 
 namespace PetrolRios.Application.DTOs.ReglasPersonalizadas;
@@ -33,6 +34,15 @@ public sealed record ReglaPersonalizadaResponse
     public bool NotificarCorreo { get; init; }
 
     public bool Activa { get; init; }
+
+    /// <summary>Cadencia de ejecución de la regla (cada ciclo / intervalo / calendario).</summary>
+    public ProgramacionDto Programacion { get; init; } = ProgramacionDto.CadaCiclo;
+
+    /// <summary>Próxima ejecución programada (UTC); null en reglas "cada ciclo" o recién configuradas.</summary>
+    public DateTime? ProximaEjecucion { get; init; }
+
+    /// <summary>Última vez que la regla corrió por programación (UTC); null si nunca o si es "cada ciclo".</summary>
+    public DateTime? UltimaEjecucion { get; init; }
 }
 
 public sealed record GuardarReglaPersonalizadaRequest
@@ -65,6 +75,12 @@ public sealed record GuardarReglaPersonalizadaRequest
     public bool NotificarCorreo { get; init; }
 
     public bool Activa { get; init; } = true;
+
+    /// <summary>
+    /// Cadencia de ejecución. <b>null</b> = sin cambios: al crear queda "cada ciclo"; al actualizar
+    /// conserva la programación previa (un cliente que no la envía no la borra por accidente).
+    /// </summary>
+    public ProgramacionDto? Programacion { get; init; }
 }
 
 /// <summary>Solicitud para validar/probar una expresión avanzada sin guardarla.</summary>
