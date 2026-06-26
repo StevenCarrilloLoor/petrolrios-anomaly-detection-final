@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 25 de junio de 2026 (agente: auto-detección ContaGober + arranque automático al encender + portable reconstruido 4 plataformas).
+Última actualización: 25 de junio de 2026 ("Frecuencia del análisis" en Ajustes ahora es un desplegable en español a prueba de errores + cron validado de verdad; antes: agente ContaGober + arranque automático).
 
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)

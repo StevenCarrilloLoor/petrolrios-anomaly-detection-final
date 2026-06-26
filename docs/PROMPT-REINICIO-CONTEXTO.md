@@ -96,7 +96,14 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Agente: ContaGober + arranque automático + portable nuevo (25-jun-2026):**
+**Última ronda — "Frecuencia del análisis" a prueba de errores (25-jun-2026):**
+- En Ajustes → "Operación del sistema", el cron crudo se cambió por un **desplegable en español**
+  (Cada 5 min, Cada hora…) + opción **"Personalizado (avanzado)"** que revela el cron. `AjustesPage.tsx`.
+- Backend `ParametrosOperacionController`: valida el cron **registrando el job en `try/catch`** (Hangfire
+  parsea y lanza si es inválido **antes** de tocar storage) → **400 limpio en vez de 500**, y solo persiste
+  si es válido. Test `Operacion_CronInvalido_DevuelveBadRequestNo500` (Api 75). *(CAMBIOS §71)*
+
+**Ronda — Agente: ContaGober + arranque automático + portable nuevo (25-jun-2026):**
 - **Auto-detección Firebird ampliada** (`FirebirdExtractor.RutasCandidatas`): añadidas rutas de ContaGober
   (`C:\Programas\ContaGober1\Datosc\CONTAB.FDB`) y variantes `CONTAB.FDB`; además **escanea** raíces de
   instalación (`C:\Programas`, Program Files, `C:\Conta`, `C:\` superficial) por `CONTA*.FDB`

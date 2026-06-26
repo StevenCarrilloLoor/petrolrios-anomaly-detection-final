@@ -1961,3 +1961,28 @@ solo cada vez que se enciende el equipo**, idealmente con una opción dentro del
 
 **Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 150 / Monitor 2 /
 **Api 74** (con Docker), eslint + vite build OK. Publicación de las 4 plataformas completada en `dist/`.
+
+---
+
+## 71. "Frecuencia del análisis" a prueba de errores: desplegable en español + cron validado de verdad
+
+**Motivación (Steven).** En Ajustes → "Operación del sistema", la **frecuencia del análisis** se editaba
+como una **expresión cron cruda** (`* * * * *`): difícil de entender y fácil de romper sin querer. Era para
+cambiar cada cuánto corre la detección de reglas. Pedido: hacerla clara y segura.
+
+**Qué se hizo.**
+- **Frontend (Ajustes):** el campo de cron crudo se reemplazó por un **desplegable en español** —
+  "Cada minuto", "Cada 2/5/10/15/30 minutos", "Cada hora", "Cada 2 horas"— donde cada opción mapea a su
+  cron por debajo, con una frase que explica lo elegido ("El sistema revisará las reglas cada 5 minutos…").
+  Se conserva una opción **"Personalizado… (avanzado)"** que revela el campo cron con sus ejemplos, para
+  quien sepa. Al abrir, si la frecuencia guardada coincide con una opción, se preselecciona; si es una
+  expresión rara, entra directo en modo avanzado.
+- **Backend (`ParametrosOperacionController`):** la validación dejó de ser "cuenta 5 campos" (que dejaba
+  pasar crons inválidos y podía tirar **500** al re-registrar el job). Ahora **registra el job dentro de un
+  `try/catch`**: Hangfire **parsea** el cron ahí y lanza si es inválido **antes de tocar el almacenamiento**,
+  así que un cron malo devuelve un **400 limpio** sin romper el job vigente, y solo si el cron es válido se
+  **persiste** (ya recortado). Mensajes guían a elegir una opción de la lista.
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 150 / Monitor 2 /
+**Api 75** (+1: test de regresión `Operacion_CronInvalido_DevuelveBadRequestNo500`, con Docker), eslint +
+vite build OK.

@@ -147,6 +147,27 @@ public sealed class ApiIntegrationTests
         content.Should().Contain("150");
     }
 
+    [DockerAvailableFact]
+    public async Task Operacion_CronInvalido_DevuelveBadRequestNo500()
+    {
+        // Arrange: un cron con valores fuera de rango (minuto 99) — antes podia tirar 500 al re-registrar
+        // el job; ahora se valida y debe devolver un 400 limpio sin romper el job vigente.
+        var token = await LoginAndGetTokenAsync();
+        var malo = new { NivelMinimoCorreo = "Critico", CronExpression = "99 99 99 99 99" };
+
+        // Act
+        var request = new HttpRequestMessage(HttpMethod.Put, "/api/v1/operacion")
+        {
+            Content = JsonContent.Create(malo),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await _client.SendAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
+    }
+
     private async Task<string> LoginAndGetTokenAsync()
     {
         var loginRequest = new { Email = "admin@petrolrios.com", Password = "Admin123!" };

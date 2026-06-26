@@ -365,6 +365,19 @@ function SeccionConexionBase() {
   );
 }
 
+/** Frecuencias listas para elegir (en español); cada una mapea a su expresión cron. */
+const FRECUENCIAS: { label: string; cron: string }[] = [
+  { label: "Cada minuto (lo más rápido, más carga)", cron: "* * * * *" },
+  { label: "Cada 2 minutos", cron: "*/2 * * * *" },
+  { label: "Cada 5 minutos (recomendado)", cron: "*/5 * * * *" },
+  { label: "Cada 10 minutos", cron: "*/10 * * * *" },
+  { label: "Cada 15 minutos", cron: "*/15 * * * *" },
+  { label: "Cada 30 minutos", cron: "*/30 * * * *" },
+  { label: "Cada hora", cron: "0 * * * *" },
+  { label: "Cada 2 horas", cron: "0 */2 * * *" },
+];
+const CRON_PERSONALIZADO = "__custom__";
+
 /** Operación del sistema (solo Admin): nivel mínimo de correo + frecuencia (cron) del job. */
 function SeccionOperacion() {
   const [config, setConfig] = useState<OperacionConfig>({
@@ -373,6 +386,7 @@ function SeccionOperacion() {
   });
   const [guardado, setGuardado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [avanzado, setAvanzado] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -408,6 +422,10 @@ function SeccionOperacion() {
   const inputCls =
     "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30";
 
+  const frecConocida = FRECUENCIAS.find((f) => f.cron === config.cronExpression);
+  const valorSelect = avanzado ? CRON_PERSONALIZADO : (frecConocida?.cron ?? CRON_PERSONALIZADO);
+  const mostrarRaw = valorSelect === CRON_PERSONALIZADO;
+
   return (
     <Card>
       <CardHeader
@@ -428,21 +446,51 @@ function SeccionOperacion() {
               <option value="Critico">Solo críticas</option>
             </select>
           </Campo>
-          <Campo label="Frecuencia del análisis (cron)">
+          <Campo label="¿Cada cuánto corre el análisis?">
+            <select
+              className={inputCls}
+              value={valorSelect}
+              onChange={(e) => {
+                if (e.target.value === CRON_PERSONALIZADO) {
+                  setAvanzado(true);
+                } else {
+                  setAvanzado(false);
+                  setConfig({ ...config, cronExpression: e.target.value });
+                }
+              }}
+            >
+              {FRECUENCIAS.map((f) => (
+                <option key={f.cron} value={f.cron}>
+                  {f.label}
+                </option>
+              ))}
+              <option value={CRON_PERSONALIZADO}>Personalizado… (avanzado)</option>
+            </select>
+          </Campo>
+        </div>
+
+        {mostrarRaw ? (
+          <div className="space-y-1">
             <input
               className={`${inputCls} font-mono`}
               value={config.cronExpression}
               onChange={(e) => setConfig({ ...config, cronExpression: e.target.value })}
               placeholder="*/5 * * * *"
             />
-          </Campo>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Cron de 5 campos (min hora día mes día-semana). Ejemplos:{" "}
-          <span className="font-mono">* * * * *</span> cada minuto,{" "}
-          <span className="font-mono">*/5 * * * *</span> cada 5 minutos,{" "}
-          <span className="font-mono">0 * * * *</span> cada hora.
-        </p>
+            <p className="text-xs text-muted-foreground">
+              Avanzado: expresión cron de 5 campos (min hora día mes día-semana). Ejemplos:{" "}
+              <span className="font-mono">* * * * *</span> cada minuto,{" "}
+              <span className="font-mono">*/5 * * * *</span> cada 5 minutos,{" "}
+              <span className="font-mono">0 * * * *</span> cada hora. Si no estás seguro, elige una opción
+              de la lista de arriba.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            El sistema revisará las reglas <span className="font-medium text-foreground">{frecConocida?.label.toLowerCase()}</span>.
+            Más seguido = detecta antes pero usa más recursos. Lo normal es cada 5 minutos.
+          </p>
+        )}
         <button
           onClick={onGuardar}
           disabled={cargando}

@@ -43,16 +43,31 @@ public sealed class ParametrosOperacionController : ControllerBase
         if (cron.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 5)
             return BadRequest(new
             {
-                mensaje = "Expresión cron inválida: use 5 campos (p. ej. \"*/5 * * * *\" para cada 5 minutos)."
+                mensaje = "La frecuencia (cron) debe tener 5 campos (p. ej. \"*/5 * * * *\" = cada 5 minutos). " +
+                          "Mejor elige una opción de la lista en Ajustes."
             });
 
-        _store.Guardar(config);
+        // Aplicar el nuevo cron re-registrando el job. Hangfire PARSEA el cron aquí y lanza si es inválido
+        // ANTES de tocar el almacenamiento, así que lo registramos primero dentro de try/catch: si el cron
+        // está mal, devolvemos 400 sin persistir ni dejar el job en mal estado (el anterior sigue vigente).
+        try
+        {
+            RecurringJob.AddOrUpdate<AnomalyDetectionJob>(
+                "anomaly-detection",
+                job => job.ExecuteAsync(CancellationToken.None),
+                cron);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new
+            {
+                mensaje = "La frecuencia no es válida (" + ex.Message + "). " +
+                          "Elige una opción de la lista, o revisa la expresión cron de 5 campos."
+            });
+        }
 
-        // Aplicar el nuevo cron en vivo (sin reiniciar) re-registrando el job recurrente.
-        RecurringJob.AddOrUpdate<AnomalyDetectionJob>(
-            "anomaly-detection",
-            job => job.ExecuteAsync(CancellationToken.None),
-            cron);
+        // Cron válido y job aplicado: ahora sí persistimos (con el cron ya normalizado/recortado).
+        _store.Guardar(new OperacionConfig(config.NivelMinimoCorreo, cron));
 
         return Ok(_store.Actual());
     }
