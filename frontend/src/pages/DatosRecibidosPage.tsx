@@ -89,8 +89,8 @@ export function DatosRecibidosPage() {
         >
           <option value="">Todos los tipos</option>
           {(tipos ?? []).map((t) => (
-            <option key={t} value={t}>
-              {t}
+            <option key={t.tipo} value={t.tipo}>
+              {t.etiqueta}
             </option>
           ))}
         </select>
@@ -164,7 +164,12 @@ export function DatosRecibidosPage() {
                     className="cursor-pointer border-t border-border transition-colors hover:bg-muted/50"
                   >
                     <td className="px-4 py-3 font-mono text-muted-foreground">{d.id}</td>
-                    <td className="px-4 py-3 font-medium">{d.tipoTransaccion}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-medium">{d.tipoNatural || d.tipoTransaccion}</span>
+                      {d.tabla && (
+                        <span className="ml-1 font-mono text-xs text-muted-foreground">({d.tabla})</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="font-medium">{d.estacionNombre || `Estación ${d.estacionId}`}</span>
                       <span className="ml-1 font-mono text-xs text-muted-foreground">{d.estacionCodigo}</span>

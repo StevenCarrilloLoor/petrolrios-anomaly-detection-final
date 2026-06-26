@@ -1,6 +1,6 @@
 import { api } from "./api";
 import type { PaginatedResponse } from "@/types/common";
-import type { DatoRecibidoResponse } from "@/types/datoRecibido";
+import type { DatoRecibidoResponse, TipoRecibidoOption } from "@/types/datoRecibido";
 
 export interface DatosRecibidosParams {
   tipo?: string;
@@ -17,5 +17,5 @@ export const datosRecibidosService = {
       .get<PaginatedResponse<DatoRecibidoResponse>>("/datos-recibidos", { params })
       .then((r) => r.data),
   getTipos: () =>
-    api.get<string[]>("/datos-recibidos/tipos").then((r) => r.data),
+    api.get<TipoRecibidoOption[]>("/datos-recibidos/tipos").then((r) => r.data),
 };

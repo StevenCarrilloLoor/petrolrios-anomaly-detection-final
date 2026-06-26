@@ -1893,3 +1893,32 @@ en `ApiIntegrationTests` (nombre de 200 caracteres → espera 400, nunca 500).
 **Api 74** (el test nuevo corrió con Docker), eslint + vite build OK. Regresión en vivo confirmada tras
 reconstruir: nombre 200 → 400 ("El nombre no puede superar 150 caracteres."), nombre 5000 → 400,
 descripción 600 → 400, regla válida → 201.
+
+---
+
+## 69. Logs "Datos recibidos": el tipo se muestra como "Nombre natural (TABLA técnica)"
+
+**Motivación (Steven).** En "Datos recibidos" el tipo salía con el nombre interno (p. ej. `Factura`, `Dcto`)
+y no se veía la **tabla** real de Contaplus. Pedido: mostrar **el nombre natural y, entre paréntesis, el
+nombre técnico (la tabla)** — p. ej. `Factura (DCTO)`, `Anulación (ANUL)` — tanto en la columna como en el
+desplegable del filtro, para tener las dos referencias a la vez. (De paso, Steven borró la fuente `Dcto`
+duplicada del selector.)
+
+**Por qué ayuda.** El built-in `Factura` y la (vieja) fuente `Dcto` apuntan a la **misma** tabla `DCTO`;
+ver la tabla técnica deja claro de qué tabla salió cada registro y desmonta la confusión "¿Factura y Dcto
+no eran lo mismo?".
+
+**Qué se hizo.**
+- **Backend:** nuevo `CatalogoTiposTransaccion` (Application/Fuentes) que traduce el tipo del staging a
+  `(nombre natural, tabla técnica)`. Cubre las 7 fuentes built-in (`Factura`→DCTO, `DetalleFactura`→DESP,
+  `CierreTurno`→TURN, `DepositoTurno`→TURN_DEPO, `Anulación`→ANUL, `Crédito`→CRED_CABE,
+  `TarjetaTurno`→TURN_TARJ), **tolera variantes de agentes antiguos** (`Anulaciones`→ANUL) y la fuente
+  `Dcto`→DCTO; para las **fuentes configurables** del selector el tipo es el nombre de la fuente y la tabla
+  se toma del catálogo (`FuentesDatos.Nombre→Tabla`). `DatoRecibidoResponse` gana `TipoNatural` y `Tabla`;
+  `GET /datos-recibidos/tipos` ahora devuelve `{ tipo, etiqueta }` (etiqueta = "Natural (TABLA)").
+- **Frontend:** la columna **Tipo** muestra el nombre natural + la tabla en gris monoespaciado entre
+  paréntesis; el **desplegable** del filtro usa la etiqueta (valor crudo para filtrar, texto legible).
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / **Detectors 150** (+15 del
+nuevo `CatalogoTiposTransaccionTests`) / Monitor 2 / Api 74 (57 + 17 de integración omitidas sin Docker en
+esa corrida), eslint + vite build OK.

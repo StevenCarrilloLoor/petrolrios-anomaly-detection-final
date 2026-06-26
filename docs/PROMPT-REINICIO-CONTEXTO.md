@@ -96,7 +96,18 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Robustez del creador de reglas + Logs + guard (25-jun-2026):**
+**Última ronda — "Datos recibidos" con nombre natural + tabla técnica (25-jun-2026):**
+- En los logs el tipo se muestra como **"Nombre natural (TABLA)"** — `Factura (DCTO)`, `Anulación (ANUL)` —
+  en la columna y en el desplegable del filtro. Backend: `CatalogoTiposTransaccion` (Application/Fuentes)
+  resuelve tipo→(natural, tabla) para los 7 built-ins (+ variante `Anulaciones` y `Dcto`→DCTO), y para las
+  fuentes configurables toma la tabla del catálogo (`FuentesDatos`). `DatoRecibidoResponse` ganó
+  `TipoNatural`+`Tabla`; `GET /datos-recibidos/tipos` devuelve `{ tipo, etiqueta }`. 15 tests nuevos.
+- Steven **borró la fuente `Dcto` duplicada** del selector (era el mismo DCTO que el built-in `Factura`).
+- **Conteos:** Domain 40, **Detectors 150**, Monitor 2, Api 74. *Pendiente: screenshot en vivo (la
+  extensión de Chrome se desconectó al relanzar el sistema; el gate y los 15 unit tests ya validan la lógica).*
+  *(CAMBIOS §69)*
+
+**Ronda — Robustez del creador de reglas + Logs + guard (25-jun-2026):**
 - **Sección "Datos recibidos"** (logs crudos de agentes: tabla con tipo/estación/fecha/estado + **filas
   expandibles** con el JSON crudo, **filtros** tipo/estación/estado y **buscador**): `DatosRecibidosController`
   (`GET /api/v1/datos-recibidos` + `/tipos`) y página en Monitoreo. Verificada en vivo: 3.241 registros

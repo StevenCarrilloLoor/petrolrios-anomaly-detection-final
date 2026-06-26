@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetrolRios.Application.DTOs.Common;
 using PetrolRios.Application.DTOs.Logs;
+using PetrolRios.Application.Fuentes;
 using PetrolRios.Infrastructure.Persistence;
 
 namespace PetrolRios.Api.Controllers.V1;
@@ -79,13 +80,20 @@ public sealed class DatosRecibidosController : ControllerBase
             .Select(e => new { e.Id, e.Codigo, e.Nombre })
             .ToDictionaryAsync(e => e.Id, e => (e.Codigo, e.Nombre), ct);
 
+        // Tabla técnica de las fuentes configurables del selector (built-ins se resuelven solos).
+        var tablaPorFuente = await TablaPorFuenteAsync(ct);
+
         var items = rows.Select(r =>
         {
             var est = estaciones.GetValueOrDefault(r.EstacionId);
+            var (natural, tabla) = CatalogoTiposTransaccion.Resolver(
+                r.TipoTransaccion, tablaPorFuente.GetValueOrDefault(r.TipoTransaccion));
             return new DatoRecibidoResponse
             {
                 Id = r.Id,
                 TipoTransaccion = r.TipoTransaccion,
+                TipoNatural = natural,
+                Tabla = tabla,
                 EstacionId = r.EstacionId,
                 EstacionCodigo = est.Codigo ?? "",
                 EstacionNombre = est.Nombre ?? "",
@@ -110,15 +118,37 @@ public sealed class DatosRecibidosController : ControllerBase
     /// vistazo qué tablas/fuentes están llegando realmente al central.
     /// </summary>
     [HttpGet("tipos")]
-    [ProducesResponseType(typeof(IReadOnlyList<string>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IReadOnlyList<TipoRecibidoOption>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTipos(CancellationToken ct)
     {
         var tipos = await _dbContext.TransaccionesStaging
             .AsNoTracking()
             .Select(s => s.TipoTransaccion)
             .Distinct()
-            .OrderBy(t => t)
             .ToListAsync(ct);
-        return Ok(tipos);
+
+        var tablaPorFuente = await TablaPorFuenteAsync(ct);
+
+        var opciones = tipos
+            .Select(t => new TipoRecibidoOption(
+                t, CatalogoTiposTransaccion.Etiqueta(t, tablaPorFuente.GetValueOrDefault(t))))
+            .OrderBy(o => o.Etiqueta, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        return Ok(opciones);
+    }
+
+    /// <summary>
+    /// Mapa Nombre-de-fuente → Tabla técnica del catálogo del selector, para resolver la tabla de las
+    /// fuentes configurables (las built-in se resuelven con <see cref="CatalogoTiposTransaccion"/>).
+    /// </summary>
+    private async Task<Dictionary<string, string>> TablaPorFuenteAsync(CancellationToken ct)
+    {
+        var fuentes = await _dbContext.FuentesDatos
+            .AsNoTracking()
+            .Select(f => new { f.Nombre, f.Tabla })
+            .ToListAsync(ct);
+        return fuentes
+            .GroupBy(f => f.Nombre, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().Tabla, StringComparer.OrdinalIgnoreCase);
     }
 }
