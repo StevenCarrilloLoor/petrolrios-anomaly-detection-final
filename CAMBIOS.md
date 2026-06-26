@@ -2076,3 +2076,35 @@ implementarlo aún**. (2) Tener por escrito cómo **relanzar cada componente** p
 
 **Verificación.** Solo documentación: no cambia código ni build. (El feature de frecuencia por regla queda
 **anotado**, pendiente de decisión para implementar.)
+
+---
+
+## 75. Frecuencia/calendario por regla — Etapa 1: el cerebro (modelo + Cronos + pruebas)
+
+**Motivación (Steven).** Implementar el feature del ingeniero "cada regla con su propia cadencia", con un
+selector en **segundos/horas/días/semanas/meses** y, además, **calendario anclado** ("el día 29 de cada
+mes, incremental; el sistema instalado a mitad de mes no debe desfasarse").
+
+**Investigación previa (pedida por Steven).** Se revisó cómo lo hacen los schedulers serios:
+- **Quartz** separa **SimpleTrigger** (intervalo fijo: "cada N min/semanas/meses") de **CronTrigger**
+  (calendario: "día 29", "último día", "cada viernes"), porque cron **no** expresa bien "cada N
+  semanas/meses". → Confirma el diseño de **doble modo**.
+- **Cronos** (librería de HangfireIO, paquete NuGet) calcula la próxima ocurrencia de un cron y soporta
+  **`L` = último día del mes**, años bisiestos y zona horaria. → Se usa para el modo Calendario en vez de
+  reinventar la matemática de fechas (que es donde es fácil fallar).
+
+**Qué se hizo (Etapa 1).**
+- **`ProgramacionEjecucion`** (value object, `Application/Programacion`): modo `CadaCiclo` |
+  `Intervalo` (N + unidad seg/min/h/d/sem/mes) | `Calendario` (diario/semanal/mensual con día del mes,
+  "último día del mes", día de la semana y hora). Serializa a JSON; trae una `Descripcion()` legible.
+- **`CalculadoraProgramacion`**: `EstaPendiente(...)` y `CalcularProxima(...)`. Intervalo = `desde + N`;
+  Calendario = se traduce a cron y **Cronos** calcula la próxima fecha anclada (resuelve "día 29 incremental"
+  y "fin de mes" sin desfase, aunque se instale a mitad de mes). + `DiasVentanaSugerida()` para la ventana
+  de datos de reglas lentas (Etapa 3).
+- Paquete **`Cronos` 0.8.4** añadido a `PetrolRios.Application`.
+- **15 pruebas** (`CalculadoraProgramacionTests`): intervalos, mensual día-29 anclado, no-desfase a mitad de
+  mes, último día con febrero (no bisiesto), semanal, diario, "¿le toca?", serialización y descripción.
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / **Detectors 165** (+15) /
+Monitor 2 / Api 75, eslint + vite OK. (Pendientes: entidades+migración, integración en el job, DTOs/API y
+UI — ver `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md` y `docs/PENDIENTES.md`.)

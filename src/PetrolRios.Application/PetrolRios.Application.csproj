@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Cronos: parser de cron y cálculo de próximas ocurrencias (soporta "L" = último día del mes,
+         años bisiestos y zonas horarias). Lo usa CalculadoraProgramacion para el modo Calendario;
+         así NO reinventamos la matemática de calendario. -->
+    <PackageReference Include="Cronos" Version="0.8.4" />
     <PackageReference Include="FluentValidation" Version="11.11.0" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" />
     <PackageReference Include="Mapster" Version="7.4.0" />

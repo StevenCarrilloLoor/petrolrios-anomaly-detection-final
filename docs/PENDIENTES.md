@@ -1,13 +1,24 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (anotado feature "frecuencia por regla" en docs/PROPUESTA-FRECUENCIA-POR-REGLA.md + guía de relanzamiento en el runbook; antes: fix keys duplicadas).
+Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — Etapa 1 hecha: modelo + Cronos + 15 tests; investigación Quartz/Cronos).
 
-## 🧭 Backlog grande pendiente de decidir
-- [ ] **Frecuencia de ejecución POR REGLA** (pedido del ingeniero): que cada regla corra en su propia
-  cadencia (cada ciclo / diaria / semanal / mensual) en vez de todas cada ciclo. **Anotado y diseñado** en
-  `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`: alcance **mediano** (no enorme), reusa `IReglaBacktestService` +
-  idempotencia. Falta **decidir** si se implementa (Fase 1 throttle / Fase 2 ventana real / ambas).
+## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
+Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +
+Calendario anclado vía **Cronos**: día-D, "último día", semanal, diario). Validado vs Quartz
+(SimpleTrigger/CronTrigger).
+- [x] **Etapa 1 — HECHO + gate verde:** `ProgramacionEjecucion` + `CalculadoraProgramacion` (Application/
+  Programacion) con Cronos; 15 tests (incl. día-29 anclado, no-desfase a mitad de mes, último día/febrero).
+  (CAMBIOS §75)
+- [ ] **Etapa 2:** columnas en `ReglaDeteccion` + `ReglaPersonalizada` (`ProgramacionJson`,
+  `ProximaEjecucion`, `UltimaEjecucion`) + **migración EF** (defaults: cada ciclo, null).
+- [ ] **Etapa 3:** integrar en `AnomalyDetectionJob` — gate "¿le toca?" (built-in no-pendiente se omite sin
+  aplicar default; custom se filtra), **ventana de datos** para reglas lentas (reusar backtest/idempotencia),
+  avanzar `ProximaEjecucion`+`UltimaEjecucion`.
+- [ ] **Etapa 4:** DTOs + controladores (motor y personalizadas) leer/escribir programación + devolver
+  `ProximaEjecucion`; validación.
+- [ ] **Etapa 5:** UI — selector de programación reutilizable (modo + unidad + calendario) en reglas del
+  motor y personalizadas; mostrar "próxima ejecución".
 
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)
