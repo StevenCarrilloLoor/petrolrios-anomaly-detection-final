@@ -1,3 +1,7 @@
+import type { ProgramacionDto } from "./regla";
+
+export type { ProgramacionDto } from "./regla";
+
 export interface CondicionRegla {
   campo: string;
   operador: string;
@@ -28,6 +32,12 @@ export interface ReglaPersonalizadaResponse {
   /** Si true, la regla envía correo a supervisores/administradores cuando se dispara. */
   notificarCorreo: boolean;
   activa: boolean;
+  /** Cadencia de ejecución (cada ciclo / intervalo / calendario). */
+  programacion: ProgramacionDto;
+  /** Próxima ejecución programada (ISO UTC); null en "cada ciclo" o recién configurada. */
+  proximaEjecucion: string | null;
+  /** Última ejecución programada (ISO UTC); null si nunca o si es "cada ciclo". */
+  ultimaEjecucion: string | null;
 }
 
 export interface GuardarReglaPersonalizadaRequest {
@@ -45,6 +55,8 @@ export interface GuardarReglaPersonalizadaRequest {
   /** Si true, la regla envía correo a supervisores/administradores cuando se dispara. */
   notificarCorreo: boolean;
   activa: boolean;
+  /** Cadencia de ejecución. Opcional: al crear, omitir = "cada ciclo"; al editar, omitir = conservar la previa. */
+  programacion?: ProgramacionDto | null;
 }
 
 export interface ValidarExpresionResponse {

@@ -10,10 +10,13 @@ import type {
   ReglaPersonalizadaResponse,
   GuardarReglaPersonalizadaRequest,
   BacktestReglaResponse,
+  ProgramacionDto,
 } from "@/types/reglaPersonalizada";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ProgramacionSelector } from "./ProgramacionSelector";
+import { PROGRAMACION_CADA_CICLO, formatProxima } from "@/lib/programacion";
 import {
   Plus,
   Trash2,
@@ -27,6 +30,7 @@ import {
   CheckCircle2,
   AlertCircle,
   FlaskConical,
+  CalendarClock,
 } from "lucide-react";
 
 const inputClass =
@@ -67,6 +71,8 @@ interface FormularioRegla {
   camposMostrar: string[];
   /** Si true, la regla envía correo a supervisores/administradores cuando se dispara. */
   notificarCorreo: boolean;
+  /** Cadencia de ejecución de la regla. */
+  programacion: ProgramacionDto;
 }
 
 const formularioVacio = (fuente: string): FormularioRegla => ({
@@ -83,6 +89,7 @@ const formularioVacio = (fuente: string): FormularioRegla => ({
   ambito: "Auditoria",
   camposMostrar: [],
   notificarCorreo: false,
+  programacion: PROGRAMACION_CADA_CICLO,
 });
 
 interface Plantilla {
@@ -229,6 +236,7 @@ export function ReglasPersonalizadasSection() {
         ambito: regla.ambito,
         camposMostrar: regla.camposMostrar ?? [],
         notificarCorreo: regla.notificarCorreo,
+        programacion: regla.programacion,
         activa: !regla.activa,
       }),
     onSuccess: invalidar,
@@ -282,6 +290,7 @@ export function ReglasPersonalizadasSection() {
       ambito: p.ambito,
       camposMostrar: [],
       notificarCorreo: false,
+      programacion: PROGRAMACION_CADA_CICLO,
     });
     setEditando(0);
     setErrores([]);
@@ -309,6 +318,7 @@ export function ReglasPersonalizadasSection() {
       ambito: regla.ambito ?? "Auditoria",
       camposMostrar: regla.camposMostrar ?? [],
       notificarCorreo: regla.notificarCorreo ?? false,
+      programacion: regla.programacion ?? PROGRAMACION_CADA_CICLO,
     });
     setEditando(regla.id);
     setErrores([]);
@@ -335,6 +345,7 @@ export function ReglasPersonalizadasSection() {
       ambito: f.ambito,
       camposMostrar: f.camposMostrar,
       notificarCorreo: f.notificarCorreo,
+      programacion: f.programacion,
       activa: true,
     };
   }
@@ -548,6 +559,8 @@ export function ReglasPersonalizadasSection() {
                       expresion: form.expresion,
                       riesgoBase: form.riesgoBase,
                       ambito: form.ambito,
+                      notificarCorreo: form.notificarCorreo,
+                      programacion: form.programacion,
                     })
                   }
                   className={`${inputClass} w-full`}
@@ -1054,6 +1067,22 @@ export function ReglasPersonalizadasSection() {
               </span>
             </div>
 
+            {/* Cadencia: cada cuánto se ejecuta la regla */}
+            <div className="mt-5 rounded-lg border border-border bg-background p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <CalendarClock size={14} /> ¿Cada cuánto se ejecuta esta regla?
+              </p>
+              <p className="mb-3 text-[11px] text-muted-foreground">
+                Por defecto corre en cada ciclo del análisis. Para reglas pesadas o de cierre (fin de
+                mes, semanal…) elige un intervalo o un día del calendario: el sistema la evaluará solo
+                entonces, sobre los datos acumulados desde su última corrida.
+              </p>
+              <ProgramacionSelector
+                value={form.programacion}
+                onChange={(programacion) => setForm({ ...form, programacion })}
+              />
+            </div>
+
             {errores.length > 0 && (
               <div className="mt-4 rounded-md border border-risk-critical/30 bg-risk-critical/10 px-4 py-3">
                 {errores.map((e, i) => (
@@ -1195,6 +1224,16 @@ export function ReglasPersonalizadasSection() {
                 <p className="mt-1 font-mono text-[10px] text-muted-foreground/60">
                   {resumenRegla(regla)}
                 </p>
+                {regla.programacion && regla.programacion.modo !== "CadaCiclo" && (
+                  <p className="mt-1 inline-flex flex-wrap items-center gap-1 text-[10px] text-primary">
+                    <CalendarClock size={11} /> {regla.programacion.descripcion}
+                    {regla.proximaEjecucion && (
+                      <span className="text-muted-foreground">
+                        · próxima: {formatProxima(regla.proximaEjecucion)}
+                      </span>
+                    )}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground">

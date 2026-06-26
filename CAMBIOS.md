@@ -2190,3 +2190,35 @@ de fijarla ni de ver la próxima ejecución desde fuera.
 (+12 pruebas de `ProgramacionDto`: ida-y-vuelta de intervalo y de "mensual día 29", y rechazo de modo/unidad/
 hora/minuto/día-mes fuera de rango, incl. mayúsculas y "último día") / Monitor 2 / **Api 77** (integración
 intacta), **EF sin cambios pendientes** (Etapa 4 no toca el esquema), eslint + vite OK. Falta la **Etapa 5** (UI).
+
+---
+
+## 79. Frecuencia/calendario por regla — Etapa 5: el selector en la interfaz (feature completo)
+
+**Motivación.** Cerrar el feature con la capa visible: que el usuario configure la cadencia de cada regla
+desde la interfaz, con un selector claro en español (segundos…meses + calendario) y viendo la "próxima
+ejecución".
+
+**Qué se hizo.**
+
+- **`<ProgramacionSelector>`** (`components/reglas/ProgramacionSelector.tsx`): componente **reutilizable**
+  y controlado con tres modos — *En cada ciclo*, *Cada cierto tiempo* (N + unidad seg/min/h/días/sem/meses)
+  y *En un calendario* (diario; semanal con día de la semana; mensual con día-D o **"último día del mes"**;
+  hora:minuto en zona estación UTC-5). Muestra una **vista previa en vivo** ("▶ El día 29 de cada mes a las
+  00:00"). Las constantes y los helpers (`PROGRAMACION_CADA_CICLO`, `describirProgramacion`, `formatProxima`)
+  viven en `lib/programacion.ts` (módulo aparte, para no romper Fast Refresh: un archivo de componente solo
+  exporta componentes).
+- **Reglas del motor** (`ReglasPage.tsx`): cada fila tiene un **chip de cadencia** (icono + descripción) que
+  abre un panel inline con el selector + "Guardar cadencia"/"Cancelar" y la **próxima ejecución**. Al guardar
+  hace `PUT { programacion }`.
+- **Reglas personalizadas** (`ReglasPersonalizadasSection.tsx`): el formulario gana la sección "¿Cada cuánto
+  se ejecuta esta regla?" con el mismo selector; la lista muestra la cadencia + próxima ejecución bajo cada
+  regla programada. El toggle activar/desactivar y el cambio de fuente **conservan** la programación (no la
+  borran).
+- **Tipos TS** (`types/regla.ts`, `types/reglaPersonalizada.ts`): `ProgramacionDto` + enums espejo del
+  backend; `programacion`/`proximaEjecucion`/`ultimaEjecucion` en las respuestas y el request.
+
+**Verificación.** Gate oficial verde: build Release **0w/0e**, Domain 40 / Detectors 177 / Monitor 2 /
+Api 77, **eslint limpio** (se corrigió `react-refresh/only-export-components` separando constantes/helpers a
+`lib/programacion.ts`) y **tsc + vite OK**. Con esto el feature **frecuencia/calendario por regla queda
+completo** (Etapas 1-5): modelo+Cronos → columnas+migración → job dos-pasadas+ventana → API+validación → UI.

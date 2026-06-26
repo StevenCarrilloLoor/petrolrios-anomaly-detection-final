@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — Etapas 1-4 hechas: modelo+Cronos, columnas+migración, job con dos pasadas+ventana, y API lee/escribe la programación con validación; Detectors 177 / Api 77).
+Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — **COMPLETO (Etapas 1-5)**: modelo+Cronos, columnas+migración, job dos-pasadas+ventana, API+validación y UI con selector reutilizable + próxima ejecución; Detectors 177 / Api 77, eslint+vite OK).
 
 ## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
 Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +
@@ -24,10 +24,13 @@ Calendario anclado vía **Cronos**: día-D, "último día", semanal, diario). Va
   `ProximaEjecucion` + `UltimaEjecucion`; `PUT`/`POST` aceptan `Programacion` y al cambiarla reinician
   `ProximaEjecucion=null` (el job la ancla). En custom, `null` en update conserva la previa. +12 pruebas
   (`ProgramacionDtoTests`, Detectors 177). (CAMBIOS §78)
-- [ ] **Etapa 5:** UI — selector de programación reutilizable (modo + unidad seg/h/d/sem/mes + calendario
-  día-D/"último día"/semanal/diario) en reglas del motor y personalizadas; mostrar "próxima ejecución".
-  Servicios/tipos TS: `reglas.service.ts`, `reglasPersonalizadas.service.ts`, `types/regla.ts`,
-  `types/reglaPersonalizada.ts`; el componente reutilizable puede vivir en `components/reglas/`.
+- [x] **Etapa 5 — HECHO + gate verde:** `<ProgramacionSelector>` reutilizable (3 modos: cada ciclo /
+  intervalo seg-min-h-d-sem-mes / calendario diario-semanal-mensual con día-D o "último día" + hora) con
+  vista previa en vivo; constantes/helpers en `lib/programacion.ts`. Integrado en reglas del **motor**
+  (chip + panel inline por fila) y **personalizadas** (sección del formulario + cadencia/próxima en la lista);
+  el toggle y el cambio de fuente conservan la programación. Tipos TS espejo. eslint+vite OK. (CAMBIOS §79)
+  **→ Feature frecuencia/calendario por regla COMPLETO.** *(Pendiente opcional: QA en Chrome en vivo +
+  prueba real de que una regla mensual dispara solo el día configurado.)*
 
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)

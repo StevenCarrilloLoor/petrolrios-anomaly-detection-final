@@ -96,7 +96,7 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Frecuencia/calendario por regla, Etapas 1-4 (26-jun-2026) — EN PROGRESO (falta la 5: UI):**
+**Última ronda — Frecuencia/calendario por regla (26-jun-2026) — ✅ COMPLETO (Etapas 1-5):**
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de
   **doble modo** validado. **Cronos** (NuGet) calcula próximas fechas con `L`=último día, bisiestos, TZ →
   se usa para el modo Calendario (no reinventar la matemática).
@@ -121,8 +121,15 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   + `ProximaEjecucion` + `UltimaEjecucion`; `PUT`/`POST` aceptan `Programacion` y al cambiarla reinician
   `ProximaEjecucion=null` (el job ancla). En custom, `null` en update conserva la previa. +12 pruebas
   (`ProgramacionDtoTests` → Detectors 177). *(CAMBIOS §78)*
-- **Falta Etapa 5** (UI: selector reutilizable modo+unidad+calendario en reglas del motor y personalizadas +
-  "próxima ejecución"). Plan en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md` y `docs/PENDIENTES.md`.
+- **Etapa 5 (hecha + gate verde):** `<ProgramacionSelector>` reutilizable (cada ciclo / intervalo
+  seg-min-h-d-sem-mes / calendario diario-semanal-mensual día-D o "último día" + hora, con vista previa en
+  vivo); constantes/helpers en `lib/programacion.ts` (separados para no romper Fast Refresh). Integrado en
+  reglas del **motor** (`ReglasPage.tsx`: chip + panel inline por fila) y **personalizadas**
+  (`ReglasPersonalizadasSection.tsx`: sección del formulario + cadencia/próxima en la lista; el toggle y el
+  cambio de fuente conservan la programación). Tipos TS espejo en `types/regla.ts` + `types/reglaPersonalizada.ts`.
+  eslint+vite OK. *(CAMBIOS §79)*
+- **✅ Feature COMPLETO.** Pendiente opcional: QA en Chrome en vivo + prueba real de que una regla mensual
+  dispara solo el día configurado (requiere el sistema arriba y datos en la ventana).
 
 **Ronda — Documentación: frecuencia por regla (anotada) + guía de relanzamiento (26-jun-2026):**
 - **`docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`** (nuevo): diseño/alcance del feature del ingeniero (cada regla

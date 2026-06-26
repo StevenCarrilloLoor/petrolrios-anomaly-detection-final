@@ -3,7 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { reglasService } from "@/services/reglas.service";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ReglasPersonalizadasSection } from "@/components/reglas/ReglasPersonalizadasSection";
-import type { ReglaDeteccionResponse, ActualizarReglaRequest } from "@/types/regla";
+import { ProgramacionSelector } from "@/components/reglas/ProgramacionSelector";
+import { PROGRAMACION_CADA_CICLO, formatProxima } from "@/lib/programacion";
+import type {
+  ReglaDeteccionResponse,
+  ActualizarReglaRequest,
+  ProgramacionDto,
+} from "@/types/regla";
 import { TIPO_DETECTOR_LABELS } from "@/types/alert";
 import type { TipoDetector } from "@/types/alert";
 import {
@@ -24,6 +30,7 @@ import {
   Bell,
   BellOff,
   RotateCcw,
+  CalendarClock,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -68,6 +75,8 @@ export function ReglasPage() {
   const [pestana, setPestana] = useState<Pestana>("motor");
   const [busqueda, setBusqueda] = useState("");
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
+  const [editProgId, setEditProgId] = useState<number | null>(null);
+  const [progDraft, setProgDraft] = useState<ProgramacionDto>(PROGRAMACION_CADA_CICLO);
 
   const { data: reglas, isLoading } = useQuery({
     queryKey: ["reglas"],
@@ -103,6 +112,16 @@ export function ReglasPage() {
   function saveEdit(id: number) {
     const val = parseFloat(editValue);
     if (!isNaN(val)) updateMutation.mutate({ id, data: { valorUmbral: val } });
+  }
+
+  function startEditProg(regla: ReglaDeteccionResponse) {
+    setEditProgId(regla.id);
+    setProgDraft(regla.programacion ?? PROGRAMACION_CADA_CICLO);
+  }
+
+  function saveProg(id: number) {
+    updateMutation.mutate({ id, data: { programacion: progDraft } });
+    setEditProgId(null);
   }
 
   function toggleGrupo(detector: string) {
@@ -260,12 +279,8 @@ export function ReglasPage() {
                 {!colapsado && (
                   <div className="divide-y divide-border border-t border-border">
                     {reglasGrupo.map((regla) => (
-                      <div
-                        key={regla.id}
-                        className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                          !regla.activa ? "opacity-55" : ""
-                        }`}
-                      >
+                      <div key={regla.id} className={!regla.activa ? "opacity-55" : ""}>
+                        <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-medium text-foreground">{regla.nombre}</p>
@@ -281,6 +296,24 @@ export function ReglasPage() {
                         </div>
 
                         <div className="flex shrink-0 items-center gap-3">
+                          <button
+                            onClick={() => startEditProg(regla)}
+                            title={`Cadencia: ${regla.programacion?.descripcion ?? "en cada ciclo"}. Clic para cambiar cada cuánto se ejecuta esta regla.`}
+                            className={`flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] transition-colors ${
+                              editProgId === regla.id
+                                ? "bg-primary/15 text-primary"
+                                : regla.programacion && regla.programacion.modo !== "CadaCiclo"
+                                  ? "text-primary hover:bg-primary/10"
+                                  : "text-muted-foreground/70 hover:bg-muted hover:text-muted-foreground"
+                            }`}
+                          >
+                            <CalendarClock size={13} />
+                            <span className="hidden max-w-[130px] truncate sm:inline">
+                              {regla.programacion && regla.programacion.modo !== "CadaCiclo"
+                                ? regla.programacion.descripcion
+                                : "cada ciclo"}
+                            </span>
+                          </button>
                           {editingId === regla.id ? (
                             <div
                               className="flex items-center gap-1.5"
@@ -374,6 +407,32 @@ export function ReglasPage() {
                             />
                           </button>
                         </div>
+                        </div>
+                        {editProgId === regla.id && (
+                          <div className="border-t border-border bg-muted/20 px-4 py-3">
+                            <ProgramacionSelector value={progDraft} onChange={setProgDraft} />
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <button
+                                onClick={() => saveProg(regla.id)}
+                                disabled={updateMutation.isPending}
+                                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                              >
+                                Guardar cadencia
+                              </button>
+                              <button
+                                onClick={() => setEditProgId(null)}
+                                className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
+                              >
+                                Cancelar
+                              </button>
+                              {regla.proximaEjecucion && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  Próxima ejecución: {formatProxima(regla.proximaEjecucion)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
