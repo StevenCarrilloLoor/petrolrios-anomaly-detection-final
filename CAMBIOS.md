@@ -1986,3 +1986,44 @@ cambiar cada cuánto corre la detección de reglas. Pedido: hacerla clara y segu
 **Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 150 / Monitor 2 /
 **Api 75** (+1: test de regresión `Operacion_CronInvalido_DevuelveBadRequestNo500`, con Docker), eslint +
 vite build OK.
+
+---
+
+## 72. Release 2.4.0 + "fábrica" de despliegue lista para San Pío (reemplazo y actualización)
+
+**Motivación (Steven).** Antes de ir a San Pío: revisar y dejar lista toda la cadena de despliegue
+(instaladores/portables del central, agente y monitor; base de datos; versionado; y la lógica de
+actualización de cada sistema), para poder **reemplazar** el agente viejo o **actualizarlo** con la lógica
+existente.
+
+**Revisión (qué hay y funciona).**
+- **Central + BD:** `instalar-central-windows.bat/.ps1` verifica Docker, genera `.env` con secretos
+  aleatorios, detecta la IP y levanta `docker-compose.prod.yml` (Postgres + API en :8080, migraciones
+  automáticas). Sólido. Alternativa sin Docker: el `.exe` self-contained (:5170 + Postgres externo).
+- **Portables/exes:** `publicar-servidor-agente-y-monitor.bat` (los 3, + Inno Setup) y
+  `publicar-solo-el-agente-multiplataforma.bat` (agente x4 SO). Versión única en `Directory.Build.props`.
+- **Actualización:** el **monitor se auto-actualiza** (cada 6 h); el **agente solo avisa** y se aplica
+  **con un clic** desde su panel (descarga → verifica SHA256 → intercambia exe → reinicia). El central
+  publica el manifiesto en `/api/v1/agente/version` y sirve el exe en `/descargas`.
+
+**Qué se hizo para dejarlo "todo listo".**
+- **Versión 2.4.0** en `Directory.Build.props` (era 2.3.0): así la vía de actualización dispara y se
+  distingue el build nuevo.
+- **URL del manifiesto ahora ABSOLUTA desde el request** (`AgenteController.Absolutizar`): el
+  `agente-version.json` lleva una URL **relativa** (`/descargas/…`) y el central la vuelve absoluta con su
+  propio host → sin IP hardcodeada, funciona en cualquier red.
+- **Volúmenes en `docker-compose.prod.yml`:** `central-config` (→ `/app/config`) y `central-descargas`
+  (→ `/app/wwwroot/descargas`). Así el central Docker sirve el manifiesto + el exe **sin reconstruir la
+  imagen**, y además **persisten** `connection.json` y `operacion.json` (antes se perdían al recrear).
+- **`publicar-actualizacion-del-agente.bat`/`.ps1` (un clic):** calcula el SHA256 del exe publicado, lo
+  copia a `central-descargas/` y genera `central-config/agente-version.json`. Quita el paso manual y
+  propenso a errores.
+- **`docs/RUNBOOK-PUESTA-EN-MARCHA.md`:** guía única (central, agente, monitor, versionado/actualización y
+  el plan de San Pío con las dos opciones). `agente-LEEME-windows.txt` ya cubría el arranque automático.
+- `.gitignore` ignora `central-config/` y `central-descargas/` (artefactos de runtime).
+
+**Verificación.** Cadena completa en Windows: **gate verde** (build Release 0w/0e, Domain 40 / Detectors
+150 / Monitor 2; las de integración Api se omiten sin Docker en esa corrida), **publicación de las 4
+plataformas** OK, y **`publicar-actualizacion`** generó `central-descargas/PetrolRios.StationAgent.exe` +
+`central-config/agente-version.json` para la **2.4.0** (SHA256 `fda86354…baabe`). Quedan listas las dos
+vías para San Pío: portable nuevo (reemplazo) y paquete de actualización (un clic).

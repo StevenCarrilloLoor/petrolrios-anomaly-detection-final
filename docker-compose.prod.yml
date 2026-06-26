@@ -54,6 +54,14 @@ services:
       Notificaciones__Email__Remitente: ${EMAIL_REMITENTE:-alertas@petrolrios.com}
     ports:
       - "${CENTRAL_PORT:-8080}:8080"
+    # Carpetas del host editables SIN reconstruir la imagen (las crea Docker si no existen):
+    #  - central-config:    config del central que debe PERSISTIR entre reinicios —
+    #                       agente-version.json (manifiesto de auto-actualización del agente),
+    #                       connection.json y operacion.json (los escribe Ajustes).
+    #  - central-descargas: el .exe del agente que se ofrece para auto-actualizar; se sirve en /descargas.
+    volumes:
+      - ./central-config:/app/config
+      - ./central-descargas:/app/wwwroot/descargas
 
 volumes:
   pgdata:

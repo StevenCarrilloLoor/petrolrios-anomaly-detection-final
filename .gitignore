@@ -3,6 +3,11 @@ bin/
 obj/
 dist/
 
+# Carpetas del central generadas al publicar una actualizacion del agente (exe + manifiesto).
+# Son artefactos/config de runtime, no fuente: las monta docker-compose.prod.yml.
+central-descargas/
+central-config/
+
 # Datos de runtime del agente (store-and-forward, watermark, memoria de envio) — no al repo
 src/PetrolRios.StationAgent/pending/
 **/pending/*.json

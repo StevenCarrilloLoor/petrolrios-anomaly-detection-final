@@ -46,7 +46,7 @@ public sealed class AgenteController : ControllerBase
                 var doc = JsonSerializer.Deserialize<ManifiestoAgente>(json,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (doc is not null && !string.IsNullOrWhiteSpace(doc.Version))
-                    return Ok(doc);
+                    return Ok(doc with { Url = Absolutizar(doc.Url) });
             }
             catch (Exception ex)
             {
@@ -62,7 +62,7 @@ public sealed class AgenteController : ControllerBase
             return Ok(new ManifiestoAgente
             {
                 Version = versionCfg,
-                Url = sec["Url"] ?? "",
+                Url = Absolutizar(sec["Url"] ?? ""),
                 Sha256 = sec["Sha256"],
                 Notas = sec["Notas"],
                 Obligatoria = bool.TryParse(sec["Obligatoria"], out var o) && o
@@ -74,6 +74,19 @@ public sealed class AgenteController : ControllerBase
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0]
             ?? "0.0.0";
         return Ok(new ManifiestoAgente { Version = v, Url = "", Notas = "Sin actualización publicada." });
+    }
+
+    /// <summary>
+    /// Convierte una URL de descarga RELATIVA (p. ej. "/descargas/PetrolRios.StationAgent.exe") en
+    /// ABSOLUTA usando el host por el que llegó la petición. Así el manifiesto no lleva una IP fija:
+    /// el agente descarga del mismo central que ya consultó, en cualquier red. Si ya es absoluta
+    /// (http…), se devuelve tal cual.
+    /// </summary>
+    private string Absolutizar(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "";
+        if (url.StartsWith('/')) return $"{Request.Scheme}://{Request.Host}{url}";
+        return url;
     }
 
     public sealed record ManifiestoAgente

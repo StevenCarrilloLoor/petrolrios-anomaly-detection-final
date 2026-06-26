@@ -96,7 +96,21 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — "Frecuencia del análisis" a prueba de errores (25-jun-2026):**
+**Última ronda — Release 2.4.0 + cadena de despliegue lista para San Pío (26-jun-2026):**
+- **Versión 2.4.0** (Directory.Build.props). Auditada toda la fábrica de despliegue: instalador del central
+  (Docker, `instalar-central-windows`), portables (`publicar-*`), versionado y actualización.
+- **Agente = avisa + 1 clic** (no auto); **monitor = auto** (6 h). Manifiesto en `/api/v1/agente/version`,
+  exe en `/descargas` (wwwroot).
+- Para dejarlo "listo para ambas" (reemplazo y update): URL del manifiesto **absoluta desde el request**
+  (`AgenteController.Absolutizar`, sin IP fija); **volúmenes** `central-config` + `central-descargas` en
+  `docker-compose.prod.yml` (sirve el update sin reconstruir imagen + persiste connection/operacion.json);
+  script **`publicar-actualizacion-del-agente.bat`** (SHA256 + copia exe + genera `agente-version.json`);
+  **`docs/RUNBOOK-PUESTA-EN-MARCHA.md`**.
+- **Generado:** portables 4 plataformas (`dist/`) + paquete de actualización 2.4.0
+  (`central-descargas/PetrolRios.StationAgent.exe` SHA256 `fda86354…`, `central-config/agente-version.json`).
+- **San Pío:** dos vías listas — reemplazo limpio (recomendado este viaje) o update con 1 clic. *(CAMBIOS §72)*
+
+**Ronda — "Frecuencia del análisis" a prueba de errores (25-jun-2026):**
 - En Ajustes → "Operación del sistema", el cron crudo se cambió por un **desplegable en español**
   (Cada 5 min, Cada hora…) + opción **"Personalizado (avanzado)"** que revela el cron. `AjustesPage.tsx`.
 - Backend `ParametrosOperacionController`: valida el cron **registrando el job en `try/catch`** (Hangfire
