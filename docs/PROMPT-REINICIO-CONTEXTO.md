@@ -128,8 +128,12 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   (`ReglasPersonalizadasSection.tsx`: sección del formulario + cadencia/próxima en la lista; el toggle y el
   cambio de fuente conservan la programación). Tipos TS espejo en `types/regla.ts` + `types/reglaPersonalizada.ts`.
   eslint+vite OK. *(CAMBIOS §79)*
-- **✅ Feature COMPLETO.** Pendiente opcional: QA en Chrome en vivo + prueba real de que una regla mensual
-  dispara solo el día configurado (requiere el sistema arriba y datos en la ventana).
+- **Pulido UX (feedback Steven, CAMBIOS §80):** el selector de calendario ahora es **grilla 1–31** + pastillas
+  de día de semana + **hora nativa** (`<input type="time">`); y en "información a mostrar en la alerta" hay un
+  **filtro por tabla** (📂) para distinguir campos del mismo concepto que el autoenlace expone desde tablas
+  distintas. Autoenlazador (`DescubridorRelacionesService`) auditado = correcto (no era bug). Gate frontend verde.
+- **✅ Feature COMPLETO.** Pendiente: **QA en Chrome en vivo** — Steven dejó una regla de prueba "Despacho
+  Excesivo" (DetalleFactura: Cantidad ≥ 500, cada 30 s) para validar el feature y los nuevos selectores en vivo.
 
 **Ronda — Documentación: frecuencia por regla (anotada) + guía de relanzamiento (26-jun-2026):**
 - **`docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`** (nuevo): diseño/alcance del feature del ingeniero (cada regla

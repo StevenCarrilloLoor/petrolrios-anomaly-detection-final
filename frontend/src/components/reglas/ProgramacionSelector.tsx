@@ -79,7 +79,7 @@ export function ProgramacionSelector({
       )}
 
       {value.modo === "Calendario" && (
-        <div className="space-y-2 pl-1">
+        <div className="space-y-3 pl-1">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-xs text-muted-foreground">Repetir</span>
             <select
@@ -91,76 +91,83 @@ export function ProgramacionSelector({
               <option value="Semanal">Cada semana</option>
               <option value="Mensual">Cada mes</option>
             </select>
-
-            {value.calendarioTipo === "Semanal" && (
-              <>
-                <span className="text-xs text-muted-foreground">el</span>
-                <select
-                  value={value.diaSemana}
-                  onChange={(e) => set({ diaSemana: parseInt(e.target.value) })}
-                  className={inputClass}
-                >
-                  {DIAS_SEMANA.map((d, i) => (
-                    <option key={i} value={i}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-
-            {value.calendarioTipo === "Mensual" && !value.ultimoDiaDelMes && (
-              <>
-                <span className="text-xs text-muted-foreground">el día</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={value.diaMes}
-                  onChange={(e) =>
-                    set({ diaMes: Math.min(31, Math.max(1, parseInt(e.target.value) || 1)) })
-                  }
-                  className={`${inputClass} w-20`}
-                />
-              </>
-            )}
           </div>
 
-          {value.calendarioTipo === "Mensual" && (
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={value.ultimoDiaDelMes}
-                onChange={(e) => set({ ultimoDiaDelMes: e.target.checked })}
-                className="h-3.5 w-3.5 accent-primary"
-              />
-              Usar el <span className="font-medium text-foreground">último día del mes</span> (sirve
-              para fin de mes: 28/29/30/31 según corresponda)
-            </label>
+          {/* Semanal: día de la semana como pastillas (más claro que un desplegable). */}
+          {value.calendarioTipo === "Semanal" && (
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">El día de la semana</p>
+              <div className="flex flex-wrap gap-1">
+                {DIAS_SEMANA.map((d, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => set({ diaSemana: i })}
+                    title={d}
+                    className={`h-9 w-12 rounded-md border text-xs font-medium capitalize transition-colors ${
+                      value.diaSemana === i
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {d.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
+          {/* Mensual: calendario de días 1–31 (clic para elegir) + botón "último día del mes". */}
+          {value.calendarioTipo === "Mensual" && (
+            <div>
+              <p className="mb-1 text-xs text-muted-foreground">El día del mes</p>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                  const sel = !value.ultimoDiaDelMes && value.diaMes === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => set({ diaMes: d, ultimoDiaDelMes: false })}
+                      className={`flex h-9 items-center justify-center rounded-md border text-sm transition-colors ${
+                        sel
+                          ? "border-primary bg-primary font-semibold text-primary-foreground"
+                          : "border-border text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => set({ ultimoDiaDelMes: !value.ultimoDiaDelMes })}
+                className={`mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                  value.ultimoDiaDelMes
+                    ? "border-primary bg-primary/15 text-primary"
+                    : "border-border text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <CalendarDays size={13} /> Último día del mes (28/29/30/31 según corresponda)
+              </button>
+            </div>
+          )}
+
+          {/* Hora: selector nativo (reloj del navegador), más intuitivo que dos cajas de número. */}
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-xs text-muted-foreground">a las</span>
             <input
-              type="number"
-              min={0}
-              max={23}
-              value={value.hora}
-              onChange={(e) =>
-                set({ hora: Math.min(23, Math.max(0, parseInt(e.target.value) || 0)) })
-              }
-              className={`${inputClass} w-16`}
-            />
-            <span className="text-xs text-muted-foreground">:</span>
-            <input
-              type="number"
-              min={0}
-              max={59}
-              value={value.minuto}
-              onChange={(e) =>
-                set({ minuto: Math.min(59, Math.max(0, parseInt(e.target.value) || 0)) })
-              }
-              className={`${inputClass} w-16`}
+              type="time"
+              value={`${String(value.hora).padStart(2, "0")}:${String(value.minuto).padStart(2, "0")}`}
+              onChange={(e) => {
+                const [h, m] = e.target.value.split(":");
+                set({
+                  hora: Math.min(23, Math.max(0, parseInt(h) || 0)),
+                  minuto: Math.min(59, Math.max(0, parseInt(m) || 0)),
+                });
+              }}
+              className={inputClass}
             />
             <span className="text-[11px] text-muted-foreground">(hora de la estación, UTC-5)</span>
           </div>

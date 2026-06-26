@@ -163,6 +163,9 @@ export function ReglasPersonalizadasSection() {
   // tras el autodescubrimiento de relaciones).
   const [busquedaMostrar, setBusquedaMostrar] = useState("");
   const [rolMostrar, setRolMostrar] = useState("Todos");
+  // Filtro por TABLA de origen: tras el autoenlace, un mismo concepto (p. ej. "Código de cliente")
+  // aparece desde varias tablas relacionadas. Este filtro deja ver de qué tabla viene cada campo.
+  const [tablaMostrar, setTablaMostrar] = useState("Todas");
 
   const { data: catalogo } = useQuery({
     queryKey: ["reglas-personalizadas", "catalogo"],
@@ -933,10 +936,21 @@ export function ReglasPersonalizadasSection() {
               const rolesMostrar = Array.from(
                 new Set(todos.map((c) => c.rol).filter((r): r is string => !!r)),
               );
+              // Tabla de origen de un campo: si su nombre es "Fuente.Campo" (relacionado por el
+              // autoenlace), la tabla es el prefijo; si es un campo propio, es la fuente del formulario.
+              const tablaDe = (nombre: string) =>
+                nombre.includes(".") ? nombre.split(".")[0] : form.fuenteDatos;
+              const etiquetaTabla = (nombre: string) =>
+                catalogo?.fuentes.find((f) => f.nombre === nombre)?.etiqueta ?? nombre;
+              const tablasMostrar = Array.from(new Set(todos.map((c) => tablaDe(c.nombre)))).sort();
               const q = busquedaMostrar.trim().toLowerCase();
               const filtrados = todos.filter(
                 (c) =>
                   (rolMostrar === "Todos" || c.rol === rolMostrar) &&
+                  // Guarda anti-stale: si la tabla elegida ya no existe en la fuente actual, no filtra.
+                  (tablaMostrar === "Todas" ||
+                    !tablasMostrar.includes(tablaMostrar) ||
+                    tablaDe(c.nombre) === tablaMostrar) &&
                   (q === "" ||
                     c.nombre.toLowerCase().includes(q) ||
                     c.etiqueta.toLowerCase().includes(q) ||
@@ -968,6 +982,21 @@ export function ReglasPersonalizadasSection() {
                         placeholder="🔎 Buscar un campo… (placa, total, vendedor, factura…)"
                         className="w-full rounded-md border border-border bg-[#0a0f1c] px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
                       />
+                      {tablasMostrar.length > 1 && (
+                        <select
+                          value={tablaMostrar}
+                          onChange={(e) => setTablaMostrar(e.target.value)}
+                          title="Filtra los campos por la tabla de la que provienen. Útil cuando el autoenlace expone varios campos del mismo tipo (p. ej. 'Código de cliente') desde tablas distintas."
+                          className="w-full rounded-md border border-border bg-[#0a0f1c] px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                        >
+                          <option value="Todas">📂 Todas las tablas</option>
+                          {tablasMostrar.map((t) => (
+                            <option key={t} value={t}>
+                              {etiquetaTabla(t)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       {rolesMostrar.length > 1 && (
                         <div className="flex flex-wrap gap-1">
                           <button

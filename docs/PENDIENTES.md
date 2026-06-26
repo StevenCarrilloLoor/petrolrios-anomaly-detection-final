@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — **COMPLETO (Etapas 1-5)**: modelo+Cronos, columnas+migración, job dos-pasadas+ventana, API+validación y UI con selector reutilizable + próxima ejecución; Detectors 177 / Api 77, eslint+vite OK).
+Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — **COMPLETO (Etapas 1-5)** + pulido UX: calendario tipo grilla 1–31/pastillas/hora nativa y **filtro por tabla** en "campos a mostrar"; autoenlazador auditado = correcto. Detectors 177 / Api 77, eslint+vite OK. Pendiente: QA Chrome de la regla de prueba "Despacho Excesivo" cada 30 s).
 
 ## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
 Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +

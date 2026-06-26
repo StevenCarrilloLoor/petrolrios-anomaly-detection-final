@@ -2222,3 +2222,32 @@ ejecución".
 Api 77, **eslint limpio** (se corrigió `react-refresh/only-export-components` separando constantes/helpers a
 `lib/programacion.ts`) y **tsc + vite OK**. Con esto el feature **frecuencia/calendario por regla queda
 completo** (Etapas 1-5): modelo+Cronos → columnas+migración → job dos-pasadas+ventana → API+validación → UI.
+
+---
+
+## 80. Pulido UX (feedback de Steven): calendario intuitivo + filtro por tabla en "campos a mostrar"
+
+**Motivación.** Dos observaciones de uso sobre la ronda anterior: (1) el selector de calendario con cajas de
+número se veía pobre y poco intuitivo; (2) al elegir "información a mostrar en la alerta", el autoenlace de
+tablas expone varios campos del mismo concepto (p. ej. "Código de cliente" propio y "Código de cliente ·
+Despacho…"), lo que confunde sin saber de qué tabla viene cada uno.
+
+**Qué se hizo.**
+
+- **Selector de calendario tipo calendario** (`ProgramacionSelector.tsx`): el día del mes ahora es una
+  **grilla 1–31** (clic para elegir, como un calendario) con botón **"Último día del mes"**; el día de la
+  semana son **pastillas** (dom–sáb); y la hora usa el **selector nativo** `<input type="time">` (reloj del
+  navegador) en vez de dos cajas de número. Mucho más claro e intuitivo; la vista previa en vivo se mantiene.
+- **Filtro por tabla** en "Información a mostrar en la alerta" (`ReglasPersonalizadasSection.tsx`): además del
+  buscador y el filtro por tipo, un desplegable **"📂 Todas las tablas"** permite filtrar los campos por su
+  tabla de origen (la fuente propia o la tabla relacionada — el prefijo "Fuente." del campo). Así, si se
+  agregan dos "Código de cliente", se sabe de qué tabla viene cada uno. Guarda anti-stale si la tabla elegida
+  ya no existe en la fuente actual.
+- **Auditoría del autoenlazador** (`DescubridorRelacionesService`): revisado a fondo — es correcto (data
+  profiling: similitud de nombre de columna + solapamiento de valores reales en staging, descarta falsos
+  positivos). Los múltiples "código" son esperados (cada tabla relacionada tiene el suyo); **no era un bug**,
+  solo faltaba la UX para distinguirlos. Sin cambios de backend.
+
+**Verificación.** Gate del frontend verde: **eslint limpio** + **tsc + vite OK** (.NET sin tocar, quedó verde
+en la ronda previa). *Pendiente: QA en vivo en Chrome (Steven dejó una regla de prueba "Despacho Excesivo"
+cada 30 s).*
