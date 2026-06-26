@@ -96,7 +96,16 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Fix bug grave: selector "campos a mostrar" (keys duplicadas) (26-jun-2026):**
+**Última ronda — Documentación: frecuencia por regla (anotada) + guía de relanzamiento (26-jun-2026):**
+- **`docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`** (nuevo): diseño/alcance del feature del ingeniero (cada regla
+  con su cadencia). Conclusión: **mediano, no enorme**; lo difícil es la **ventana de datos** de reglas
+  lentas (hoy el job marca `Procesada` tras una pasada), pero `IReglaBacktestService` (corre una regla sobre
+  N días de staging) + idempotencia ya dan la base. Fases: 1 throttle, 2 ventana real. **Anotado, sin
+  implementar** (a decisión de Steven).
+- **`docs/RUNBOOK-PUESTA-EN-MARCHA.md`** §6: cómo relanzar cada componente (central Docker / estación / dev).
+- Sin cambios de código. *(CAMBIOS §74)*
+
+**Ronda — Fix bug grave: selector "campos a mostrar" (keys duplicadas) (26-jun-2026):**
 - Síntoma: en el creador de reglas, "Información a mostrar en la alerta", al filtrar/borrar/seleccionar el
   buscador y los chips dejaban de responder.
 - Raíz: `ReglasPersonalizadasController` agregaba el mismo campo relacionado **por cada relación** a la misma

@@ -1,7 +1,13 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (fix bug grave: selector/buscador de "campos a mostrar" se rompía por keys duplicadas; antes: release 2.4.0 + runbook).
+Última actualización: 26 de junio de 2026 (anotado feature "frecuencia por regla" en docs/PROPUESTA-FRECUENCIA-POR-REGLA.md + guía de relanzamiento en el runbook; antes: fix keys duplicadas).
+
+## 🧭 Backlog grande pendiente de decidir
+- [ ] **Frecuencia de ejecución POR REGLA** (pedido del ingeniero): que cada regla corra en su propia
+  cadencia (cada ciclo / diaria / semanal / mensual) en vez de todas cada ciclo. **Anotado y diseñado** en
+  `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`: alcance **mediano** (no enorme), reusa `IReglaBacktestService` +
+  idempotencia. Falta **decidir** si se implementa (Fase 1 throttle / Fase 2 ventana real / ambas).
 
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)

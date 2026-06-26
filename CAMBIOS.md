@@ -2053,3 +2053,26 @@ responder.
 
 **Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 150 / Monitor 2 /
 **Api 75** (con Docker), **eslint + tsc + vite build OK**.
+
+---
+
+## 74. Documentación: frecuencia por regla (propuesta anotada) + guía de relanzamiento
+
+**Motivación (Steven).** (1) Dejar **anotado y bien documentado** el feature que pidió el ingeniero —"un
+parámetro para poner cada qué tiempo se ejecuta cada regla"— con su alcance/dificultad, **sin
+implementarlo aún**. (2) Tener por escrito cómo **relanzar cada componente** para la puesta en producción.
+
+**Qué se hizo (solo documentación, sin tocar código del producto).**
+- **`docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`** (nuevo): documento de diseño/alcance de la frecuencia por
+  regla. Conclusión investigada: **cambio mediano, no enorme**. El "campo de frecuencia + saltarse ciclos"
+  es trivial; lo no-trivial es que las reglas lentas (semanal/mensual) necesitan su **ventana de datos**, no
+  el lote incremental (hoy el job marca `Procesada` tras una pasada). **Pero** la maquinaria clave ya existe:
+  `IReglaBacktestService` ya evalúa una regla sobre los últimos N días de staging, y la **idempotencia**
+  evita alertas duplicadas al re-escanear. Plan por fases (1: throttle por-transacción; 2: ventana real
+  reusando backtest), entidades/migración/UI/endpoints afectados, riesgos y alcance acotado.
+- **`docs/RUNBOOK-PUESTA-EN-MARCHA.md`** (sección 6 nueva): **relanzar/reiniciar cada componente** —central
+  Docker (`restart`, `up -d --build`, `down`/`up`, logs), estación (agente/monitor), y los scripts de
+  desarrollo (`reiniciar-solo-la-api`, `reiniciar-solo-el-frontend`, etc.).
+
+**Verificación.** Solo documentación: no cambia código ni build. (El feature de frecuencia por regla queda
+**anotado**, pendiente de decisión para implementar.)

@@ -126,3 +126,29 @@ verde; en el central, la estación **En línea** y, en **Datos recibidos**, que 
 - [ ] **Arranque automático activado** en el agente.
 - [ ] (Opcional) Monitor instalado.
 - [ ] La estación aparece **En línea** y llegan datos en **Datos recibidos**.
+
+---
+
+## 6. Relanzar / reiniciar cada componente
+
+**Producción — central (Docker):**
+- Levantar la 1.ª vez: `ejecutables/6-INSTALAR-EN-NUEVO-PC/instalar-central-windows.bat`.
+- Reiniciar el central (sin tocar la BD): `docker compose -f docker-compose.prod.yml restart central`
+- Aplicar código nuevo: `docker compose -f docker-compose.prod.yml up -d --build`
+- Apagar / prender: `docker compose -f docker-compose.prod.yml down` → `... up -d`
+- Estado / logs: `docker compose -f docker-compose.prod.yml ps` y `... logs -f central`
+- La base (volumen `pgdata`) sobrevive a reinicios y cortes; **no** uses `down -v` salvo que quieras borrarla.
+
+**Producción — estación:**
+- Agente: ciérralo (si es servicio: `sc stop "PetrolRios Station Agent"`) y reabre
+  `PetrolRios.StationAgent.exe` (o `sc start ...`). Panel: `http://localhost:5180`.
+- Monitor: igual; `http://localhost:5190` (se auto-actualiza solo).
+
+**Local / desarrollo** (`ejecutables/1-INICIAR-Y-DETENER/`):
+- Todo: `iniciar-todo-el-sistema.bat` · apagar: `detener-todo-el-sistema.bat`
+- Solo API (tras cambiar backend): `reiniciar-solo-la-api.bat`
+- Solo frontend: `reiniciar-solo-el-frontend.bat` (Vite recarga solo al guardar)
+- Monitor: `iniciar-monitor-de-estacion.bat`
+- Central accesible por la red (para que estaciones conecten a tu PC): `reiniciar-central-accesible-por-red.bat`
+
+> Detalle de cada script en `ejecutables/LEEME.md`.
