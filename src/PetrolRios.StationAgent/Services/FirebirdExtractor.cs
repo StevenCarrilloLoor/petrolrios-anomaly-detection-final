@@ -122,10 +122,27 @@ public sealed class FirebirdExtractor
         // aplique a esta estación simplemente se omite. Se toleran fallos individuales: una
         // fuente mal configurada no rompe el ciclo.
         var efectivas = new Dictionary<string, FuenteExtraccion>(StringComparer.OrdinalIgnoreCase);
+
+        // Omitir fuentes configurables cuya tabla YA la extrae un built-in (DCTO→Factura, ANUL→Anulacion,
+        // etc.): registrarlas duplicaba el dato en el staging con nombres de campo distintos. El central
+        // ya impide registrarlas; aquí se ignoran también por si quedaron de antes.
+        bool EsConfigurableValida(FuenteExtraccion f)
+        {
+            if (!f.Activa || string.IsNullOrWhiteSpace(f.Tabla)) return false;
+            if (FuenteDatosPolicy.TablaCubiertaPorBuiltIn(f.Tabla))
+            {
+                _logger.LogInformation(
+                    "Fuente '{Fuente}' (tabla {Tabla}) OMITIDA: ya se extrae como built-in '{BuiltIn}'.",
+                    f.Nombre, f.Tabla, FuenteDatosPolicy.FuenteBuiltInDe(f.Tabla));
+                return false;
+            }
+            return true;
+        }
+
         if (fuentesCentrales is not null)
-            foreach (var f in fuentesCentrales.Where(f => f.Activa && !string.IsNullOrWhiteSpace(f.Tabla)))
+            foreach (var f in fuentesCentrales.Where(EsConfigurableValida))
                 efectivas[f.Tabla] = f;
-        foreach (var f in _config.Actual.FuentesExtraccion.Where(f => f.Activa && !string.IsNullOrWhiteSpace(f.Tabla)))
+        foreach (var f in _config.Actual.FuentesExtraccion.Where(EsConfigurableValida))
             efectivas.TryAdd(f.Tabla, f); // no pisa una ya definida por el central
 
         foreach (var fuente in efectivas.Values)

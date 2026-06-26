@@ -6,7 +6,7 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)
 - [ ] **VALIDAR EN SAN PÍO (mañana):** confirmar que con FIX 1 la built-in `Factura` fluye al día (el desfase TZ solo se reproduce en estación real UTC-5). Luego quitar del selector la fuente `Dcto` duplicada.
-- [ ] **Opcional (FIX 3):** de-duplicar DCTO en el agente (omitir fuentes configurables que ya cubre un built-in). Se dejó como paso manual seguro para no arriesgar el envío en producción antes de validar FIX 1.
+- [x] **HECHO + gate verde (FIX 3 guard):** el central **rechaza** registrar en el selector una tabla que ya extrae un built-in (DCTO→Factura, ANUL→Anulacion, …) y el agente **omite** las que quedaron de antes. `FuenteDatosPolicy.TablasBuiltIn` + 11 pruebas. (CAMBIOS §66)
 
 
 ---

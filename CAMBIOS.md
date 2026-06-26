@@ -1798,3 +1798,26 @@ regla sobre `Dcto` funciona con cualquier nombre.
 Pío mañana** (el desfase horario solo se reproduce en una estación real fuera de UTC; el demo es UTC).
 Recomendación operativa anotada: quitar del selector la fuente `Dcto` duplicada una vez confirmado que la
 built-in `Factura` fluye (evita doble staging).
+
+---
+
+## 66. Guard anti-duplicación: no registrar en el selector tablas que ya extrae un built-in
+
+**Motivación (Steven).** El bug de San Pío nació de agregar **DCTO** (y **Anulaciones**/ANUL) en el selector
+de tablas cuando esas tablas YA se extraen como fuentes built-in (`Factura`, `Anulacion`). Eso duplicaba el
+dato (dos veces en staging, con nombres de campo crudos vs amigables) y confundía al crear reglas. Pedido:
+"que no me deje agregar tablas que ya existan".
+
+**Qué se hizo.**
+- **Lista compartida** `FuenteDatosPolicy.TablasBuiltIn` (tabla cruda → fuente built-in): DCTO→Factura,
+  DESP→DetalleFactura, TURN→CierreTurno, TURN_DEPO→DepositoTurno, ANUL→Anulacion, CRED_CABE→Credito,
+  TURN_TARJ→TarjetaTurno. Helpers `TablaCubiertaPorBuiltIn` / `FuenteBuiltInDe`.
+- **Central (guard):** `FuentesDatosController.ValidarDefinicionAsync` (crear y editar) **rechaza** registrar
+  una tabla built-in con un mensaje claro ("La tabla 'DCTO' ya se procesa automáticamente como la fuente
+  'Factura'…").
+- **Agente (red de seguridad):** `FirebirdExtractor` **omite** del catálogo configurable las tablas built-in
+  (por si quedaron registradas de antes), con log; así dejan de duplicarse sin borrar nada a mano.
+- 11 pruebas nuevas (`FuenteDatosPolicyTests`).
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / **Detectors 135** / Monitor 2 /
+Api 57 (+16 saltadas sin Docker), eslint + vite build OK.

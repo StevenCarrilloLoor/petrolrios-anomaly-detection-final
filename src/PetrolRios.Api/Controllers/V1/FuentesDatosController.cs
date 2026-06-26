@@ -229,6 +229,14 @@ public sealed class FuentesDatosController : ControllerBase
         string? columnaWatermark,
         CancellationToken ct)
     {
+        // No permitir registrar una tabla que el agente YA extrae como fuente built-in: la
+        // duplicaría (entra dos veces al staging, con nombres de campo crudos vs amigables) y
+        // confunde a quien crea reglas. Se debe usar la fuente built-in directamente.
+        var builtIn = FuenteDatosPolicy.FuenteBuiltInDe(tabla);
+        if (builtIn is not null)
+            return $"La tabla '{tabla}' ya se procesa automáticamente como la fuente '{builtIn}'. " +
+                   $"No la agregues al selector: crea tus reglas directamente sobre la fuente '{builtIn}'.";
+
         var esquema = await _dbContext.EsquemasTabla
             .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Tabla == tabla, ct);
