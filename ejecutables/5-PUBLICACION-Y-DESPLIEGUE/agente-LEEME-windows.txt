@@ -20,7 +20,10 @@ PASOS (la primera vez, en la computadora de la estacion)
 4. Vaya a "Configuracion" y complete:
    - Nombre de la estacion  (asi aparece en el panel central)
    - URL del servidor central  (http://IP-DEL-SERVIDOR:5170)
-   - Ruta del CONTAC.FDB, usuario y contrasena de Firebird
+   - Ruta de la base Firebird (CONTAC.FDB o CONTAB.FDB), usuario
+     y contrasena. Puede pulsar "Detectar Firebird automaticamente":
+     ya busca tambien C:\Programas\ContaGober1\Datosc\CONTAB.FDB y
+     escanea las carpetas de instalacion comunes.
    - Si la base es Firebird 2.5: WireCrypt = Disabled
    Pulse "Probar Firebird" y "Probar servidor", luego
    "Guardar configuracion".
@@ -29,12 +32,22 @@ PASOS (la primera vez, en la computadora de la estacion)
    aparece "En linea" en el panel central.
 
 ------------------------------------------------------------
-ARRANQUE AUTOMATICO (opcional)
+ARRANQUE AUTOMATICO AL ENCENDER (dos formas)
 ------------------------------------------------------------
 
-Para que arranque solo con Windows, haga clic derecho en
-  instalar_agente_servicio.bat  ->  "Ejecutar como administrador".
-Lo registra como servicio de Windows.
+OPCION A — Desde el panel, SIN administrador (la mas facil):
+  En el panel (http://localhost:5180) -> "Configuracion" ->
+  seccion "Arranque automatico al encender" -> boton
+  "Activar arranque automatico".
+  El agente quedara arrancando solo (oculto, sin ventana) cada
+  vez que se inicie sesion en este equipo. Si la PC tiene
+  autologin, equivale a "al encender". Se desactiva con el mismo
+  boton. No pide permisos.
+
+OPCION B — Como SERVICIO de Windows (arranca antes del login,
+  pide administrador):
+  Clic derecho en  instalar_agente_servicio.bat  ->
+  "Ejecutar como administrador". Lo registra como servicio.
    Detener:     sc stop "PetrolRios Station Agent"
    Desinstalar: sc delete "PetrolRios Station Agent"  (detener primero)
 

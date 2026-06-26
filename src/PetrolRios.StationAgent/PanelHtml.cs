@@ -337,8 +337,8 @@ internal static class PanelHtml
             <input id="f-fbport" type="number" placeholder="3050">
           </div>
           <div class="field" style="grid-column:1/-1">
-            <label>Ruta de la base (CONTAC.FDB)</label>
-            <input id="f-fbdatabase" placeholder="C:\CONTAC\CONTAC.FDB">
+            <label>Ruta de la base (CONTAC.FDB / CONTAB.FDB)</label>
+            <input id="f-fbdatabase" placeholder="C:\Programas\ContaGober1\Datosc\CONTAB.FDB">
             <div style="margin-top:6px">
               <button type="button" class="sec" id="btn-autodetectar" onclick="autodetectarFirebird()">
                 🔎 Detectar Firebird automáticamente
@@ -427,6 +427,33 @@ internal static class PanelHtml
             <label>Contraseña local de respaldo</label>
             <input id="f-localpass" type="password" placeholder="(sin cambios)" autocomplete="new-password">
             <span class="hint">Déjela vacía para conservar la actual. Se guarda cifrada (PBKDF2).</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h2>Arranque automático al encender</h2>
+        <div class="fields">
+          <div class="field" style="grid-column:1/-1">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <button type="button" class="sec" id="btn-inicio-auto" onclick="toggleInicioAuto()">Cargando…</button>
+              <span id="inicio-auto-msg" style="color:var(--muted);font-size:13px"></span>
+            </div>
+            <span class="hint" style="margin-top:8px;display:block">
+              Sin permisos de administrador. Deja el agente arrancando solo (oculto, sin ventana) cada vez
+              que se inicia sesión en este equipo. En una PC con autologin equivale a "al encender".
+            </span>
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <details>
+              <summary style="cursor:pointer;color:var(--muted);font-size:13px">Opción avanzada: instalar como servicio de Windows (arranca antes del login, requiere administrador)</summary>
+              <div class="hint" style="margin-top:8px">
+                En la carpeta del agente, clic derecho sobre <b>instalar_agente_servicio.bat</b> →
+                <b>Ejecutar como administrador</b>. Quedará como servicio (arranca con Windows, sin que nadie
+                inicie sesión). Para quitarlo: <code>sc stop "PetrolRios Station Agent"</code> y luego
+                <code>sc delete "PetrolRios Station Agent"</code> (en una consola de administrador).
+              </div>
+            </details>
           </div>
         </div>
       </div>
@@ -562,6 +589,7 @@ async function cargarConfig(){
     document.getElementById('f-requierelogin').value = String(!!c.requiereLoginPanel);
     document.getElementById('f-localuser').value = c.panelLocalUsuario || '';
   }catch(e){}
+  cargarInicioAuto();
 }
 
 function mostrarResultado(id, ok, texto){
@@ -760,6 +788,38 @@ async function autodetectarFirebird(){
     }
   }catch(e){ msg.style.color = '#f87171'; msg.textContent = 'No se pudo contactar al agente.'; }
   btn.disabled = false; btn.textContent = txt;
+}
+
+let inicioAutoHab = false;
+function pintarInicioAuto(soportado){
+  const btn = document.getElementById('btn-inicio-auto');
+  if(!btn) return;
+  if(soportado === false){ btn.disabled = true; btn.textContent = 'No disponible en este equipo'; return; }
+  btn.disabled = false;
+  btn.textContent = inicioAutoHab ? '✓ Arranca solo — desactivar' : '▶ Activar arranque automático';
+}
+async function cargarInicioAuto(){
+  const msg = document.getElementById('inicio-auto-msg');
+  try{
+    const r = await fetch('/api/inicio-automatico');
+    const j = await r.json();
+    inicioAutoHab = !!j.habilitado;
+    pintarInicioAuto(j.soportado);
+    if(msg){ msg.style.color = 'var(--muted)'; msg.textContent = j.mensaje || ''; }
+  }catch(e){ /* el agente puede estar arrancando */ }
+}
+async function toggleInicioAuto(){
+  const btn = document.getElementById('btn-inicio-auto');
+  const msg = document.getElementById('inicio-auto-msg');
+  btn.disabled = true; btn.textContent = 'Aplicando…';
+  try{
+    const r = await fetch('/api/inicio-automatico', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({habilitar: !inicioAutoHab})});
+    const j = await r.json();
+    inicioAutoHab = !!j.habilitado;
+    if(msg){ msg.style.color = j.ok ? '#34d399' : '#f87171'; msg.textContent = j.mensaje || ''; }
+  }catch(e){ if(msg){ msg.style.color = '#f87171'; msg.textContent = 'No se pudo contactar al agente.'; } }
+  pintarInicioAuto(true);
 }
 
 async function buscarActualizacion(){

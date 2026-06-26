@@ -352,6 +352,23 @@ try
         return Results.Json(new { ok, host, port, database, mensaje });
     });
 
+    // Arranque automático al encender el equipo (sin admin): estado actual.
+    app.MapGet("/api/inicio-automatico", () =>
+    {
+        var (soportado, habilitado, ejecutable, mensaje) = InicioAutomatico.Estado();
+        return Results.Json(new { soportado, habilitado, ejecutable, mensaje });
+    });
+
+    // Arranque automático: activar/desactivar (escribe/borra el lanzador en la carpeta de Inicio).
+    app.MapPost("/api/inicio-automatico", (InicioAutoRequest body, AgentState state) =>
+    {
+        var (ok, habilitado, mensaje) = body.Habilitar
+            ? InicioAutomatico.Habilitar()
+            : InicioAutomatico.Deshabilitar();
+        state.RegistrarEvento(ok ? "OK" : "ERROR", "Arranque automatico: " + mensaje);
+        return Results.Json(new { ok, habilitado, mensaje });
+    });
+
     // Explorador de esquema: lista de tablas de la base Firebird (auto-documentación).
     app.MapGet("/api/firebird/tablas", async (FirebirdExtractor extractor, CancellationToken ct) =>
     {
@@ -465,6 +482,8 @@ static string OcultarPassword(string connectionString) =>
         connectionString, @"(?i)(password\s*=\s*)[^;]+", "$1•••••");
 
 internal sealed record ModoRequest(bool Automatico);
+
+internal sealed record InicioAutoRequest(bool Habilitar);
 
 internal sealed record LoginPanelRequest(string? Usuario, string? Password);
 

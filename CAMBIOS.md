@@ -1929,3 +1929,35 @@ el DTO nunca se había versionado (el commit de §67 también lo omitió en sile
 compilaría. Se añadió una **excepción** en `.gitignore` (`!src/PetrolRios.Application/DTOs/Logs/**`) y se
 versionó el DTO. Lección: cuidado con las reglas amplias `[Ll]ogs/`/`[Ll]og/` cuando hay carpetas de fuente
 homónimas.
+
+---
+
+## 70. Agente: auto-detección de la base ContaGober + arranque automático al encender
+
+**Motivación (Steven).** Dos pedidos sobre el agente, de cara al nuevo despliegue: (1) que el botón
+**"Detectar Firebird automáticamente"** encuentre la base real de la estación,
+`C:\Programas\ContaGober1\Datosc\CONTAB.FDB` (ojo: **CONTAB**, no CONTAC); y (2) que el agente **se levante
+solo cada vez que se enciende el equipo**, idealmente con una opción dentro del propio agente.
+
+**Qué se hizo.**
+- **Auto-detección ampliada (`FirebirdExtractor.RutasCandidatas`).** Añadidas las rutas de **ContaGober**
+  (`C:\Programas\ContaGober1\Datosc\CONTAB.FDB` y variantes) y las variantes **`CONTAB.FDB`** de las
+  ubicaciones clásicas. Además ahora **escanea** (acotado, `IgnoreInaccessible`, profundidad limitada) las
+  raíces típicas de instalación (`C:\Programas`, `C:\Program Files`, `C:\Program Files (x86)`, `C:\Conta`,
+  `C:\` superficial) buscando cualquier `CONTA*.FDB`, así detecta instalaciones nuevas sin hardcodear cada
+  una. El campo de ruta del panel ahora rotula "CONTAC.FDB / CONTAB.FDB".
+- **Arranque automático al encender — dos vías ("las dos", como pediste):**
+  - **Botón en el panel, SIN admin** (la fácil): nueva sección **"Arranque automático al encender"** en
+    Configuración con un botón Activar/Desactivar. Backend `InicioAutomatico` + endpoints
+    `GET/POST /api/inicio-automatico`: en Windows escribe/borra un lanzador `.vbs` en la **carpeta de
+    Inicio** del usuario que levanta el agente **oculto** (sin ventana) al iniciar sesión. Con autologin =
+    "al encender". Reversible con un clic, sin permisos.
+  - **Servicio de Windows** (avanzada, arranca antes del login, pide admin): se mantiene el
+    `instalar_agente_servicio.bat` que viaja en el portable; el panel lo explica en un desplegable y el
+    `LEEME-windows.txt` documenta ambas opciones paso a paso.
+- **Portable reconstruido** con todos los cambios acumulados (watermark por reloj de Firebird, nombres
+  naturales en "Datos recibidos", auto-detección ContaGober, arranque automático) para las **4 plataformas**
+  (Windows, Linux, macOS Intel y ARM) vía `publicar-solo-el-agente-multiplataforma.bat`.
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 150 / Monitor 2 /
+**Api 74** (con Docker), eslint + vite build OK. Publicación de las 4 plataformas completada en `dist/`.

@@ -96,7 +96,22 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — "Datos recibidos" con nombre natural + tabla técnica (25-jun-2026):**
+**Última ronda — Agente: ContaGober + arranque automático + portable nuevo (25-jun-2026):**
+- **Auto-detección Firebird ampliada** (`FirebirdExtractor.RutasCandidatas`): añadidas rutas de ContaGober
+  (`C:\Programas\ContaGober1\Datosc\CONTAB.FDB`) y variantes `CONTAB.FDB`; además **escanea** raíces de
+  instalación (`C:\Programas`, Program Files, `C:\Conta`, `C:\` superficial) por `CONTA*.FDB`
+  (IgnoreInaccessible, profundidad limitada).
+- **Arranque automático al encender (las dos vías):** (a) botón en el panel **sin admin** —
+  `InicioAutomatico` + `GET/POST /api/inicio-automatico` escribe un `.vbs` oculto en la carpeta de Inicio;
+  (b) **servicio de Windows** (admin) con el `instalar_agente_servicio.bat` que ya viaja en el portable.
+  Documentado en el panel (desplegable) y en `agente-LEEME-windows.txt`.
+- **Portable reconstruido (4 plataformas)** con TODO lo acumulado (watermark TZ, nombres naturales,
+  ContaGober, arranque automático) vía `publicar-solo-el-agente-multiplataforma.bat` → `dist/`.
+- **Conteos:** Domain 40, Detectors 150, Monitor 2, Api 74 (gate verde con Docker). *(CAMBIOS §70)*
+- **Pendiente San Pío (mañana):** copiar `dist/agente-windows` a la estación, configurar (auto-detectar la
+  base), activar el arranque automático y validar que la built-in `Factura` fluye al día (fix de watermark).
+
+**Ronda — "Datos recibidos" con nombre natural + tabla técnica (25-jun-2026):**
 - En los logs el tipo se muestra como **"Nombre natural (TABLA)"** — `Factura (DCTO)`, `Anulación (ANUL)` —
   en la columna y en el desplegable del filtro. Backend: `CatalogoTiposTransaccion` (Application/Fuentes)
   resuelve tipo→(natural, tabla) para los 7 built-ins (+ variante `Anulaciones` y `Dcto`→DCTO), y para las

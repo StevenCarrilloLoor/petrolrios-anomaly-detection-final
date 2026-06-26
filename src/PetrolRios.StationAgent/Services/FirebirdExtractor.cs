@@ -258,10 +258,15 @@ public sealed class FirebirdExtractor
         }
 
         return (false, null, 0, null,
-            "No se encontró una base CONTAC.FDB en las ubicaciones comunes. Indique la ruta manualmente.");
+            "No se encontró una base CONTAC.FDB / CONTAB.FDB en las ubicaciones comunes (incluido C:\\Programas\\ContaGober1\\Datosc). Indique la ruta manualmente.");
     }
 
-    /// <summary>Rutas candidatas de CONTAC.FDB según el sistema operativo (más la ya configurada).</summary>
+    /// <summary>
+    /// Rutas candidatas de la base de Contaplus/ContaGober según el SO (más la ya configurada).
+    /// Cubre los nombres de archivo conocidos (CONTAC.FDB y CONTAB.FDB) y, en Windows, además
+    /// ESCANEA las carpetas típicas de instalación para hallar cualquier CONTA*.FDB sin hardcodear
+    /// cada variante (p. ej. C:\Programas\ContaGober1\Datosc\CONTAB.FDB).
+    /// </summary>
     private static IReadOnlyList<string> RutasCandidatas(string rutaConfigurada)
     {
         var candidatas = new List<string>();
@@ -270,17 +275,45 @@ public sealed class FirebirdExtractor
         if (OperatingSystem.IsWindows())
         {
             candidatas.AddRange([
+                // ContaGober (Datosc) — instalación real de PetrolRíos
+                @"C:\Programas\ContaGober1\Datosc\CONTAB.FDB",
+                @"C:\Programas\ContaGober\Datosc\CONTAB.FDB",
+                @"C:\Programas\ContaGober1\Datosc\CONTAC.FDB",
+                // Contaplus clásico
                 @"C:\CONTAC\CONTAC.FDB", @"C:\Contaplus\CONTAC.FDB",
                 @"C:\Contaplus\Datos\CONTAC.FDB", @"C:\PROGRA~1\CONTAC\CONTAC.FDB",
-                @"C:\Datos\CONTAC.FDB", @"C:\Firebird\CONTAC.FDB"
+                @"C:\Datos\CONTAC.FDB", @"C:\Firebird\CONTAC.FDB",
+                // Variantes con CONTAB.FDB en las mismas ubicaciones
+                @"C:\CONTAC\CONTAB.FDB", @"C:\Contaplus\CONTAB.FDB",
+                @"C:\Contaplus\Datos\CONTAB.FDB", @"C:\Datos\CONTAB.FDB"
             ]);
+
+            // Escaneo acotado: busca CONTA*.FDB en las raíces donde suele instalarse el contable.
+            // IgnoreInaccessible + profundidad limitada para que sea rápido y no truene por permisos.
+            string[] raices = [@"C:\Programas", @"C:\Program Files", @"C:\Program Files (x86)", @"C:\Conta", @"C:\"];
+            foreach (var raiz in raices)
+            {
+                try
+                {
+                    if (!Directory.Exists(raiz)) continue;
+                    var opciones = new EnumerationOptions
+                    {
+                        RecurseSubdirectories = true,
+                        IgnoreInaccessible = true,
+                        MaxRecursionDepth = string.Equals(raiz, @"C:\", StringComparison.OrdinalIgnoreCase) ? 2 : 5
+                    };
+                    foreach (var archivo in Directory.EnumerateFiles(raiz, "CONTA*.FDB", opciones).Take(25))
+                        candidatas.Add(archivo);
+                }
+                catch { /* raíz inaccesible: seguir con la siguiente */ }
+            }
         }
         else
         {
             candidatas.AddRange([
                 "/opt/firebird/data/CONTAC.FDB", "/var/lib/firebird/3.0/data/CONTAC.FDB",
                 "/var/lib/firebird/data/CONTAC.FDB", "/firebird/data/CONTAC.FDB",
-                "/data/CONTAC.FDB"
+                "/data/CONTAC.FDB", "/firebird/data/CONTAB.FDB", "/data/CONTAB.FDB"
             ]);
         }
         return candidatas.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
