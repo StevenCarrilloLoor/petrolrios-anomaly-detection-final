@@ -1761,3 +1761,40 @@ un **resumen al inicio de cada uno** y **limpiar los obsoletos**.
 otros archivos); el PowerShell de cabeceras/rutas reportó **todos los reemplazos encontrados** (0
 "NO-ENCONTRADO"); y el **gate oficial corrido desde su nueva ruta** quedó verde (build Release 0w/0e,
 EF sin cambios pendientes, Domain 40 / Detectors 119 / Monitor 2 / Api 73, lint + frontend build OK).
+
+---
+
+## 65. Auditoría agente/reglas (San Pío): watermark por zona horaria + tolerancia de nombres en reglas
+
+**Motivación.** En San Pío (estación real, UTC-5) el agente enviaba datos (vía la fuente configurable
+`Dcto`) pero la **regla nueva no disparaba**, y los **4 detectores predeterminados** se quedaban sin datos
+nuevos. Auditoría profunda (código + base central en vivo) → dos defectos reales, documentados en
+`docs/DIAGNOSTICO-AGENTE-REGLAS.md`.
+
+**FIX 1 — Watermark por reloj de Firebird (bug de producción crítico).** El extractor built-in avanzaba la
+marca de agua global con `DateTime.UtcNow`, pero `FEC_DCTO`/`FIN_DESP`/`FFI_TURN` se graban con el reloj
+**local** de la estación. En UTC-5, tras el primer envío la marca saltaba 5 h al futuro y **dejaba de
+extraer** lo nuevo (congelaba `Factura`, `DetalleFactura`, etc. → los 4 detectores predeterminados se
+quedaban ciegos). El demo no lo mostraba porque el contenedor Docker corre en UTC. Solución: la marca
+ahora avanza con el **reloj del servidor Firebird** (`SELECT CURRENT_TIMESTAMP FROM RDB$DATABASE`,
+`ResultadoExtraccionAgente.RelojFirebird`), serialización `Unspecified` con `RoundtripKind`, semilla
+"1 h atrás en reloj de Firebird", y re-siembra automática si encuentra una marca antigua en UTC (`...Z`)
+al actualizar el agente. (Archivos: `FirebirdExtractor.cs`, `CycleRunner.cs`.)
+
+**FIX 2 — Tolerancia de nombres en reglas sobre fuentes configurables.** `CatalogoReglasPersonalizadas.GetValor`
+hacía match **exacto** del nombre crudo (`TNI_DCTO`) en fuentes configurables; una regla escrita con el
+nombre amigable (`TotalNeto`) no resolvía. Ahora resuelve con tolerancia: (1) exacto, (2) sin distinguir
+mayúsculas/espacios, (3) **puente amigable→crudo** (`TotalNeto`→`TNI_DCTO`, `Subtotal`→`SUB_DCTO`,
+`Cantidad`→`CAN_DESP`/`CAN_TURN_TARJ`, …). 5 pruebas nuevas (`CatalogoGetValorTests`).
+
+**Causa de la confusión del "diccionario" (documentada):** el mismo total `TNI_DCTO` se mostraba como
+"Total de la factura ($)" en la fuente built-in `Factura` y como "Total con IVA ($)" en la configurable
+`Dcto` — dos nombres para la misma columna. La regla `#45` se creó sobre `Factura/TotalNeto` pero el dato
+fluía como `Dcto/TNI_DCTO`. Con FIX 1 la fuente `Factura` vuelve a fluir (su regla dispara) y con FIX 2 una
+regla sobre `Dcto` funciona con cualquier nombre.
+
+**Verificación.** Gate verde: build Release 0w/0e; EF sin cambios pendientes; Domain 40 / **Detectors 124**
+(+5) / Monitor 2 / Api 57 (+16 saltadas sin Docker); eslint + vite build OK. **Pendiente de validar en San
+Pío mañana** (el desfase horario solo se reproduce en una estación real fuera de UTC; el demo es UTC).
+Recomendación operativa anotada: quitar del selector la fuente `Dcto` duplicada una vez confirmado que la
+built-in `Factura` fluye (evita doble staging).

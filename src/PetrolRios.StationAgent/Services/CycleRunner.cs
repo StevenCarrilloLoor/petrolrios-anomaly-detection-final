@@ -29,7 +29,9 @@ public sealed class CycleRunner
     /// </summary>
     public void ReiniciarWatermark(DateTime fechaUtc)
     {
-        _lastWatermark = DateTime.SpecifyKind(fechaUtc, DateTimeKind.Utc);
+        // La fecha viene del panel (hora de la estación); se trata como reloj de Firebird (naive),
+        // que es contra lo que se compara FEC_DCTO/FIN_DESP.
+        _lastWatermark = DateTime.SpecifyKind(fechaUtc, DateTimeKind.Unspecified);
         SaveWatermark(_lastWatermark);
         _state.RegistrarEvento("INFO", $"Marca de agua reiniciada a {_lastWatermark:yyyy-MM-dd HH:mm} — se reenviarán datos desde esa fecha");
     }
@@ -127,7 +129,10 @@ public sealed class CycleRunner
                     "Sincronizada",
                     fuentesCentrales,
                     ct);
-                _lastWatermark = DateTime.UtcNow;
+                // Avanzar la marca con el RELOJ DE FIREBIRD (no DateTime.UtcNow): así vive en el mismo
+                // reloj que FEC_DCTO/FIN_DESP y no se desfasa en estaciones fuera de UTC (antes una
+                // estación en UTC-5 saltaba 5 h al futuro y dejaba de extraer lo nuevo).
+                _lastWatermark = extraccion.RelojFirebird;
                 SaveWatermark(_lastWatermark);
                 _state.TotalTransaccionesEnviadas += nuevos.Count;
                 _state.UltimaConexionServidor = DateTime.UtcNow;
@@ -281,11 +286,23 @@ public sealed class CycleRunner
         try
         {
             if (File.Exists(_watermarkFile))
-                return DateTime.Parse(File.ReadAllText(_watermarkFile).Trim());
+            {
+                // RoundtripKind: conserva el Kind del texto. La marca NUEVA se guarda sin zona
+                // (Unspecified = reloj de Firebird) y se usa tal cual.
+                var guardada = DateTime.Parse(
+                    File.ReadAllText(_watermarkFile).Trim(),
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind);
+                // Marca ANTIGUA guardada en UTC ('...Z', versión previa del agente): NO es del reloj
+                // de Firebird → re-sembrar (default) para que el primer ciclo arranque desde el reloj
+                // de Firebird y no quede 5 h desfasada tras actualizar.
+                return guardada.Kind == DateTimeKind.Utc ? default : guardada;
+            }
         }
-        catch { /* Si no se puede leer, empezar desde hace 1 hora */ }
+        catch { /* Si no se puede leer, primera sincronización. */ }
 
-        return DateTime.UtcNow.AddHours(-1);
+        // Sentinela "sin marca previa": el extractor arranca desde 1 h atrás EN EL RELOJ DE FIREBIRD.
+        return default;
     }
 
     private void SaveWatermark(DateTime watermark)

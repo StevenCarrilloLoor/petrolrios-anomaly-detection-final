@@ -94,13 +94,24 @@ public sealed class FirebirdExtractor
             throw new InvalidOperationException($"Firebird: {InterpretarError(ex)}", ex);
         }
 
-        items.AddRange(await ExtractTypeAsync<FacturaDto>(connection, "Factura", GetFacturasSql, watermark, r => r.FechaDocumento, ct));
-        items.AddRange(await ExtractTypeAsync<DetalleFacturaDto>(connection, "DetalleFactura", GetDetallesSql, watermark, r => r.FechaDespacho, ct));
-        items.AddRange(await ExtractTypeAsync<CierreTurnoDto>(connection, "CierreTurno", GetCierresSql, watermark, r => r.FechaFin, ct));
-        items.AddRange(await ExtractTypeAsync<DepositoTurnoDto>(connection, "DepositoTurno", GetDepositosSql, watermark, r => r.FechaDeposito, ct));
-        items.AddRange(await ExtractTypeAsync<AnulacionDto>(connection, "Anulacion", GetAnulacionesSql, watermark, r => r.FechaAnulacion, ct));
-        items.AddRange(await ExtractTypeAsync<CreditoDto>(connection, "Credito", GetCreditosSql, watermark, r => r.FechaCabecera, ct));
-        items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>(connection, "TarjetaTurno", GetTarjetasSql, watermark, _ => DateTime.UtcNow, ct));
+        // Reloj del SERVIDOR Firebird (no del agente). FEC_DCTO/FIN_DESP/FFI_TURN se graban con este
+        // reloj local de la estación; la marca de agua DEBE vivir en el mismo reloj, o se desfasa:
+        // una estación en UTC-5 con la marca en UTC (DateTime.UtcNow) saltaba 5 h al futuro y dejaba
+        // de extraer las transacciones nuevas. Por eso ahora la marca avanza con este valor.
+        var relojFirebird = DateTime.SpecifyKind(
+            await connection.ExecuteScalarAsync<DateTime>(
+                new CommandDefinition("SELECT CAST(CURRENT_TIMESTAMP AS TIMESTAMP) FROM RDB$DATABASE", cancellationToken: ct)),
+            DateTimeKind.Unspecified);
+        // Primera sincronización (sin marca previa): arrancar desde 1 h atrás EN EL RELOJ DE FIREBIRD.
+        var efectivo = watermark == default ? relojFirebird.AddHours(-1) : watermark;
+
+        items.AddRange(await ExtractTypeAsync<FacturaDto>(connection, "Factura", GetFacturasSql, efectivo, r => r.FechaDocumento, ct));
+        items.AddRange(await ExtractTypeAsync<DetalleFacturaDto>(connection, "DetalleFactura", GetDetallesSql, efectivo, r => r.FechaDespacho, ct));
+        items.AddRange(await ExtractTypeAsync<CierreTurnoDto>(connection, "CierreTurno", GetCierresSql, efectivo, r => r.FechaFin, ct));
+        items.AddRange(await ExtractTypeAsync<DepositoTurnoDto>(connection, "DepositoTurno", GetDepositosSql, efectivo, r => r.FechaDeposito, ct));
+        items.AddRange(await ExtractTypeAsync<AnulacionDto>(connection, "Anulacion", GetAnulacionesSql, efectivo, r => r.FechaAnulacion, ct));
+        items.AddRange(await ExtractTypeAsync<CreditoDto>(connection, "Credito", GetCreditosSql, efectivo, r => r.FechaCabecera, ct));
+        items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>(connection, "TarjetaTurno", GetTarjetasSql, efectivo, _ => DateTime.UtcNow, ct));
 
         // Fuentes de extracción configurables (multi-tabla). Se combinan dos orígenes:
         //   1) El catálogo CENTRAL (registrado una sola vez por el ingeniero en el servidor;
@@ -121,7 +132,7 @@ public sealed class FirebirdExtractor
         {
             try
             {
-                var cursor = fuente.Id > 0 ? _sourceWatermarks.Get(fuente) : watermark;
+                var cursor = fuente.Id > 0 ? _sourceWatermarks.Get(fuente) : efectivo;
                 var resultado = await ExtractFuenteConEstadoAsync(fuente, cursor, ct);
                 items.AddRange(resultado.Items);
                 if (fuente.Id > 0)
@@ -152,8 +163,9 @@ public sealed class FirebirdExtractor
             }
         }
 
-        _logger.LogInformation("Extraídas {Count} transacciones desde watermark {Watermark:O}", items.Count, watermark);
-        return new ResultadoExtraccionAgente(items, estados, cursores);
+        _logger.LogInformation("Extraídas {Count} transacciones desde watermark {Watermark:O} (reloj Firebird {Reloj:O})",
+            items.Count, efectivo, relojFirebird);
+        return new ResultadoExtraccionAgente(items, estados, cursores, relojFirebird);
     }
 
     private async Task<IEnumerable<TransaccionBatchItem>> ExtractTypeAsync<T>(
@@ -675,7 +687,10 @@ public sealed record CursorFuenteExtraida(
 public sealed record ResultadoExtraccionAgente(
     List<TransaccionBatchItem> Items,
     List<EstadoFuenteAgente> EstadosFuentes,
-    List<CursorFuenteExtraida> CursoresFuentes);
+    List<CursorFuenteExtraida> CursoresFuentes,
+    // Reloj del servidor Firebird al momento de extraer (mismo reloj que FEC_DCTO/FIN_DESP).
+    // La marca de agua global avanza con este valor para no desfasarse por zona horaria.
+    DateTime RelojFirebird);
 
 internal sealed record ResultadoFuenteExtraida(
     IReadOnlyList<TransaccionBatchItem> Items,

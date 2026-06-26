@@ -122,14 +122,71 @@ public static class CatalogoReglasPersonalizadas
             ]
         };
 
+    /// <summary>
+    /// Puente nombre amigable → posibles nombres crudos de Firebird. Una fuente CONFIGURABLE
+    /// (tabla cruda DCTO/DESP/…) envía las columnas con su nombre real (TNI_DCTO), pero el usuario
+    /// puede haber escrito el nombre amigable (TotalNeto) que ve en otras fuentes. Esto los reconcilia
+    /// para que la regla funcione igual con cualquiera de los dos nombres. Cada amigable lista uno o
+    /// más crudos candidatos (se prueba el que exista en la fila).
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string[]> AliasAmigableACrudo =
+        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            // Factura / DCTO
+            ["TotalNeto"] = ["TNI_DCTO"], ["TotalSinIva"] = ["TSI_DCTO"], ["Subtotal"] = ["SUB_DCTO"],
+            ["Descuento"] = ["DSC_DCTO"], ["Iva"] = ["IVA_DCTO"], ["FechaDocumento"] = ["FEC_DCTO"],
+            ["CodigoPago"] = ["COD_PAGO"], ["Placa"] = ["PLA_DCTO"], ["RucCliente"] = ["RUC_DCTO"],
+            ["NumeroDocumento"] = ["NUM_DCTO"], ["TipoDocumento"] = ["TIP_DCTO"],
+            // DetalleFactura / DESP
+            ["ValorUnitario"] = ["VUN_DESP"], ["VolumenTotal"] = ["VTO_DESP"],
+            ["CodigoProducto"] = ["COD_PROD"], ["NombreProducto"] = ["NOM_PROD"],
+            ["FechaDespacho"] = ["FIN_DESP"], ["NumeroDespacho"] = ["NUM_DESP"],
+            // CierreTurno / TURN
+            ["Faltante"] = ["FAL_TURN"], ["Sobrante"] = ["SOB_TURN"], ["Ingresos"] = ["ING_TURN"],
+            ["Egresos"] = ["EGR_TURN"], ["EstadoTurno"] = ["EST_TURN"], ["FechaFin"] = ["FFI_TURN"],
+            // Comunes (varias tablas) — se prueban en orden hasta encontrar la columna que exista
+            ["Cantidad"] = ["CAN_DESP", "CAN_TURN_TARJ"], ["Valor"] = ["VAL_TURN_TARJ", "VTO_DESP"],
+            ["CodigoCliente"] = ["COD_CLIE"], ["CodigoVendedor"] = ["COD_VEND"],
+            ["NumeroTurno"] = ["NUM_TURN"], ["CodigoBanco"] = ["COD_BANC"], ["Creditos"] = ["CRE_TURN"],
+            ["TotalCredito"] = ["TCR_CABE", "TOT_CABE"]
+        };
+
     /// <summary>Obtiene el valor de un campo de un registro de la fuente indicada.</summary>
     public static object? GetValor(string fuente, string campo, object registro)
     {
         // Fuente genérica (tabla configurable): el registro es un diccionario campo→valor.
         if (registro is IDictionary<string, object> dict)
-            return dict.TryGetValue(campo, out var valor) ? valor : null;
+            return GetValorGenerico(dict, campo);
 
         return GetValorTipado(fuente, campo, registro);
+    }
+
+    /// <summary>
+    /// Resuelve un campo en una fila genérica con tolerancia: (1) coincidencia exacta, (2) sin
+    /// distinguir mayúsculas/espacios, (3) puente nombre amigable → nombre crudo de Firebird. Así una
+    /// regla escrita con "TotalNeto" funciona sobre una fuente configurable que trae "TNI_DCTO".
+    /// </summary>
+    private static object? GetValorGenerico(IDictionary<string, object> dict, string campo)
+    {
+        var c = (campo ?? string.Empty).Trim();
+        if (c.Length == 0) return null;
+
+        // 1) Exacto.
+        if (dict.TryGetValue(c, out var v)) return v;
+
+        // 2) Sin distinguir mayúsculas ni espacios (las columnas de Firebird suelen traer padding).
+        var clave = dict.Keys.FirstOrDefault(k => string.Equals(k.Trim(), c, StringComparison.OrdinalIgnoreCase));
+        if (clave is not null) return dict[clave];
+
+        // 3) Puente amigable → crudo (TotalNeto → TNI_DCTO, etc.).
+        if (AliasAmigableACrudo.TryGetValue(c, out var crudos))
+            foreach (var crudo in crudos)
+            {
+                var k = dict.Keys.FirstOrDefault(x => string.Equals(x.Trim(), crudo, StringComparison.OrdinalIgnoreCase));
+                if (k is not null) return dict[k];
+            }
+
+        return null;
     }
 
     private static object? GetValorTipado(string fuente, string campo, object registro) => (fuente, registro) switch

@@ -1,7 +1,13 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 25 de junio de 2026 (mejora de asignación de alertas).
+Última actualización: 25 de junio de 2026 (auditoría agente/reglas San Pío: watermark TZ + tolerancia de nombres).
+
+## 🛠️ Auditoría agente/reglas San Pío (25-jun)
+- [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)
+- [ ] **VALIDAR EN SAN PÍO (mañana):** confirmar que con FIX 1 la built-in `Factura` fluye al día (el desfase TZ solo se reproduce en estación real UTC-5). Luego quitar del selector la fuente `Dcto` duplicada.
+- [ ] **Opcional (FIX 3):** de-duplicar DCTO en el agente (omitir fuentes configurables que ya cubre un built-in). Se dejó como paso manual seguro para no arriesgar el envío en producción antes de validar FIX 1.
+
 
 ---
 

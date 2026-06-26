@@ -96,6 +96,20 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**Última ronda — Auditoría agente/reglas San Pío (25-jun-2026), commiteado:**
+- Síntoma: en San Pío (estación real UTC-5) el agente envía datos (vía fuente configurable `Dcto`) pero la
+  regla nueva no disparaba y los 4 detectores predeterminados se quedaban sin datos nuevos.
+- **FIX 1 (watermark por reloj de Firebird):** el extractor built-in avanzaba la marca con `DateTime.UtcNow`
+  pero `FEC_DCTO` es hora local → en UTC-5 saltaba 5 h y congelaba `Factura`/`DetalleFactura`/etc. Ahora la
+  marca usa `CURRENT_TIMESTAMP` de Firebird (`ResultadoExtraccionAgente.RelojFirebird`), `Unspecified` +
+  `RoundtripKind`, re-siembra de marcas viejas en UTC. (`FirebirdExtractor.cs`, `CycleRunner.cs`)
+- **FIX 2 (tolerancia de nombres en reglas):** `CatalogoReglasPersonalizadas.GetValor` resuelve fuentes
+  configurables con exacto → sin mayúsculas/espacios → puente amigable→crudo (`TotalNeto`→`TNI_DCTO`). +5 tests.
+- Diagnóstico completo en `docs/DIAGNOSTICO-AGENTE-REGLAS.md`. Gate verde (Detectors **124**, +5). **Falta
+  validar en San Pío mañana** (el desfase TZ solo aparece en estación real; el demo es UTC). *(CAMBIOS §65)*
+
+
+
 **Última ronda — Reorganización de scripts (25-jun-2026), commiteado:**
 - **TODOS** los scripts (`.bat`/`.ps1`/`.sh`) viven ahora bajo `ejecutables/` en 6 carpetas por tipo
   (`1-INICIAR-Y-DETENER`, `2-BASE-DE-DATOS-Y-DEMO`, `3-DIAGNOSTICO`, `4-VERIFICACION-Y-PRUEBAS`,
