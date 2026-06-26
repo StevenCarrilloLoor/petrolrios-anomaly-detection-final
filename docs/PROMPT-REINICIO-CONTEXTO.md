@@ -132,8 +132,15 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   de día de semana + **hora nativa** (`<input type="time">`); y en "información a mostrar en la alerta" hay un
   **filtro por tabla** (📂) para distinguir campos del mismo concepto que el autoenlace expone desde tablas
   distintas. Autoenlazador (`DescubridorRelacionesService`) auditado = correcto (no era bug). Gate frontend verde.
-- **✅ Feature COMPLETO.** Pendiente: **QA en Chrome en vivo** — Steven dejó una regla de prueba "Despacho
-  Excesivo" (DetalleFactura: Cantidad ≥ 500, cada 30 s) para validar el feature y los nuevos selectores en vivo.
+- **✅ Feature COMPLETO + QA Chrome en vivo OK** (regla "Despacho Excesivo" cada 30 s muestra cadencia +
+  próxima; filtro por tabla y grilla de días 1–31 renderizan bien).
+
+**Ronda — FIX regla "Despacho NO facturado" (26-jun, CAMBIOS §81):** disparaba en TODOS los despachos de San
+Pío. Causa: `DespachoNoFacturadoRule` leía `FAC_DESP` como 0/1 y marcaba todo lo que no fuera "1". En los datos
+reales `FAC_DESP` ∈ {2,4,5,7, vacío} (código de estado de facturación, **nunca "1"**): poblado = ya facturado.
+Fix: solo marca "no facturado" si viene **vacío o "0"**. +5 pruebas (Detectors 182). Corregido el comentario de
+`DetalleFacturaDto.Facturado`. **Hay que reiniciar el API** para aplicarlo. Aclaración de tablas: **DCTO** =
+cabecera de factura, **DESP** = detalle del despacho (una factura agrupa varios despachos).
 
 **Ronda — Documentación: frecuencia por regla (anotada) + guía de relanzamiento (26-jun-2026):**
 - **`docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`** (nuevo): diseño/alcance del feature del ingeniero (cada regla

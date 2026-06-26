@@ -2251,3 +2251,35 @@ Despacho…"), lo que confunde sin saber de qué tabla viene cada uno.
 **Verificación.** Gate del frontend verde: **eslint limpio** + **tsc + vite OK** (.NET sin tocar, quedó verde
 en la ronda previa). *Pendiente: QA en vivo en Chrome (Steven dejó una regla de prueba "Despacho Excesivo"
 cada 30 s).*
+
+---
+
+## 81. Fix: "Despacho NO facturado" disparaba en TODOS los despachos (lectura errónea de FAC_DESP)
+
+**Síntoma.** En San Pío llegaban sin parar alertas operativas "Despacho N NO facturado: X gal por $Y. Revisar
+(combustible servido sin cobrar)" — en prácticamente cada despacho.
+
+**Causa raíz.** `DespachoNoFacturadoRule` asumía que el campo `FAC_DESP` (DESP) es un 0/1 y marcaba como
+anomalía **todo lo que no fuera "1"**. Consulta a los datos reales (`transacciones_staging`): `FAC_DESP`
+toma valores **2, 4, 5, 7** (y a veces vacío), **nunca "1"**. Es un **código de estado de facturación**
+(distintos canales de liquidación), no un booleano: cualquier valor poblado = despacho **ya facturado**. La
+regla, al exigir "1", disparaba en todos; y, peor, **saltaba** el caso realmente sospechoso (marca vacía).
+
+**Qué se hizo.** Se invirtió la lógica: la regla marca "no facturado" **solo cuando `FAC_DESP` viene vacío o
+"0"** (despacho sin liquidar = combustible servido sin cobrar); cualquier código poblado (2/4/5/7…) se
+considera facturado y no genera alerta. Se corrigió el comentario del DTO `DetalleFacturaDto.Facturado` (que
+afirmaba erróneamente "'1' facturado"), y la evidencia muestra "(vacío)" cuando la marca está en blanco.
+*Diagnóstico apoyado en el schema (`docs/contac-schema.sql`, `DESP.FAC_DESP Char(1)`) y en la distribución
+real de valores.*
+
+**De paso (duda de Steven):** en el log "Datos recibidos" se ven dos tipos que parecen "facturas" pero son
+**dos tablas distintas y complementarias**: **`DCTO`** = la **cabecera de la factura** (documento de venta:
+IVA, subtotal, total, RUC, vendedor, forma de pago, nº de documento…) y **`DESP`** = el **detalle del
+despacho** (cada surtido de combustible: galones, producto, manguera, valor unitario, nº de despacho). Una
+factura `DCTO` agrupa uno o varios despachos `DESP`. Por eso aparecen ambas para San Pío.
+
+**Verificación.** Gate verde: build Release 0w/0e, Domain 40 / **Detectors 182** (+5 pruebas de regresión:
+`FAC_DESP` = 2/4/5/7 → **no** alerta; vacío → **sí** alerta; las previas de "0"→alerta y "1"→no-alerta siguen
+en verde) / Monitor 2 / Api 77, EF sin cambios. **Para que surta efecto hay que reiniciar el API**
+(`ejecutables/1-INICIAR-Y-DETENER/reiniciar-solo-la-api.bat`); las alertas falsas ya generadas quedan como
+histórico (pueden marcarse como falso positivo).

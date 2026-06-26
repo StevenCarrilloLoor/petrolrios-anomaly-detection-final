@@ -20,8 +20,14 @@ public sealed class DespachoNoFacturadoRule(RiskScoringEngine scoring) : Detecti
         foreach (var despacho in context.Detalles)
         {
             var marca = despacho.Facturado.Trim();
-            if (string.IsNullOrEmpty(marca)) continue;
-            if (marca == "1") continue;
+            // FAC_DESP en Contaplus es un CÓDIGO de estado de facturación, no un 0/1. En los datos
+            // reales toma valores poblados (2, 4, 5, 7…) según el tipo/canal con que se liquidó el
+            // despacho: cualquiera de ellos significa que YA se facturó. El único caso de "combustible
+            // servido sin cobrar" es cuando la marca viene VACÍA o en "0" (despacho sin liquidar).
+            // (Antes se marcaba como anomalía todo lo que no fuera "1", lo que disparaba en cada
+            //  despacho porque "1" prácticamente no se usa.)
+            var sinFacturar = marca.Length == 0 || marca == "0";
+            if (!sinFacturar) continue;
             if (despacho.Cantidad <= 0) continue;
 
             var (score, nivel) = Scoring.Calculate(riesgoBase: 35, montoInvolucrado: despacho.VolumenTotal);
@@ -42,7 +48,7 @@ public sealed class DespachoNoFacturadoRule(RiskScoringEngine scoring) : Detecti
                     ["Galones"] = despacho.Cantidad,
                     ["Monto"] = despacho.VolumenTotal,
                     ["Producto"] = despacho.NombreProducto.Trim(),
-                    ["IndicadorFacturado"] = marca
+                    ["IndicadorFacturado"] = marca.Length == 0 ? "(vacío)" : marca
                 }
             });
         }

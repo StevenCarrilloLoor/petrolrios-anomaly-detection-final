@@ -32,6 +32,7 @@ public sealed record DetalleFacturaDto
     // COD_CLIE — código de cliente
     public string CodigoCliente { get; init; } = string.Empty;
 
-    // FAC_DESP — indicador de facturado ('1' facturado; distinto = no facturado)
+    // FAC_DESP — código de estado de facturación del despacho. POBLADO (2, 4, 5, 7… según el canal de
+    // liquidación) = ya facturado; VACÍO o "0" = despacho sin liquidar (combustible servido sin cobrar).
     public string Facturado { get; init; } = string.Empty;
 }

@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — **COMPLETO (Etapas 1-5)** + pulido UX: calendario tipo grilla 1–31/pastillas/hora nativa y **filtro por tabla** en "campos a mostrar"; autoenlazador auditado = correcto. Detectors 177 / Api 77, eslint+vite OK. Pendiente: QA Chrome de la regla de prueba "Despacho Excesivo" cada 30 s).
+Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla COMPLETO + pulido UX **verificado en Chrome**; y **FIX regla "Despacho NO facturado"**: leía mal `FAC_DESP` (lo poblado 2/4/5/7 = ya facturado, no anomalía) → ahora solo marca vacío/"0". Detectors 182 / Api 77. Reiniciar el API para aplicar).
 
 ## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
 Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +

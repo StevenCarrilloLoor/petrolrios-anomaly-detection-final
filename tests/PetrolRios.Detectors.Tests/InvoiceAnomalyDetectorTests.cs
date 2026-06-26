@@ -252,6 +252,42 @@ public class InvoiceAnomalyDetectorTests
         result.Where(a => a.Descripcion.Contains("NO facturado")).Should().BeEmpty();
     }
 
+    [Theory]
+    [InlineData("5")]
+    [InlineData("7")]
+    [InlineData("2")]
+    [InlineData("4")]
+    public async Task DetectAsync_DespachoConCodigoDeLiquidacionPoblado_NoGeneraAlerta(string codigo)
+    {
+        // Regresión: FAC_DESP poblado (2/4/5/7…) = despacho ya facturado/liquidado, NO es anomalía.
+        // Antes se marcaba como "NO facturado" todo lo que no fuera "1", inundando de falsos positivos
+        // porque en los datos reales de Contaplus el "1" prácticamente no se usa.
+        var detalles = new List<DetalleFacturaDto>
+        {
+            TestHelpers.CreateDetalle(numero: 11, cantidad: 6, facturado: codigo)
+        };
+        var context = TestHelpers.CreateContext(detalles: detalles);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Where(a => a.Descripcion.Contains("NO facturado")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DetectAsync_DespachoConFacturadoVacio_GeneraAlerta()
+    {
+        // Marca vacía = despacho sin liquidar (combustible servido sin cobrar) → sí es anomalía.
+        var detalles = new List<DetalleFacturaDto>
+        {
+            TestHelpers.CreateDetalle(numero: 14, cantidad: 6, facturado: "")
+        };
+        var context = TestHelpers.CreateContext(detalles: detalles);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("NO facturado"));
+    }
+
     [Fact]
     public async Task DetectAsync_AnulacionesRecurrentes_GeneraAlertaKiting()
     {
