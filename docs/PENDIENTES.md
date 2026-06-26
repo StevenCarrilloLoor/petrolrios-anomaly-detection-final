@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — Etapa 1 hecha: modelo + Cronos + 15 tests; investigación Quartz/Cronos).
+Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla — Etapas 1-3 hechas: modelo+Cronos, columnas+migración, e integración en el job con dos pasadas + ventana; Api 77).
 
 ## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
 Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +
@@ -13,9 +13,12 @@ Calendario anclado vía **Cronos**: día-D, "último día", semanal, diario). Va
 - [x] **Etapa 2 — HECHO + gate verde:** columnas `ProgramacionJson` (default '' = cada ciclo),
   `ProximaEjecucion`, `UltimaEjecucion` en `ReglaDeteccion` + `ReglaPersonalizada` + migración
   `20260626145512_ProgramacionDeRegla`. (CAMBIOS §76)
-- [ ] **Etapa 3:** integrar en `AnomalyDetectionJob` — gate "¿le toca?" (built-in no-pendiente se omite sin
-  aplicar default; custom se filtra), **ventana de datos** para reglas lentas (reusar backtest/idempotencia),
-  avanzar `ProximaEjecucion`+`UltimaEjecucion`.
+- [x] **Etapa 3 — HECHO + gate verde:** `AnomalyDetectionJob` en **dos pasadas**: A) incremental (reglas "cada
+  ciclo" sobre el lote no procesado, igual que antes; las programadas del motor se presentan `Activa=false`,
+  las custom se filtran); B) por **ventana** `FechaOriginal ∈ (UltimaEjecucion ?? ahora−díasVentana, ahora]`
+  para cada regla programada a la que le toca, evaluando solo esa regla. Ventana no solapada → sin duplicados
+  (sin tocar el modelo de Alerta). Avance de `ProximaEjecucion`/`UltimaEjecucion` una vez por ciclo (zona EC
+  UTC-5 vía Cronos). Con todo en "cada ciclo" = comportamiento idéntico. +2 pruebas E2E. (CAMBIOS §77)
 - [ ] **Etapa 4:** DTOs + controladores (motor y personalizadas) leer/escribir programación + devolver
   `ProximaEjecucion`; validación.
 - [ ] **Etapa 5:** UI — selector de programación reutilizable (modo + unidad + calendario) en reglas del

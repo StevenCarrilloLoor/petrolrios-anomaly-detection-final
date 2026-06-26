@@ -96,19 +96,27 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Frecuencia/calendario por regla, Etapa 1 (26-jun-2026) — EN PROGRESO:**
+**Última ronda — Frecuencia/calendario por regla, Etapas 1-3 (26-jun-2026) — EN PROGRESO (faltan 4-5):**
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de
   **doble modo** validado. **Cronos** (NuGet) calcula próximas fechas con `L`=último día, bisiestos, TZ →
   se usa para el modo Calendario (no reinventar la matemática).
 - **Etapa 1 (hecha):** `ProgramacionEjecucion` + `CalculadoraProgramacion` en `Application/Programacion`
   (Cronos 0.8.4). Intervalo seg/min/h/d/sem/mes + Calendario diario/semanal/mensual (día-D, "último día").
-  15 tests (Detectors 165). *(CAMBIOS §75)*
+  15 tests. *(CAMBIOS §75)*
 - **Etapa 2 (hecha):** columnas `ProgramacionJson`/`ProximaEjecucion`/`UltimaEjecucion` en `ReglaDeteccion`
   + `ReglaPersonalizada` + migración `20260626145512_ProgramacionDeRegla` (default '' = cada ciclo).
   *(CAMBIOS §76)*
-- **Faltan Etapas 3–5** (job, DTOs/API, UI). Plan en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`
-  y `docs/PENDIENTES.md`. **Decisión de diseño clave:** las reglas lentas consultan su VENTANA de datos
-  (reusar backtest + idempotencia), desacopladas del marcado `Procesada` incremental.
+- **Etapa 3 (hecha + gate verde):** `AnomalyDetectionJob` en **dos pasadas**. **Pasada A** (incremental):
+  reglas "cada ciclo" sobre el lote no procesado, igual que antes; las programadas del motor se presentan
+  `Activa=false` (las reglas se cargan **sin tracking** para alternar `Activa` sin tocar la BD), las custom
+  se filtran. **Pasada B** (ventana): cada regla programada a la que le toca se evalúa sola sobre
+  `FechaOriginal ∈ (UltimaEjecucion ?? ahora−díasVentana, ahora]` (sin marcar `Procesada`). Ventana **no
+  solapada** entre corridas → **sin alertas duplicadas** (no hizo falta idempotencia nueva ni tocar Alerta).
+  Avance de `ProximaEjecucion`/`UltimaEjecucion` una vez por ciclo (zona EC UTC-5 vía Cronos, normalizado a
+  UTC). **Con todo en "cada ciclo" = idéntico al comportamiento previo** (feature opt-in). +2 pruebas E2E →
+  Api 77. *(CAMBIOS §77)*
+- **Faltan Etapas 4-5** (DTOs/API leer-escribir programación + validación; UI con selector reutilizable y
+  "próxima ejecución"). Plan en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md` y `docs/PENDIENTES.md`.
 
 **Ronda — Documentación: frecuencia por regla (anotada) + guía de relanzamiento (26-jun-2026):**
 - **`docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`** (nuevo): diseño/alcance del feature del ingeniero (cada regla

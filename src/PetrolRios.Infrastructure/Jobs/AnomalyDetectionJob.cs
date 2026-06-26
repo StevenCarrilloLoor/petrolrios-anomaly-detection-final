@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.Programacion;
 using PetrolRios.Application.RealTime;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
@@ -48,6 +49,32 @@ public sealed class AnomalyDetectionJob
         _logger = logger;
     }
 
+    /// <summary>
+    /// Zona horaria de las estaciones (Ecuador, UTC-5, sin horario de verano). Se usa para el modo
+    /// Calendario de la programación: "el día 29 a las 00:00" significa medianoche hora local, y Cronos
+    /// la traduce a UTC. Se construye a mano para ser idéntica en Windows y Linux (los IDs de TZ difieren).
+    /// </summary>
+    private static readonly TimeZoneInfo ZonaEstacion =
+        TimeZoneInfo.CreateCustomTimeZone("PetrolRios-EC", TimeSpan.FromHours(-5), "Ecuador (UTC-5)", "Ecuador (UTC-5)");
+
+    /// <summary>
+    /// Calcula la próxima ejecución de una programación y la normaliza a UTC (Npgsql exige
+    /// <c>DateTimeKind.Utc</c> para columnas <c>timestamptz</c>). Cronos devuelve instantes UTC; el
+    /// modo Intervalo suma sobre <c>DateTime.UtcNow</c>. El guardia cubre cualquier <c>Unspecified</c>.
+    /// </summary>
+    private static DateTime CalcularProximaUtc(ProgramacionEjecucion prog, DateTime desdeUtc)
+    {
+        // CalcularProxima solo devuelve null en "cada ciclo" (que aquí nunca se programa); el ?? es
+        // un guardia defensivo. Para Intervalo/Calendario siempre hay una próxima fecha.
+        var prox = CalculadoraProgramacion.CalcularProxima(prog, desdeUtc, ZonaEstacion) ?? desdeUtc.AddDays(1);
+        return prox.Kind switch
+        {
+            DateTimeKind.Utc => prox,
+            DateTimeKind.Local => prox.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(prox, DateTimeKind.Utc)
+        };
+    }
+
     public async Task ExecuteAsync(CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
@@ -64,7 +91,11 @@ public sealed class AnomalyDetectionJob
             // los detectores necesitan ver una regla desactivada para NO ejecutarla
             // (si no la ven, aplicarían su umbral por defecto).
             var estaciones = await _unitOfWork.Estaciones.GetActivasAsync(ct);
-            var reglas = await _unitOfWork.ReglasDeteccion.GetAllAsync(ct);
+            // Sin tracking: el gate de programación alterna Activa en memoria para "apagar" las reglas
+            // que no les toca este ciclo; al no estar rastreadas, esos cambios nunca tocan la BD.
+            var reglas = await _dbContext.ReglasDeteccion
+                .AsNoTracking()
+                .ToListAsync(ct);
             var reglasPersonalizadas = await _dbContext.ReglasPersonalizadas
                 .AsNoTracking()
                 .ToListAsync(ct);
@@ -77,6 +108,52 @@ public sealed class AnomalyDetectionJob
             var totalAlertas = 0;
             var estacionesProcesadas = 0;
 
+            // ── Gate de programación por regla ──────────────────────────────────────────────────
+            // Cada regla declara su cadencia en ProgramacionJson (vacío = "cada ciclo", el default).
+            // La Pasada A corre las reglas "cada ciclo" sobre el lote incremental no procesado. Las
+            // reglas programadas (intervalo/calendario) NO corren en A: cuando les toca, corren en la
+            // Pasada B sobre su VENTANA de datos (FechaOriginal en (UltimaEjecucion, ahora]), sin marcar
+            // Procesada, y luego avanzamos su próxima ejecución. Como la ventana no se solapa entre
+            // corridas, cada transacción la ve la regla una sola vez → sin alertas duplicadas.
+            var ahora = DateTime.UtcNow;
+            var activaOriginalBi = reglas.ToDictionary(r => r.Id, r => r.Activa);
+            var biCadaCiclo = new HashSet<int>();
+            var cuCadaCiclo = new HashSet<int>();
+            var corridasProgramadas = new List<(ReglaDeteccion? BuiltIn, ReglaPersonalizada? Custom, ProgramacionEjecucion Prog)>();
+            var anclajes = new List<(bool EsBuiltIn, int Id, DateTime Prox)>();
+
+            foreach (var r in reglas)
+            {
+                var prog = ProgramacionEjecucion.Leer(r.ProgramacionJson);
+                if (prog.Modo == ModoProgramacion.CadaCiclo) { biCadaCiclo.Add(r.Id); continue; }
+                if (!activaOriginalBi[r.Id]) continue;               // programada pero desactivada: ni corre ni agenda
+                if (r.ProximaEjecucion is null)
+                    anclajes.Add((true, r.Id, CalcularProximaUtc(prog, ahora)));   // primer anclaje: espera su turno
+                else if (ahora >= r.ProximaEjecucion.Value)
+                    corridasProgramadas.Add((r, null, prog));        // le toca: se evalúa por ventana en la Pasada B
+            }
+            foreach (var r in reglasPersonalizadas)
+            {
+                var prog = ProgramacionEjecucion.Leer(r.ProgramacionJson);
+                if (prog.Modo == ModoProgramacion.CadaCiclo) { cuCadaCiclo.Add(r.Id); continue; }
+                if (!r.Activa) continue;
+                if (r.ProximaEjecucion is null)
+                    anclajes.Add((false, r.Id, CalcularProximaUtc(prog, ahora)));
+                else if (ahora >= r.ProximaEjecucion.Value)
+                    corridasProgramadas.Add((null, r, prog));
+            }
+
+            // Reglas personalizadas del carril incremental (cada ciclo). El resto va por ventana.
+            var reglasPersCadaCiclo = reglasPersonalizadas.Where(r => cuCadaCiclo.Contains(r.Id)).ToList();
+
+            // Ajusta el flag Activa de las reglas del motor (en memoria, sin tracking) preservando el
+            // "desactivada por el usuario": una regla solo se evalúa si estaba activa Y le toca esta pasada.
+            void AplicarActivaBi(Func<ReglaDeteccion, bool> leToca)
+            {
+                foreach (var r in reglas)
+                    r.Activa = activaOriginalBi[r.Id] && leToca(r);
+            }
+
             // Nivel mínimo de alerta que dispara aviso por correo (configurable en Ajustes → Operación
             // del sistema). Por defecto Crítico; si baja a Alto, también avisará por correo las Altas.
             var nivelMinCorreo = Enum.TryParse<NivelRiesgo>(_parametros.Actual().NivelMinimoCorreo, true, out var nm)
@@ -85,50 +162,55 @@ public sealed class AnomalyDetectionJob
 
             foreach (var estacion in estaciones)
             {
-                // Construir contexto de detección para esta estación
                 var watermark = await _unitOfWork.Estaciones.GetWatermarkAsync(estacion.Id, ct);
-                var context = await BuildDetectionContextAsync(
-                    estacion, watermark, reglas, reglasPersonalizadas, relacionesTabla, ct);
-
-                // Ejecutar los 4 detectores en paralelo
-                var detectionTasks = _detectors
-                    .Select(d => d.DetectAsync(context, ct))
-                    .ToArray();
-                var results = await Task.WhenAll(detectionTasks);
-
-                // Persistir alertas y notificar
                 var operativasDeEstacion = new List<Alerta>();
-                foreach (var anomalies in results)
+
+                // Historial de alertas por empleado (30 días): se calcula una vez por estación y se
+                // reutiliza en ambas pasadas para el scoring de reincidencia.
+                var alertasPrevias = await CargarHistorialEmpleadoAsync(estacion.Id, ct);
+
+                // ── Pasada A: ciclo incremental (reglas "cada ciclo") sobre el lote no procesado ──
+                AplicarActivaBi(r => biCadaCiclo.Contains(r.Id));
+                var lote = await _dbContext.TransaccionesStaging
+                    .Where(s => s.EstacionId == estacion.Id && !s.Procesada)
+                    .ToListAsync(ct);
+                var contextoA = ConstruirContexto(
+                    estacion, watermark, lote, reglas, reglasPersCadaCiclo, relacionesTabla, alertasPrevias);
+                totalAlertas += await ProcesarContextoAsync(
+                    contextoA, estacion, ejecucion, nivelMinCorreo, operativasDeEstacion, ct);
+                foreach (var s in lote) s.Procesada = true;   // el lote queda consumido por el carril incremental
+
+                // ── Pasada B: reglas programadas a las que les toca, cada una sobre su VENTANA ──
+                foreach (var corrida in corridasProgramadas)
                 {
-                    foreach (var anomaly in anomalies)
+                    var dias = CalculadoraProgramacion.DiasVentanaSugerida(corrida.Prog);
+                    var ultima = corrida.BuiltIn?.UltimaEjecucion ?? corrida.Custom?.UltimaEjecucion;
+                    var desdeVentana = ultima ?? ahora.AddDays(-dias);
+                    var ventana = await _dbContext.TransaccionesStaging
+                        .AsNoTracking()
+                        .Where(s => s.EstacionId == estacion.Id
+                                 && s.FechaOriginal > desdeVentana && s.FechaOriginal <= ahora)
+                        .ToListAsync(ct);
+                    if (ventana.Count == 0) continue;
+
+                    List<ReglaPersonalizada> persB;
+                    if (corrida.BuiltIn is not null)
                     {
-                        var alerta = Alerta.Create(
-                            anomaly.TipoDetector,
-                            anomaly.NivelRiesgo,
-                            anomaly.Descripcion,
-                            anomaly.Score,
-                            anomaly.EstacionId,
-                            anomaly.EmpleadoCodigo,
-                            anomaly.TransaccionReferencia,
-                            JsonSerializer.Serialize(anomaly.Metadata),
-                            ejecucion.Id,
-                            anomaly.Ambito);
-
-                        await _dbContext.Alertas.AddAsync(alerta, ct);
-                        totalAlertas++;
-                        if (alerta.Ambito is AmbitoAlerta.Operativa or AmbitoAlerta.Ambos)
-                            operativasDeEstacion.Add(alerta);
-
-                        // Notificar por SignalR
-                        await NotifyAlertAsync(alerta, estacion.Id);
-
-                        // Correo: si la alerta alcanza el nivel mínimo configurado (por defecto Crítico);
-                        // y si la regla que la generó pidió aviso por correo (opt-in, motor o personalizada).
-                        if ((int)alerta.NivelRiesgo >= (int)nivelMinCorreo)
-                            await NotificarNivelPorCorreoAsync(alerta, estacion, ct);
-                        else if (anomaly.NotificarCorreo)
-                            await NotificarReglaPorCorreoAsync(alerta, estacion, ct);
+                        var idBi = corrida.BuiltIn.Id;
+                        AplicarActivaBi(r => r.Id == idBi);   // solo esta regla del motor
+                        persB = [];
                     }
+                    else
+                    {
+                        AplicarActivaBi(_ => false);                        // ninguna regla del motor
+                        persB = [corrida.Custom!];
+                    }
+                    var contextoB = ConstruirContexto(
+                        estacion, watermark, ventana, reglas, persB, relacionesTabla, alertasPrevias);
+                    totalAlertas += await ProcesarContextoAsync(
+                        contextoB, estacion, ejecucion, nivelMinCorreo, operativasDeEstacion, ct);
+                    // La ventana NO se marca Procesada (es re-lectura por fecha; el avance de
+                    // UltimaEjecucion evita el solape entre corridas → sin alertas duplicadas).
                 }
 
                 // Digest de problemas operativos al contacto de la estación (carril Operativa)
@@ -136,6 +218,10 @@ public sealed class AnomalyDetectionJob
 
                 estacionesProcesadas++;
             }
+
+            // Avanzar la programación (anclar las nuevas + mover la próxima de las que corrieron), una
+            // sola vez por ciclo: la regla corre para todas las estaciones, su próxima fecha es global.
+            await AvanzarProgramacionAsync(anclajes, corridasProgramadas, ahora, ct);
 
             await _dbContext.SaveChangesAsync(ct);
 
@@ -163,24 +249,41 @@ public sealed class AnomalyDetectionJob
         }
     }
 
-    private async Task<DetectionContext> BuildDetectionContextAsync(
+    /// <summary>
+    /// Historial de alertas por empleado (últimos 30 días) para el scoring de reincidencia. Se
+    /// materializa y agrupa en memoria para compatibilidad con todos los providers de EF.
+    /// </summary>
+    private async Task<Dictionary<string, int>> CargarHistorialEmpleadoAsync(int estacionId, CancellationToken ct)
+    {
+        var hace30Dias = DateTime.UtcNow.AddDays(-30);
+        var lista = await _dbContext.Alertas
+            .Where(a => a.EstacionId == estacionId
+                     && a.FechaDeteccion >= hace30Dias
+                     && a.EmpleadoCodigo != null)
+            .Select(a => a.EmpleadoCodigo!)
+            .ToListAsync(ct);
+        return lista.GroupBy(codigo => codigo).ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    /// <summary>
+    /// Construye el contexto de detección a partir de un conjunto de registros de staging ya cargados
+    /// (no consulta la BD ni marca <c>Procesada</c>: eso lo decide quien llama, según la pasada). Las
+    /// reglas y su flag <c>Activa</c> vienen preparados por el gate de programación.
+    /// </summary>
+    private static DetectionContext ConstruirContexto(
         Estacion estacion,
         EstacionWatermark? watermark,
+        IReadOnlyList<TransaccionStaging> stagingFuente,
         IReadOnlyList<ReglaDeteccion> reglas,
         IReadOnlyList<ReglaPersonalizada> reglasPersonalizadas,
         IReadOnlyList<RelacionTabla> relaciones,
-        CancellationToken ct)
+        Dictionary<string, int> alertasPrevias)
     {
         var desde = watermark?.UltimaExtraccion ?? DateTime.UtcNow.AddHours(-1);
 
-        // Obtener datos de staging para esta estación
-        var stagingTodos = await _dbContext.TransaccionesStaging
-            .Where(s => s.EstacionId == estacion.Id && !s.Procesada)
-            .ToListAsync(ct);
-
-        // Deduplicar lotes reenviados por el agente (store-and-forward puede
-        // reenviar un lote ya recibido si el primer envío falló a mitad de camino)
-        var staging = stagingTodos
+        // Deduplicar lotes reenviados por el agente (store-and-forward puede reenviar un lote ya
+        // recibido si el primer envío falló a mitad de camino).
+        var staging = stagingFuente
             .GroupBy(s => new { s.TipoTransaccion, s.DataJson })
             .Select(g => g.First())
             .ToList();
@@ -192,19 +295,6 @@ public sealed class AnomalyDetectionJob
         var anulaciones = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.AnulacionDto>(staging, "Anulacion");
         var creditos = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.CreditoDto>(staging, "Credito");
         var tarjetas = StagingJson.DeserializarPorTipo<Application.DTOs.Firebird.TarjetaTurnoDto>(staging, "TarjetaTurno");
-
-        // Historial de alertas por empleado (últimos 30 días)
-        // Se materializa primero y se agrupa en memoria para compatibilidad con todos los providers
-        var hace30Dias = DateTime.UtcNow.AddDays(-30);
-        var alertasPreviasList = await _dbContext.Alertas
-            .Where(a => a.EstacionId == estacion.Id
-                     && a.FechaDeteccion >= hace30Dias
-                     && a.EmpleadoCodigo != null)
-            .Select(a => a.EmpleadoCodigo!)
-            .ToListAsync(ct);
-        var alertasPrevias = alertasPreviasList
-            .GroupBy(codigo => codigo)
-            .ToDictionary(g => g.Key, g => g.Count());
 
         // Fuentes genéricas: staging de tipos NO conocidos = tablas configurables del agente.
         // Se exponen como diccionarios para que las reglas personalizadas operen sobre ellas.
@@ -223,10 +313,6 @@ public sealed class AnomalyDetectionJob
                     .Where(d => d is not null)
                     .Cast<IDictionary<string, object>>()
                     .ToList());
-
-        // Marcar TODO el staging (incluidos duplicados) como procesado
-        foreach (var s in stagingTodos)
-            s.Procesada = true;
 
         return new DetectionContext
         {
@@ -249,6 +335,109 @@ public sealed class AnomalyDetectionJob
             HoraApertura = estacion.HoraApertura,
             HoraCierre = estacion.HoraCierre
         };
+    }
+
+    /// <summary>
+    /// Corre los detectores sobre un contexto, persiste las alertas resultantes, las notifica por
+    /// SignalR y dispara los correos según nivel/opt-in. Devuelve cuántas alertas generó.
+    /// </summary>
+    private async Task<int> ProcesarContextoAsync(
+        DetectionContext context,
+        Estacion estacion,
+        EjecucionJob ejecucion,
+        NivelRiesgo nivelMinCorreo,
+        List<Alerta> operativasDeEstacion,
+        CancellationToken ct)
+    {
+        var detectionTasks = _detectors
+            .Select(d => d.DetectAsync(context, ct))
+            .ToArray();
+        var results = await Task.WhenAll(detectionTasks);
+
+        var generadas = 0;
+        foreach (var anomalies in results)
+        {
+            foreach (var anomaly in anomalies)
+            {
+                var alerta = Alerta.Create(
+                    anomaly.TipoDetector,
+                    anomaly.NivelRiesgo,
+                    anomaly.Descripcion,
+                    anomaly.Score,
+                    anomaly.EstacionId,
+                    anomaly.EmpleadoCodigo,
+                    anomaly.TransaccionReferencia,
+                    JsonSerializer.Serialize(anomaly.Metadata),
+                    ejecucion.Id,
+                    anomaly.Ambito);
+
+                await _dbContext.Alertas.AddAsync(alerta, ct);
+                generadas++;
+                if (alerta.Ambito is AmbitoAlerta.Operativa or AmbitoAlerta.Ambos)
+                    operativasDeEstacion.Add(alerta);
+
+                // Notificar por SignalR
+                await NotifyAlertAsync(alerta, estacion.Id);
+
+                // Correo: si la alerta alcanza el nivel mínimo configurado (por defecto Crítico);
+                // y si la regla que la generó pidió aviso por correo (opt-in, motor o personalizada).
+                if ((int)alerta.NivelRiesgo >= (int)nivelMinCorreo)
+                    await NotificarNivelPorCorreoAsync(alerta, estacion, ct);
+                else if (anomaly.NotificarCorreo)
+                    await NotificarReglaPorCorreoAsync(alerta, estacion, ct);
+            }
+        }
+        return generadas;
+    }
+
+    /// <summary>
+    /// Avanza la programación de las reglas tras el ciclo: ancla la próxima ejecución de las reglas
+    /// recién programadas (sin <c>ProximaEjecucion</c>) y, para las que corrieron, fija
+    /// <c>UltimaEjecucion = ahora</c> y calcula la siguiente. Carga las entidades con tracking (una
+    /// vez cada una) para que el <c>SaveChanges</c> del cierre del ciclo persista los cambios.
+    /// </summary>
+    private async Task AvanzarProgramacionAsync(
+        List<(bool EsBuiltIn, int Id, DateTime Prox)> anclajes,
+        List<(ReglaDeteccion? BuiltIn, ReglaPersonalizada? Custom, ProgramacionEjecucion Prog)> corridas,
+        DateTime ahora,
+        CancellationToken ct)
+    {
+        if (anclajes.Count == 0 && corridas.Count == 0) return;
+
+        // Cada regla aparece a lo sumo en UNA de las listas y una sola vez (es CadaCiclo, o se ancla, o
+        // le toca), así que se carga con tracking una única vez y el SaveChanges del ciclo la persiste.
+        foreach (var (esBuiltIn, id, prox) in anclajes)
+        {
+            if (esBuiltIn)
+            {
+                var e = await _dbContext.ReglasDeteccion.FirstAsync(r => r.Id == id, ct);
+                e.ProximaEjecucion = prox;
+            }
+            else
+            {
+                var e = await _dbContext.ReglasPersonalizadas.FirstAsync(r => r.Id == id, ct);
+                e.ProximaEjecucion = prox;
+            }
+        }
+
+        foreach (var corrida in corridas)
+        {
+            var prox = CalcularProximaUtc(corrida.Prog, ahora);
+            if (corrida.BuiltIn is not null)
+            {
+                var id = corrida.BuiltIn.Id;
+                var e = await _dbContext.ReglasDeteccion.FirstAsync(r => r.Id == id, ct);
+                e.UltimaEjecucion = ahora;
+                e.ProximaEjecucion = prox;
+            }
+            else
+            {
+                var id = corrida.Custom!.Id;
+                var e = await _dbContext.ReglasPersonalizadas.FirstAsync(r => r.Id == id, ct);
+                e.UltimaEjecucion = ahora;
+                e.ProximaEjecucion = prox;
+            }
+        }
     }
 
     // Cache de destinatarios de correo por ciclo (supervisores y administradores activos).

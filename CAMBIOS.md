@@ -2122,3 +2122,41 @@ nullables. Down las elimina.
 
 **Verificación.** Gate verde: build Release 0w/0e, **EF sin cambios pendientes tras la migración**,
 Domain 40 / Detectors 165 / Monitor 2 / Api 75, eslint + vite OK.
+
+---
+
+## 77. Frecuencia/calendario por regla — Etapa 3: integración en el job (gate + ventana + avance)
+
+**Motivación.** Cerrar el corazón del feature: que el ciclo de detección **respete la cadencia de cada
+regla**. Antes, todas las reglas corrían en cada ciclo del job (cada minuto en dev). El ingeniero pidió que
+"una regla que analiza las transacciones finales del mes no se ejecute todo el rato"; ahora cada regla decide
+cuándo le toca y, cuando le toca, mira **su ventana de datos** (no solo el último lote).
+
+**Qué se hizo.** `AnomalyDetectionJob` pasó a un modelo de **dos pasadas** por estación, gobernado por la
+`ProgramacionEjecucion` de cada regla (Etapa 1) leída de `ProgramacionJson` (Etapa 2):
+
+- **Gate de programación (antes del bucle).** Se clasifica cada regla del motor y personalizada: "cada ciclo"
+  (default), "le toca" (su `ProximaEjecucion` ya venció) o "anclar" (programada sin `ProximaEjecucion` aún →
+  se calcula y **espera su turno**, no corre este ciclo). Las reglas se cargan **sin tracking** para poder
+  alternar el flag `Activa` en memoria sin tocar la BD.
+- **Pasada A — incremental.** Corre solo las reglas "cada ciclo" sobre el lote **no procesado** y lo marca
+  `Procesada` (comportamiento clásico, intacto). Las reglas del motor programadas se presentan con `Activa=false`
+  (así el detector NO les aplica su umbral por defecto); las personalizadas programadas se excluingen de la lista.
+- **Pasada B — por ventana.** Para cada regla programada a la que le toca, se construye su **ventana**
+  `FechaOriginal ∈ (UltimaEjecucion ?? ahora−díasVentana, ahora]` (sin marcar `Procesada`) y se evalúa **solo
+  esa regla**. Como la ventana **no se solapa** entre corridas (el avance de `UltimaEjecucion` mueve el borde),
+  cada transacción la ve la regla una sola vez → **sin alertas duplicadas** (no hizo falta tocar el modelo de
+  Alerta ni añadir idempotencia nueva).
+- **Avance de programación (tras el bucle).** Las reglas que corrieron fijan `UltimaEjecucion = ahora` y
+  recalculan `ProximaEjecucion`; las recién ancladas fijan su primera `ProximaEjecucion`. Se persiste una sola
+  vez por ciclo (la próxima fecha es global a todas las estaciones). El modo Calendario usa la zona **Ecuador
+  (UTC-5, sin DST)** vía Cronos, y todo se normaliza a UTC para Npgsql (`timestamptz`).
+
+**Garantía de no-regresión.** Con todas las reglas en "cada ciclo" (el default de hoy), la Pasada A corre
+exactamente como antes y la Pasada B no hace nada → comportamiento **idéntico**. El feature es opt-in por regla.
+
+**Verificación.** Gate oficial verde a la primera: build Release **0 warnings / 0 errores**, Domain 40 /
+Detectors 165 / Monitor 2 / **Api 77** (+2 pruebas nuevas del camino programado: "no le toca → no evalúa" y
+"le toca → evalúa por ventana y avanza la próxima"; los 7 E2E previos siguen verdes = carril incremental
+intacto), **EF sin cambios pendientes** (Etapa 3 no toca el esquema), eslint + vite OK. Faltan Etapas 4 (API/DTOs)
+y 5 (UI).

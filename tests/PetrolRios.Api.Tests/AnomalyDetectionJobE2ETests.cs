@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
+using PetrolRios.Application.Programacion;
 using PetrolRios.Application.RealTime;
 using PetrolRios.Application.ReglasPersonalizadas;
 using PetrolRios.Detectors;
@@ -357,6 +358,73 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         var alertas = await _dbContext.Alertas.ToListAsync();
         alertas.Should().Contain(a => a.TipoDetector == TipoDetector.ComplianceViolation,
             "la factura con placa ZZZ999949 y 10 galones debe disparar alerta de cumplimiento");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ReglaProgramadaNoLeToca_NoSeEvalua()
+    {
+        // Arrange — ambas reglas personalizadas pasan de "cada ciclo" a estar programadas "cada 1 día"
+        // con la próxima ejecución en el FUTURO: aún no les toca.
+        var prog = new ProgramacionEjecucion
+        {
+            Modo = ModoProgramacion.Intervalo,
+            IntervaloN = 1,
+            IntervaloUnidad = UnidadIntervalo.Dias
+        }.Serializar();
+        foreach (var r in _dbContext.ReglasPersonalizadas.ToList())
+        {
+            r.ProgramacionJson = prog;
+            r.ProximaEjecucion = DateTime.UtcNow.AddDays(1);   // futuro → no le toca
+            r.UltimaEjecucion = null;
+        }
+        await _dbContext.SaveChangesAsync();
+
+        // Act
+        await _job.ExecuteAsync();
+
+        // Assert — ninguna alerta personalizada: la regla está programada y no le toca este ciclo
+        var personalizadas = await _dbContext.Alertas
+            .CountAsync(a => a.TipoDetector == TipoDetector.Personalizada);
+        personalizadas.Should().Be(0, "una regla programada cuya próxima ejecución es futura no debe evaluarse");
+
+        // …pero las reglas del motor (cada ciclo por defecto) no se ven afectadas por el gate
+        (await _dbContext.Alertas.CountAsync(a => a.TipoDetector == TipoDetector.CashFraud))
+            .Should().BeGreaterThan(0, "las reglas 'cada ciclo' siguen corriendo en cada ciclo");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ReglaProgramadaLeToca_SeEvaluaPorVentanaYAvanzaProxima()
+    {
+        // Arrange — ambas reglas personalizadas programadas "cada 1 día" con la próxima ejecución YA
+        // VENCIDA (les toca). Sin última ejecución → la ventana abarca los últimos ~31 días.
+        var prog = new ProgramacionEjecucion
+        {
+            Modo = ModoProgramacion.Intervalo,
+            IntervaloN = 1,
+            IntervaloUnidad = UnidadIntervalo.Dias
+        }.Serializar();
+        foreach (var r in _dbContext.ReglasPersonalizadas.ToList())
+        {
+            r.ProgramacionJson = prog;
+            r.ProximaEjecucion = DateTime.UtcNow.AddMinutes(-1);   // vencida → le toca
+            r.UltimaEjecucion = null;
+        }
+        await _dbContext.SaveChangesAsync();
+
+        // Act
+        await _job.ExecuteAsync();
+
+        // Assert — la regla se evaluó sobre su ventana y generó alertas en ambos carriles
+        var personalizadas = await _dbContext.Alertas
+            .Where(a => a.TipoDetector == TipoDetector.Personalizada)
+            .ToListAsync();
+        personalizadas.Should().Contain(a => a.Ambito == AmbitoAlerta.Auditoria);
+        personalizadas.Should().Contain(a => a.Ambito == AmbitoAlerta.Operativa);
+
+        // …y su programación avanzó: próxima ≈ ahora + 1 día, última ejecución registrada
+        var actualizadas = await _dbContext.ReglasPersonalizadas.AsNoTracking().ToListAsync();
+        actualizadas.Should().OnlyContain(r => r.ProximaEjecucion != null && r.ProximaEjecucion > DateTime.UtcNow);
+        actualizadas.Should().OnlyContain(r => r.UltimaEjecucion != null);
     }
 
     public void Dispose()
