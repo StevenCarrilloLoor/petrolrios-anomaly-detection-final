@@ -903,10 +903,16 @@ export function ReglasPersonalizadasSection() {
 
             {/* Información a mostrar en la alerta (campos propios + relacionados, con búsqueda y filtro) */}
             {(() => {
-              const todos = [
+              const todosBruto = [
                 ...camposFuente(form.fuenteDatos),
                 ...relacionadosFuente(form.fuenteDatos),
               ];
+              // Dedupe por nombre (defensa): un mismo campo no debe aparecer dos veces. Una key
+              // duplicada en el .map de abajo rompe el reconciliado de React y deja el buscador y
+              // los chips sin responder al filtrar o seleccionar.
+              const todos = todosBruto.filter(
+                (c, i) => todosBruto.findIndex((o) => o.nombre === c.nombre) === i,
+              );
               const iconoRol: Record<string, string> = {
                 Fecha: "📅", Monto: "💲", Cantidad: "⛽", Numero: "🔢", Codigo: "🏷️",
                 Nombre: "🔤", Identificacion: "🪪", Placa: "🚗", Estado: "🔘", Texto: "📝",

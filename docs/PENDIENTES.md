@@ -1,7 +1,7 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (release 2.4.0: cadena de despliegue lista para San Pío — reemplazo y actualización con un clic; runbook de puesta en marcha).
+Última actualización: 26 de junio de 2026 (fix bug grave: selector/buscador de "campos a mostrar" se rompía por keys duplicadas; antes: release 2.4.0 + runbook).
 
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)

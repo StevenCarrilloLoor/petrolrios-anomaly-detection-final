@@ -96,7 +96,15 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Release 2.4.0 + cadena de despliegue lista para San Pío (26-jun-2026):**
+**Última ronda — Fix bug grave: selector "campos a mostrar" (keys duplicadas) (26-jun-2026):**
+- Síntoma: en el creador de reglas, "Información a mostrar en la alerta", al filtrar/borrar/seleccionar el
+  buscador y los chips dejaban de responder.
+- Raíz: `ReglasPersonalizadasController` agregaba el mismo campo relacionado **por cada relación** a la misma
+  tabla destino → `nombre` duplicado → `key={c.nombre}` duplicada en React → reconciliado corrupto.
+- Fix: **dedupe por Nombre** del catálogo de relacionados (backend, raíz) + dedupe defensivo de `todos` en el
+  picker (frontend). Gate verde (Api 75, eslint+tsc+vite OK). *(CAMBIOS §73)*
+
+**Ronda — Release 2.4.0 + cadena de despliegue lista para San Pío (26-jun-2026):**
 - **Versión 2.4.0** (Directory.Build.props). Auditada toda la fábrica de despliegue: instalador del central
   (Docker, `instalar-central-windows`), portables (`publicar-*`), versionado y actualización.
 - **Agente = avisa + 1 clic** (no auto); **monitor = auto** (6 h). Manifiesto en `/api/v1/agente/version`,

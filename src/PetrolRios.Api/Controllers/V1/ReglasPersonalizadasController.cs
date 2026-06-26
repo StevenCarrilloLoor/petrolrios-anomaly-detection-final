@@ -125,7 +125,18 @@ public sealed class ReglasPersonalizadasController : ControllerBase
                         c.Tipo, c.Rol, c.Descripcion, c.Icono)));
                 }
                 if (relacionados.Count > 0)
-                    fuentes[i] = fuentes[i] with { CamposRelacionados = relacionados };
+                {
+                    // Dedupe por Nombre: si una fuente tiene VARIAS relaciones a la MISMA tabla destino,
+                    // el mismo campo ("Dcto.ANE_DCTO") llegaba repetido. En la UI eso producía una key de
+                    // React duplicada que corrompía el reconciliado (el buscador y los chips dejaban de
+                    // responder al filtrar/seleccionar). Un campo es el mismo dato sin importar por qué
+                    // relación se alcanzó: se conserva la primera aparición.
+                    var unicos = relacionados
+                        .GroupBy(c => c.Nombre, StringComparer.OrdinalIgnoreCase)
+                        .Select(g => g.First())
+                        .ToList();
+                    fuentes[i] = fuentes[i] with { CamposRelacionados = unicos };
+                }
             }
         }
 

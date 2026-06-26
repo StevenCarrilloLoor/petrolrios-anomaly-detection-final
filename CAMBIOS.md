@@ -2027,3 +2027,29 @@ existente.
 plataformas** OK, y **`publicar-actualizacion`** generó `central-descargas/PetrolRios.StationAgent.exe` +
 `central-config/agente-version.json` para la **2.4.0** (SHA256 `fda86354…baabe`). Quedan listas las dos
 vías para San Pío: portable nuevo (reemplazo) y paquete de actualización (un clic).
+
+---
+
+## 73. Bug grave: el selector/buscador de "campos a mostrar" se rompía (keys duplicadas)
+
+**Motivación (Steven).** En el creador de reglas, sección **"Información a mostrar en la alerta"**: al
+escribir en el buscador (p. ej. `sec_dcto`) y borrar con backspace, o al seleccionar varios campos, **el
+buscador, el filtro por tipo y los chips dejaban de responder** y no se podía seleccionar nada.
+
+**Causa raíz (confirmada en el backend).** `ReglasPersonalizadasController` adjunta a cada fuente los campos
+de sus tablas **relacionadas** con el nombre `"Destino.Campo"`, recorriendo **todas** las relaciones activas
+y agregando **todos** los campos del destino **por cada relación**. Si una fuente tenía **varias relaciones
+a la MISMA tabla** (el autodescubridor las crea con facilidad), el mismo campo (`Dcto.ANE_DCTO`) entraba
+**repetido**. En el frontend el `.map` de los chips usa `key={c.nombre}` → **key de React duplicada** → al
+re-renderizar (filtrar, borrar, seleccionar) el reconciliado se corrompe y el buscador/los chips dejan de
+responder.
+
+**Qué se hizo (dos capas).**
+- **Backend (raíz):** se **deduplican** los campos relacionados por `Nombre`
+  (`GroupBy(c.Nombre).Select(g.First())`) antes de adjuntarlos al catálogo — un campo es el mismo dato sin
+  importar por cuántas relaciones se alcance. Sana a todos los consumidores de la UI.
+- **Frontend (defensa):** en el picker, `todos` se deduplica por `nombre` antes de filtrar/renderizar, para
+  que jamás haya una key repetida aunque el catálogo cambie.
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 150 / Monitor 2 /
+**Api 75** (con Docker), **eslint + tsc + vite build OK**.
