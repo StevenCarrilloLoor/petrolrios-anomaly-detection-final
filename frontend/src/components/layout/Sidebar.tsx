@@ -41,6 +41,7 @@ const navSections: NavSection[] = [
         icon: <Wrench size={20} />,
       },
       { to: "/conexiones", label: "Conexiones", icon: <Radio size={20} /> },
+      { to: "/datos-recibidos", label: "Datos recibidos", icon: <Database size={20} /> },
     ],
   },
   {

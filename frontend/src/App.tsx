@@ -12,6 +12,7 @@ import { AlertasPage } from "@/pages/AlertasPage";
 import { ProblemasEstacionPage } from "@/pages/ProblemasEstacionPage";
 import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
 import { ConexionesPage } from "@/pages/ConexionesPage";
+import { DatosRecibidosPage } from "@/pages/DatosRecibidosPage";
 import { ReglasPage } from "@/pages/ReglasPage";
 import { FuentesDatosPage } from "@/pages/FuentesDatosPage";
 import { ReportesPage } from "@/pages/ReportesPage";
@@ -55,6 +56,7 @@ function App() {
                   <Route path="/problemas-estacion" element={<ProblemasEstacionPage />} />
                   <Route path="/alertas/:id" element={<DetalleAlertaPage />} />
                   <Route path="/conexiones" element={<ConexionesPage />} />
+                  <Route path="/datos-recibidos" element={<DatosRecibidosPage />} />
                   <Route path="/seguridad" element={<SeguridadPage />} />
                   <Route path="/ajustes" element={<AjustesPage />} />
                   <Route path="/aprobar-qr" element={<AprobarQrPage />} />

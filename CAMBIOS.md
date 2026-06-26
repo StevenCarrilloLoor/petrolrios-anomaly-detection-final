@@ -1821,3 +1821,27 @@ dato (dos veces en staging, con nombres de campo crudos vs amigables) y confund�
 
 **Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / **Detectors 135** / Monitor 2 /
 Api 57 (+16 saltadas sin Docker), eslint + vite build OK.
+
+---
+
+## 67. Sección "Datos recibidos" en el central: logs crudos de lo que envían los agentes
+
+**Motivación (Steven).** Hacía falta una vista para ver **la información cruda recibida de los agentes**
+(sea anomalía o no), ordenada, con **filtro y buscador**, para confirmar que las tablas registradas en el
+selector (las que se auto-enlazan a los agentes) realmente **están llegando** al central.
+
+**Qué se hizo.**
+- **Backend:** `DatosRecibidosController` (`GET /api/v1/datos-recibidos`) — lista paginada de
+  `transacciones_staging` (lo crudo que envía el agente), ordenada por más reciente, con filtros por
+  **tipo**, **estación** y **estado (procesada/sin procesar)** y **búsqueda por tipo**. Resuelve el nombre
+  de la estación. `GET /datos-recibidos/tipos` da los tipos distintos para el desplegable. Solo lectura,
+  cuentas del central (excluye agentes). DTO `DatoRecibidoResponse`.
+- **Frontend:** página **"Datos recibidos"** (sección Monitoreo del menú): tabla con tipo, estación, fecha
+  original, estado y **datos crudos expandibles** (JSON formateado); filtros (tipo/estación/estado) +
+  buscador; paginación. Tipo + servicio + ruta + ítem de menú.
+
+**Para qué sirve:** filtrar por "Tanques", "Dcto", etc. confirma de un vistazo si esa tabla del selector
+está enviando datos a esta estación (lo que Steven pidió para validar el auto-enlace de tablas).
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 135 / Monitor 2 /
+**Api 73** (Docker arriba), eslint + vite build OK.
