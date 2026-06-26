@@ -1922,3 +1922,10 @@ no eran lo mismo?".
 **Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / **Detectors 150** (+15 del
 nuevo `CatalogoTiposTransaccionTests`) / Monitor 2 / Api 74 (57 + 17 de integración omitidas sin Docker en
 esa corrida), eslint + vite build OK.
+
+**Bug de repo corregido (al commitear).** `DatoRecibidoResponse.cs` vive en `…/DTOs/Logs/`, y la regla de
+`.gitignore` `[Ll]ogs/` (plantilla de Visual Studio para logs de runtime) **ignoraba esa carpeta de código**:
+el DTO nunca se había versionado (el commit de §67 también lo omitió en silencio), así que un clon limpio no
+compilaría. Se añadió una **excepción** en `.gitignore` (`!src/PetrolRios.Application/DTOs/Logs/**`) y se
+versionó el DTO. Lección: cuidado con las reglas amplias `[Ll]ogs/`/`[Ll]og/` cuando hay carpetas de fuente
+homónimas.

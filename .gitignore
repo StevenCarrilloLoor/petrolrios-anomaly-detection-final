@@ -26,6 +26,10 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+# Excepción: la carpeta de DTOs "Logs" es CÓDIGO FUENTE (no logs de runtime).
+# Sin esto, [Ll]ogs/ ignoraba src/PetrolRios.Application/DTOs/Logs/ y su DTO no entraba al repo.
+!src/PetrolRios.Application/DTOs/Logs/
+!src/PetrolRios.Application/DTOs/Logs/**
 TestResults/
 coverage/
 
