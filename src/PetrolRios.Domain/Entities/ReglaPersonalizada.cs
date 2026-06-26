@@ -53,6 +53,19 @@ public class ReglaPersonalizada : BaseEntity
     /// </summary>
     public bool NotificarCorreo { get; set; }
 
+    /// <summary>
+    /// Programación de ejecución (JSON de <c>ProgramacionEjecucion</c>). Vacío = "cada ciclo" (igual que
+    /// antes). Permite que la regla corra en su propia cadencia: intervalo (cada N seg/min/h/d/sem/mes) o
+    /// calendario anclado (día del mes, "último día", día de la semana, hora).
+    /// </summary>
+    public string ProgramacionJson { get; set; } = "";
+
+    /// <summary>Próxima ejecución programada (UTC). null = correr en el próximo ciclo / aún sin calcular.</summary>
+    public DateTime? ProximaEjecucion { get; set; }
+
+    /// <summary>Última vez que la regla corrió (UTC). Informativo / base del intervalo.</summary>
+    public DateTime? UltimaEjecucion { get; set; }
+
     public static ReglaPersonalizada Create(
         string nombre, string descripcion, string fuenteDatos,
         string condicionesJson, string? agregacionJson, double riesgoBase,

@@ -2108,3 +2108,17 @@ mes, incremental; el sistema instalado a mitad de mes no debe desfasarse").
 **Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / **Detectors 165** (+15) /
 Monitor 2 / Api 75, eslint + vite OK. (Pendientes: entidades+migración, integración en el job, DTOs/API y
 UI — ver `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md` y `docs/PENDIENTES.md`.)
+
+---
+
+## 76. Frecuencia/calendario por regla — Etapa 2: columnas + migración EF
+
+**Qué se hizo.** A las dos entidades de regla (`ReglaDeteccion` y `ReglaPersonalizada`) se les añadieron 3
+columnas: **`ProgramacionJson`** (JSON de `ProgramacionEjecucion`; vacío = "cada ciclo"),
+**`ProximaEjecucion`** y **`UltimaEjecucion`** (UTC, nullable). Migración EF
+`20260626145512_ProgramacionDeRegla`: en ambas tablas, `ProgramacionJson text NOT NULL DEFAULT ''` (así las
+reglas existentes quedan en "cada ciclo", sin cambio de comportamiento) y los dos timestamps `timestamptz`
+nullables. Down las elimina.
+
+**Verificación.** Gate verde: build Release 0w/0e, **EF sin cambios pendientes tras la migración**,
+Domain 40 / Detectors 165 / Monitor 2 / Api 75, eslint + vite OK.

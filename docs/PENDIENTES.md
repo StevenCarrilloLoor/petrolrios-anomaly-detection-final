@@ -10,8 +10,9 @@ Calendario anclado vía **Cronos**: día-D, "último día", semanal, diario). Va
 - [x] **Etapa 1 — HECHO + gate verde:** `ProgramacionEjecucion` + `CalculadoraProgramacion` (Application/
   Programacion) con Cronos; 15 tests (incl. día-29 anclado, no-desfase a mitad de mes, último día/febrero).
   (CAMBIOS §75)
-- [ ] **Etapa 2:** columnas en `ReglaDeteccion` + `ReglaPersonalizada` (`ProgramacionJson`,
-  `ProximaEjecucion`, `UltimaEjecucion`) + **migración EF** (defaults: cada ciclo, null).
+- [x] **Etapa 2 — HECHO + gate verde:** columnas `ProgramacionJson` (default '' = cada ciclo),
+  `ProximaEjecucion`, `UltimaEjecucion` en `ReglaDeteccion` + `ReglaPersonalizada` + migración
+  `20260626145512_ProgramacionDeRegla`. (CAMBIOS §76)
 - [ ] **Etapa 3:** integrar en `AnomalyDetectionJob` — gate "¿le toca?" (built-in no-pendiente se omite sin
   aplicar default; custom se filtra), **ventana de datos** para reglas lentas (reusar backtest/idempotencia),
   avanzar `ProximaEjecucion`+`UltimaEjecucion`.

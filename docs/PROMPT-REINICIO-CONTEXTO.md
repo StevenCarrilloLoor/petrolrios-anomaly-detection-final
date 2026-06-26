@@ -100,10 +100,13 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de
   **doble modo** validado. **Cronos** (NuGet) calcula próximas fechas con `L`=último día, bisiestos, TZ →
   se usa para el modo Calendario (no reinventar la matemática).
-- **Etapa 1 (hecha, gate verde):** `ProgramacionEjecucion` + `CalculadoraProgramacion` en
-  `Application/Programacion` (Cronos 0.8.4). Intervalo seg/min/h/d/sem/mes + Calendario diario/semanal/
-  mensual (día-D, "último día"). 15 tests (Detectors 165). *(CAMBIOS §75)*
-- **Faltan Etapas 2–5** (entidades+migración, job, DTOs/API, UI). Plan en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`
+- **Etapa 1 (hecha):** `ProgramacionEjecucion` + `CalculadoraProgramacion` en `Application/Programacion`
+  (Cronos 0.8.4). Intervalo seg/min/h/d/sem/mes + Calendario diario/semanal/mensual (día-D, "último día").
+  15 tests (Detectors 165). *(CAMBIOS §75)*
+- **Etapa 2 (hecha):** columnas `ProgramacionJson`/`ProximaEjecucion`/`UltimaEjecucion` en `ReglaDeteccion`
+  + `ReglaPersonalizada` + migración `20260626145512_ProgramacionDeRegla` (default '' = cada ciclo).
+  *(CAMBIOS §76)*
+- **Faltan Etapas 3–5** (job, DTOs/API, UI). Plan en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`
   y `docs/PENDIENTES.md`. **Decisión de diseño clave:** las reglas lentas consultan su VENTANA de datos
   (reusar backtest + idempotencia), desacopladas del marcado `Procesada` incremental.
 

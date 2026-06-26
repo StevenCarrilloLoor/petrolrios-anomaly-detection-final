@@ -643,8 +643,18 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("ProgramacionJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProximaEjecucion")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("TipoDetector")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UltimaEjecucion")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -715,8 +725,18 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<bool>("NotificarCorreo")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("ProgramacionJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProximaEjecucion")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<double>("RiesgoBase")
                         .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("UltimaEjecucion")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
