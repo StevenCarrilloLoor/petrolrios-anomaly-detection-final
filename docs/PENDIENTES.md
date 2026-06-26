@@ -1,12 +1,14 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 25 de junio de 2026 (auditoría agente/reglas San Pío: watermark TZ + tolerancia de nombres).
+Última actualización: 25 de junio de 2026 (stress-test del creador de reglas en Chrome + guard de longitud; verificación en vivo del guard built-in y de "Datos recibidos").
 
 ## 🛠️ Auditoría agente/reglas San Pío (25-jun)
 - [x] **HECHO + gate verde** — **FIX 1 watermark por reloj de Firebird** (`FirebirdExtractor`/`CycleRunner`): la marca avanza con `CURRENT_TIMESTAMP` del servidor Firebird (no `DateTime.UtcNow`), serialización `Unspecified`, re-siembra de marcas viejas en UTC. Destranca los 4 detectores predeterminados en estaciones fuera de UTC. **FIX 2 tolerancia de nombres** en `GetValor` (amigable→crudo: `TotalNeto`→`TNI_DCTO`) + 5 pruebas. (CAMBIOS §65, `docs/DIAGNOSTICO-AGENTE-REGLAS.md`)
 - [ ] **VALIDAR EN SAN PÍO (mañana):** confirmar que con FIX 1 la built-in `Factura` fluye al día (el desfase TZ solo se reproduce en estación real UTC-5). Luego quitar del selector la fuente `Dcto` duplicada.
 - [x] **HECHO + gate verde (FIX 3 guard):** el central **rechaza** registrar en el selector una tabla que ya extrae un built-in (DCTO→Factura, ANUL→Anulacion, …) y el agente **omite** las que quedaron de antes. `FuenteDatosPolicy.TablasBuiltIn` + 11 pruebas. (CAMBIOS §66)
+- [x] **HECHO + gate verde + Chrome** — **sección "Datos recibidos"** (logs crudos de agentes, filtros + buscador + filas expandibles); verificada en vivo con 3.241 registros reales de San Pío. (CAMBIOS §67)
+- [x] **HECHO + gate verde + Chrome** — **stress-test del creador de reglas** (25+ casos límite, inyección SQL/XSS, 1000 condiciones, fuente arbitraria): el sistema aguanta y escala. **Bug cazado y arreglado:** nombre/desc/expresión más largos que su columna provocaban **500 → ahora 400 limpio** (guards de longitud en `Validar()` + test de regresión `ReglasPersonalizadas_NombreDemasiadoLargo…`). Guard built-in re-verificado en vivo (TURN_DEPO/CRED_CABE/TURN_TARJ→400, DCTO→409). (CAMBIOS §68)
 
 
 ---

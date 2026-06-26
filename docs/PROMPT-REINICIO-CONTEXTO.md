@@ -96,7 +96,30 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Auditoría agente/reglas San Pío (25-jun-2026), commiteado:**
+**Última ronda — Robustez del creador de reglas + Logs + guard (25-jun-2026):**
+- **Sección "Datos recibidos"** (logs crudos de agentes: tabla con tipo/estación/fecha/estado + **filas
+  expandibles** con el JSON crudo, **filtros** tipo/estación/estado y **buscador**): `DatosRecibidosController`
+  (`GET /api/v1/datos-recibidos` + `/tipos`) y página en Monitoreo. Verificada en vivo: 3.241 registros
+  reales de San Pío (`DCTO` con COD_PAGO/COD_VEND/COD_CLIE reales). *(CAMBIOS §67, commit `d4b6fc4`)*
+- **Guard anti-duplicación** del selector (no registrar tablas que ya extrae un built-in:
+  DCTO→Factura, ANUL→Anulacion, …): `FuenteDatosPolicy.TablasBuiltIn` + 11 tests. Verificado en vivo:
+  TURN_DEPO/CRED_CABE/TURN_TARJ→**400** ("ya se procesa como …"), DCTO/`dcto`→**409** ("ya registrada").
+  *(CAMBIOS §66, commit `6f2d559`)*
+- **Stress-test en Chrome del creador de reglas** (25+ casos: inyección SQL/XSS inertes — la tabla
+  sobrevive y EF parametriza; 1000 condiciones y fuente configurable arbitraria → 201; aguanta y escala).
+  **Bug cazado y arreglado:** un nombre/descripción/expresión más largo que su columna provocaba **HTTP 500**
+  al guardar → ahora **400 limpio** (guards de longitud en `ReglasPersonalizadasController.Validar()`,
+  espejo de la BD: Nombre 150 / Descripción 500 / Fuente 50 / Expresión 2000). Test de regresión
+  `ReglasPersonalizadas_NombreDemasiadoLargo_DevuelveBadRequestNo500`. *(CAMBIOS §68)*
+- **Autounidor `DescubridorRelacionesService`:** revisado (similitud de nombre + solape de valores en
+  staging, umbrales prudentes) — bien implementado y escalable; sin cambios.
+- **Conteos tras esta ronda:** Domain 40, Detectors 135, Monitor 2, **Api 74** (con Docker; +1 regresión).
+  Agente v2.3.0.
+- **Pendiente San Pío (mañana):** republicar el agente con FIX 1 (watermark por reloj de Firebird),
+  validar que la built-in `Factura` fluye al día y la regla nueva dispara; luego **quitar del selector la
+  fuente `Dcto` duplicada** (el agente ya la omite, pero conviene limpiar el catálogo).
+
+**Ronda — Auditoría agente/reglas San Pío (25-jun-2026), commiteado:**
 - Síntoma: en San Pío (estación real UTC-5) el agente envía datos (vía fuente configurable `Dcto`) pero la
   regla nueva no disparaba y los 4 detectores predeterminados se quedaban sin datos nuevos.
 - **FIX 1 (watermark por reloj de Firebird):** el extractor built-in avanzaba la marca con `DateTime.UtcNow`

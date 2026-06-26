@@ -1845,3 +1845,51 @@ está enviando datos a esta estación (lo que Steven pidió para validar el auto
 
 **Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 135 / Monitor 2 /
 **Api 73** (Docker arriba), eslint + vite build OK.
+
+---
+
+## 68. Robustez del creador de reglas: stress-test en Chrome + guard de longitud (bug 500 → 400)
+
+**Motivación (Steven).** "Intenta romper el programa, vuélvete loco en la creación de reglas… el sistema
+debe ser escalable". Se sometió el endpoint `POST /api/v1/reglas-personalizadas` a una batería agresiva de
+casos límite desde Chrome (contra la API + Postgres reales), y se verificaron en vivo el **guard
+anti-duplicación** (§66) y la **página de Datos recibidos** (§67).
+
+**Qué se probó (25+ casos, 0 caídas salvo la documentada abajo).**
+- Nombre vacío / solo espacios → 400. Riesgo 0 / 101 / negativo / `1e308` → 400. Fuente vacía → 400.
+- Campo inexistente, operador inválido (`DROP TABLE`), función de agregación falsa (`HACK`),
+  agrupación por campo que no existe → 400 (validación de catálogo).
+- Expresión avanzada basura (`a OR OR b )(`) → 400; expresión válida → 201.
+- **Inyección SQL** en el nombre (`'); DROP TABLE …; --`) → se guarda como literal (EF parametriza); la
+  tabla **sigue viva** tras el intento (se re-consultó el total). XSS en un valor → se guarda como texto
+  (React lo escapa al render). Emoji/Unicode (`🔥用户αβγ`) en el nombre → 201.
+- **Escalabilidad:** regla con **1000 condiciones** → 201; **fuente configurable arbitraria** ("Tanques"
+  con campo libre) → 201 (se valida en tiempo de ejecución, no al guardar). Body `{}` → 400.
+
+**Bug encontrado y corregido.** Un **nombre de más de 150 caracteres** (o descripción > 500, expresión >
+2000) **pasaba la validación y reventaba con HTTP 500** al guardar, porque las columnas de
+`reglas_personalizadas` tienen límite (`Nombre` 150, `Descripcion` 500, `FuenteDatos` 50,
+`ExpresionAvanzada` 2000) pero `Validar()` no lo comprobaba. **Fix:** se añadieron guards de longitud
+espejo de la BD en `ReglasPersonalizadasController.Validar()` (usado por crear **y** actualizar), que ahora
+devuelven un **400 limpio** ("El nombre no puede superar 150 caracteres.", etc.) en vez de un 500.
+
+**Otras verificaciones en vivo (Chrome).**
+- **Guard de tablas built-in (§66):** registrar `TURN_DEPO`/`CRED_CABE`/`TURN_TARJ` en el selector →
+  400 con "ya se procesa automáticamente como la fuente 'DepositoTurno/Credito/TarjetaTurno'"; `DCTO`
+  (que ya estaba registrada de antes) → 409 "ya está registrada"; `dcto` minúscula se normaliza y bloquea.
+  Se confirmó la duplicación histórica que sospechaba Steven: 3214 filas tipo `Dcto` (selector) vs 13
+  `Factura` (built-in); el agente ya **omite** la fuente duplicada (§65), así que no se re-procesa.
+- **Datos recibidos (§67):** la página renderiza 3.241 registros reales de San Pío, con filtros
+  (tipo/estación/estado), buscador y **filas expandibles** que muestran el JSON crudo del `DCTO`
+  (COD_PAGO="001", COD_VEND="DD0000013", COD_CLIE="CZ0061065", DEE_DCTO="RECIBIDO POR EL SRI").
+- **Autounidor de tablas (`DescubridorRelacionesService`):** revisado — descubre relaciones por similitud
+  de nombre + solape de valores en el staging, con umbrales prudentes; bien implementado y escalable
+  (no inventa relaciones sin evidencia de datos). Sin cambios.
+
+**Prueba automatizada.** Nuevo test de integración `ReglasPersonalizadas_NombreDemasiadoLargo_DevuelveBadRequestNo500`
+en `ApiIntegrationTests` (nombre de 200 caracteres → espera 400, nunca 500).
+
+**Verificación.** Gate verde: build Release 0w/0e, EF sin cambios, Domain 40 / Detectors 135 / Monitor 2 /
+**Api 74** (el test nuevo corrió con Docker), eslint + vite build OK. Regresión en vivo confirmada tras
+reconstruir: nombre 200 → 400 ("El nombre no puede superar 150 caracteres."), nombre 5000 → 400,
+descripción 600 → 400, regla válida → 201.

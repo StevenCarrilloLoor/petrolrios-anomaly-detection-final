@@ -349,6 +349,17 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         if (string.IsNullOrWhiteSpace(nombre))
             errores.Add("El nombre de la regla es obligatorio.");
 
+        // Límites de longitud espejo de las columnas de BD (ReglaPersonalizadaConfiguration):
+        // sin esto, un texto más largo que la columna provoca un 500 al guardar en vez de un 400.
+        if (nombre.Length > 150)
+            errores.Add("El nombre no puede superar 150 caracteres.");
+
+        if (request.Descripcion is { Length: > 500 })
+            errores.Add("La descripción no puede superar 500 caracteres.");
+
+        if (request.ExpresionAvanzada is { Length: > 2000 })
+            errores.Add("La expresión avanzada no puede superar 2000 caracteres.");
+
         if (request.RiesgoBase is < 1 or > 100)
             errores.Add("El riesgo base debe estar entre 1 y 100.");
 
@@ -356,6 +367,8 @@ public sealed class ReglasPersonalizadasController : ControllerBase
         // arbitrarias enviadas por el agente). Solo se exige que se indique una.
         if (string.IsNullOrWhiteSpace(request.FuenteDatos))
             errores.Add("Debe indicar una fuente de datos.");
+        else if (request.FuenteDatos.Length > 50)
+            errores.Add("El nombre de la fuente de datos no puede superar 50 caracteres.");
 
         if (!string.IsNullOrWhiteSpace(request.ExpresionAvanzada))
         {

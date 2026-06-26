@@ -114,6 +114,39 @@ public sealed class ApiIntegrationTests
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [DockerAvailableFact]
+    public async Task ReglasPersonalizadas_NombreDemasiadoLargo_DevuelveBadRequestNo500()
+    {
+        // Arrange: nombre de 200 caracteres (la columna admite 150). Regresión del bug
+        // hallado en stress-test: antes provocaba un 500 al guardar; debe ser un 400 limpio.
+        var token = await LoginAndGetTokenAsync();
+        var regla = new
+        {
+            Nombre = new string('X', 200),
+            Descripcion = "Regla de prueba de longitud",
+            FuenteDatos = "Factura",
+            Condiciones = new[] { new { Campo = "TotalNeto", Operador = ">", Valor = "1" } },
+            CombinadorCondiciones = "Y",
+            RiesgoBase = 50.0,
+            Ambito = "Auditoria",
+            Activa = true,
+        };
+
+        // Act
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/reglas-personalizadas")
+        {
+            Content = JsonContent.Create(regla),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await _client.SendAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain("150");
+    }
+
     private async Task<string> LoginAndGetTokenAsync()
     {
         var loginRequest = new { Email = "admin@petrolrios.com", Password = "Admin123!" };
