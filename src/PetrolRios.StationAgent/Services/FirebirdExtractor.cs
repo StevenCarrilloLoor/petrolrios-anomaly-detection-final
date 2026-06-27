@@ -87,7 +87,8 @@ public sealed class FirebirdExtractor
               SEC_DCTO AS "SecuenciaDocumento", TIP_DCTO AS "TipoDocumento", NUM_DCTO AS "NumeroDocumento",
               FEC_DCTO AS "Fecha", COD_CLIE AS "Cliente", RUC_DCTO AS "Ruc", COD_VEND AS "Vendedor",
               PLA_DCTO AS "Placa", COD_PAGO AS "FormaPago", NUM_TURN AS "NumeroTurno",
-              TSI_DCTO AS "TotalSinIva", IVA_DCTO AS "Iva", DSC_DCTO AS "Descuento", TNI_DCTO AS "TotalNeto"
+              TSI_DCTO AS "TotalSinIva", IVA_DCTO AS "Iva", DSC_DCTO AS "Descuento", TNI_DCTO AS "TotalNeto",
+              NDO_DCTO AS "NumeroDespacho"
             FROM DCTO
             WHERE (@tipo IS NULL OR TIP_DCTO = @tipo)
               AND (@desde IS NULL OR FEC_DCTO >= @desde)
@@ -96,7 +97,8 @@ public sealed class FirebirdExtractor
                    OR CAST(RUC_DCTO AS VARCHAR(60)) CONTAINING @codigo
                    OR CAST(PLA_DCTO AS VARCHAR(60)) CONTAINING @codigo
                    OR CAST(COD_CLIE AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(NUM_DCTO AS VARCHAR(60)) CONTAINING @codigo)
+                   OR CAST(NUM_DCTO AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(COD_VEND AS VARCHAR(60)) CONTAINING @codigo)
             ORDER BY FEC_DCTO DESC
             """;
         var prm = new

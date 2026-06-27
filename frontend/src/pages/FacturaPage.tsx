@@ -103,6 +103,7 @@ export function FacturaPage() {
               <Campo label="Despachador" value={texto(doc.Vendedor)} mono />
               <Campo label="Forma de pago" value={texto(doc.FormaPago)} />
               <Campo label="Turno" value={texto(doc.NumeroTurno)} />
+              <Campo label="Despacho (origen)" value={texto(doc.NumeroDespacho)} mono />
             </div>
           </div>
 
@@ -117,8 +118,9 @@ export function FacturaPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Datos traídos en vivo de la base de la estación {texto(est)} (solo lectura). El detalle de líneas
-            de despacho (DESP) se añadirá en una próxima versión.
+            Datos traídos en vivo de la base de la estación {texto(est)} (solo lectura). El «Despacho (origen)»
+            identifica el surtido (DESP) del que proviene la factura. El detalle de la línea (producto, galones,
+            precio del surtidor) se incorporará cuando se habilite el cruce DESP↔DCTO.
           </p>
         </div>
       )}

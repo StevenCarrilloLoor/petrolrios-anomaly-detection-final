@@ -93,7 +93,7 @@ export function ConsultasPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Busca documentos directamente en la base de la estación (en vivo, solo lectura). Filtra por tipo,
-          rango de fechas y un código que coincide con RUC, placa, cliente o número de documento.
+          rango de fechas y un código que coincide con RUC, placa, cliente, despachador o número de documento.
         </p>
       </div>
 
@@ -121,7 +121,7 @@ export function ConsultasPage() {
             </select>
           </label>
           <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">RUC / placa / cliente / n.º de documento</span>
+            <span className="text-xs font-medium text-muted-foreground">RUC / placa / cliente / despachador / n.º doc</span>
             <input
               className={`${inputClass} w-full`}
               value={codigo}

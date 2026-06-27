@@ -33,6 +33,7 @@ export interface DocumentoFirebird {
   Iva?: number;
   Descuento?: number;
   TotalNeto?: number;
+  NumeroDespacho?: string; // NDO_DCTO: el despacho (DESP) que originó la factura
   [k: string]: unknown;
 }
 
@@ -41,7 +42,7 @@ export interface DocumentoFirebird {
 // el alias del agente, la tabla y la factura siempre encuentran su valor.
 const CAMPOS_DOC = [
   "SecuenciaDocumento", "TipoDocumento", "NumeroDocumento", "Fecha", "Cliente", "Ruc", "Vendedor",
-  "Placa", "FormaPago", "NumeroTurno", "TotalSinIva", "Iva", "Descuento", "TotalNeto",
+  "Placa", "FormaPago", "NumeroTurno", "TotalSinIva", "Iva", "Descuento", "TotalNeto", "NumeroDespacho",
 ] as const;
 
 function normalizarDoc(raw: Record<string, unknown>): DocumentoFirebird {
