@@ -108,7 +108,16 @@ automáticos. Base: la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`) y 
   (`OperacionConfig.RefrescoSegundos`, default 1 s, acotada 1 s…1 h; `GET /api/v1/refresco` para todo rol;
   selector en Ajustes; `RefrescoContext`/`useRefrescoMs` en TODAS las pantallas) + **agente cada 1 s** por
   defecto (clamp mín. 5→1). +8 pruebas → Api 94. *(Pendiente: QA en vivo al final, junto con las demás etapas.)*
-- *(Etapas 2–5 pendientes: enriquecer reglas → cola de consulta a Firebird → pestaña Consultas + factura/reportes → pulido UI.)*
+- **Etapa 2 HECHA (CAMBIOS §90, commit `1114d65`, gate verde):** **evidencia identificable automática** en las
+  alertas. `DetectedAnomaly.Fuente` (objeto de origen) + `EvidenciaEnriquecida` reflejado por
+  `RuleBasedDetector` → toda anomalía trae RUC, nº de documento, placa, cliente, turno, fecha, monto, forma de
+  pago, sin pisar lo de la regla. `Fuente` fijada en 10 reglas (incl. diferencia de efectivo, la del caso de la
+  auditora). Frontend etiqueta/enlaza las claves nuevas. +4 pruebas → Detectors 193. *(Falta: extender `Fuente`
+  al resto de reglas built-in + a las personalizadas.)*
+- *(Etapas 3–5 pendientes: **cola de consulta en vivo a Firebird** (entidad + agente on-demand + central) →
+  **pestaña Consultas + factura completa + reportes** cliente/RUC/despachador en ventana nueva → **pulido UI**
+  del detalle. La etapa 3 es la más grande: espejo de `ISolicitudesEsquema`, el agente recoge la consulta en
+  su heartbeat (1 s) y devuelve datos SOLO LECTURA de Firebird.)*
 
 ---
 

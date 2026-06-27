@@ -2569,3 +2569,36 @@ archivo, sin esquema), **lint + build de frontend OK**.
 Commit: `626c3e0`.
 
 ---
+
+## 90. Evidencia identificable automática en las alertas (RUC, n° doc, placa, cliente, turno…)
+
+**Motivación.** La auditora, viendo una alerta de "diferencia de efectivo" (caso real), notó que **falta
+información** para identificar de un vistazo de qué se trata: quiere RUC, **número de documento** (el corto),
+placa, cliente, etc. en TODAS las alertas — y que sea **automático y escalable** (también para reglas nuevas).
+
+**Qué se hizo.**
+
+- **`DetectedAnomaly.Fuente`** (objeto de origen, p. ej. una `FacturaDto`/`CierreTurnoDto`). El orquestador
+  **`RuleBasedDetector`** enriquece la evidencia de **toda** anomalía reflejando desde la `Fuente` los campos
+  **identificables estándar** — **RUC, número de documento, placa, cliente, turno, fecha, monto, forma de
+  pago** — mediante **`EvidenciaEnriquecida`** (mapea por nombre de propiedad del DTO). **No pisa** las claves
+  que la regla ya puso ni copia vacíos/cero. Es la pieza que vuelve la evidencia **automática y escalable**:
+  una regla nueva solo fija `Fuente` y hereda todos esos campos.
+- **`Fuente` fijada en 10 reglas** (las de mayor valor identificable): venta sin placa, venta sin
+  identificación, alto volumen sin placa, placa genérica, descuento excesivo, total inconsistente, campos
+  obligatorios, precio fuera de lista, crédito sin cliente y **diferencia de efectivo** (la del caso de la
+  auditora). El resto de reglas puede sumarse en un renglón (solo `Fuente = …`).
+- **Frontend**: el detalle de alerta etiqueta las claves nuevas (`Ruc` → "RUC / cédula", `Fecha`,
+  `FormaPago` → "Forma de pago") y ya las hace **buscables/enlazadas** (RUC, n° de documento, placa, cliente
+  llevan a la bandeja filtrada).
+- **+4 pruebas** (`EvidenciaEnriquecidaTests`): refleja los campos, **no pisa** lo de la regla, **omite**
+  vacíos/cero, y no hace nada con fuente nula.
+
+**Verificación.** Gate oficial en la PC de Steven: **build Release 0/0**, **pruebas 329 / 0 skipped**
+(Domain 40, Monitor 2, **Detectors 193 (+4)**, Api 94), **EF sin migraciones pendientes**, **lint + build de
+frontend OK**.
+
+Commit: `1114d65`. *(Pendiente: extender `Fuente` al resto de reglas built-in y al detector de reglas
+personalizadas; QA en vivo junto con el resto de la ronda.)*
+
+---
