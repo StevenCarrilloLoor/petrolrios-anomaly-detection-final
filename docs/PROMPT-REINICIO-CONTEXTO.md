@@ -106,8 +106,11 @@ stored procedure del esquema) → la heurística daba falsos positivos; off por 
 del patrón de FueraHorario); QA en vivo: toggle inactivo. La detección correcta exige el cruce
 `DESP.NUM_DESP↔DCTO.NDO_DCTO` con staging+gracia (futuro). (c) **Despachador (COD_VEND) buscable en Consultas +
 Nº de despacho (NDO_DCTO) en la factura** («Despacho (origen)»); QA en vivo: 200 docs por «005»; factura real
-`006102000024646` → despacho **39904** (confirma que el cruce es viable). Refinamiento restante (opcional): el
-detalle de la **línea** DESP (producto/galones/precio) dentro de la factura.
+`006102000024646` → despacho **39904**. (d) **Detalle de la línea de surtido (DESP) en la factura
+(`a173b5a`, §95)**: consulta DESP aislada por `NUM_DESP = CAST(NDO_DCTO)` (discriminador `Tabla` en la cola;
+`ConsultarDespachosAsync` en el agente; `consultarDespachos` + tabla en la FacturaPage). QA en vivo: la
+factura `006102000024646` muestra su línea (manguera 02, 1.01 gal @ $2.47 = $2.50). **El round ERP/UX está
+COMPLETO, sin pendientes.**
 
 **Ronda ERP/UX (27-jun-2026, EN PROGRESO por etapas — Steven pidió 5 cosas, "tú decides el orden, todo seguido"):**
 (1) pulir UI del detalle de alerta; (2) **hipervínculos de verdad**: nº de documento → factura COMPLETA

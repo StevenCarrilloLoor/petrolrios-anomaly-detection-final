@@ -2774,3 +2774,36 @@ se documenta como pendiente en vez de forzar un join frágil que arriesgue la co
 funciona perfecta).
 
 Commits: `25334b6`, `ac371aa`, `f239a3a`.
+
+---
+
+## 95. Factura completa: detalle de líneas de surtido (DESP) en vivo
+
+**Motivación.** Cierre del último refinamiento del round ERP/UX: la `FacturaPage` ya mostraba cabecera
+(DCTO) + importes + «Despacho (origen)» (NDO_DCTO), pero faltaba el **detalle de la línea de surtidor**
+(producto, galones, precio) que la auditora pidió como parte de la «factura completa». Era el único
+pendiente que había quedado documentado (§94.3) porque exige cruzar `DESP.NUM_DESP ↔ DCTO.NDO_DCTO`
+(tipos distintos: `Double` vs `Char(20)`).
+
+**Qué se hizo (consulta DESP aislada, sin tocar la consulta principal de documentos).**
+
+- **DTOs (`ConsultaDtos`).** `SolicitudConsulta` y `ConsultaPendiente` ganan un discriminador **`Tabla`**
+  (`"DCTO"` por defecto = documentos; `"DESP"` = líneas de surtidor por NUM_DESP). El controlador y el
+  `ServerClient` lo pasan solos (el record viaja entero por la cola y el heartbeat).
+- **Agente (`FirebirdExtractor.ConsultarDespachosAsync`).** Nuevo `SELECT FIRST n` SOLO LECTURA sobre
+  **DESP** por `NUM_DESP = CAST(@numero AS DOUBLE PRECISION)` (el nº llega como texto desde NDO_DCTO),
+  devolviendo producto, manguera, galones, precio unitario, total y fecha. `Worker.EjecutarConsultasAsync`
+  enruta por `Tabla` (DESP→despachos, resto→documentos); el error de una consulta no rompe el ciclo.
+- **Frontend.** `consultas.service` añade `consultarDespachos(estación, nº)` + tipo `DespachoFirebird`
+  (refactorizando el sondeo a un helper compartido `sondearFilas`). La `FacturaPage` carga las líneas
+  **cuando el «Despacho (origen)» es numérico** y las muestra en una **tabla** (producto, manguera, galones,
+  precio unit., total); si no hay despacho asociado lo dice claramente.
+
+**Verificación.** Gate `_gate.bat` (PC de Steven): **build Release 0/0**, **tests 334** (Domain 40 /
+Detectors 193 / Api 99 / Monitor 2), **EF sin cambios de modelo**, **eslint + `tsc -b && vite build` OK**.
+QA en vivo en Chrome: la factura real `006102000024646` (despacho **39904**) muestra su línea de surtido
+traída en vivo de la base de la estación. **Con esto la «factura completa» (cabecera + importes + líneas)
+queda cerrada, y el round ERP/UX no tiene pendientes.**
+
+Commit: `a173b5a` (código). QA en vivo: factura `006102000024646` → línea de surtido manguera 02, **1.01 gal
+@ $2.47 = $2.50** (cabecera + importes + línea, todo en vivo de la estación).
