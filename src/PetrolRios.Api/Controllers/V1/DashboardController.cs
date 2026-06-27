@@ -22,9 +22,9 @@ public sealed class DashboardController : ControllerBase
     /// </summary>
     [HttpGet("kpis")]
     [ProducesResponseType(typeof(KpiResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetKpis(CancellationToken ct)
+    public async Task<IActionResult> GetKpis([FromQuery] int? estacionId, CancellationToken ct)
     {
-        var result = await _dashboardService.GetKpisAsync(ct);
+        var result = await _dashboardService.GetKpisAsync(estacionId, ct);
         return Ok(result);
     }
 
@@ -33,9 +33,9 @@ public sealed class DashboardController : ControllerBase
     /// </summary>
     [HttpGet("alertas-por-tipo")]
     [ProducesResponseType(typeof(IReadOnlyList<AlertasPorTipoResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAlertasPorTipo(CancellationToken ct)
+    public async Task<IActionResult> GetAlertasPorTipo([FromQuery] int? estacionId, CancellationToken ct)
     {
-        var result = await _dashboardService.GetAlertasPorTipoAsync(ct);
+        var result = await _dashboardService.GetAlertasPorTipoAsync(estacionId, ct);
         return Ok(result);
     }
 
@@ -55,9 +55,9 @@ public sealed class DashboardController : ControllerBase
     /// </summary>
     [HttpGet("alertas-por-nivel")]
     [ProducesResponseType(typeof(IReadOnlyList<AlertasPorNivelResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAlertasPorNivel(CancellationToken ct)
+    public async Task<IActionResult> GetAlertasPorNivel([FromQuery] int? estacionId, CancellationToken ct)
     {
-        var result = await _dashboardService.GetAlertasPorNivelAsync(ct);
+        var result = await _dashboardService.GetAlertasPorNivelAsync(estacionId, ct);
         return Ok(result);
     }
 
@@ -66,9 +66,10 @@ public sealed class DashboardController : ControllerBase
     /// </summary>
     [HttpGet("tendencia")]
     [ProducesResponseType(typeof(IReadOnlyList<TendenciaDiaResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetTendencia([FromQuery] int dias = 14, CancellationToken ct = default)
+    public async Task<IActionResult> GetTendencia(
+        [FromQuery] int dias = 14, [FromQuery] int? estacionId = null, CancellationToken ct = default)
     {
-        var result = await _dashboardService.GetTendenciaAsync(dias, ct);
+        var result = await _dashboardService.GetTendenciaAsync(dias, estacionId, ct);
         return Ok(result);
     }
 
@@ -77,9 +78,10 @@ public sealed class DashboardController : ControllerBase
     /// </summary>
     [HttpGet("top-empleados")]
     [ProducesResponseType(typeof(IReadOnlyList<TopEmpleadoResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetTopEmpleados([FromQuery] int top = 10, CancellationToken ct = default)
+    public async Task<IActionResult> GetTopEmpleados(
+        [FromQuery] int top = 10, [FromQuery] int? estacionId = null, CancellationToken ct = default)
     {
-        var result = await _dashboardService.GetTopEmpleadosAsync(top, ct);
+        var result = await _dashboardService.GetTopEmpleadosAsync(top, estacionId, ct);
         return Ok(result);
     }
 
@@ -88,9 +90,9 @@ public sealed class DashboardController : ControllerBase
     /// </summary>
     [HttpGet("metricas-resolucion")]
     [ProducesResponseType(typeof(MetricasResolucionResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMetricasResolucion(CancellationToken ct)
+    public async Task<IActionResult> GetMetricasResolucion([FromQuery] int? estacionId, CancellationToken ct)
     {
-        var result = await _dashboardService.GetMetricasResolucionAsync(ct);
+        var result = await _dashboardService.GetMetricasResolucionAsync(estacionId, ct);
         return Ok(result);
     }
 }

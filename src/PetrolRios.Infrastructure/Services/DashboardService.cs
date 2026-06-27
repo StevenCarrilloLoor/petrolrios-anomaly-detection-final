@@ -24,14 +24,20 @@ public sealed class DashboardService : IDashboardService
     /// <summary>
     /// Alertas del carril de auditoría (anomalías a revisar). El dashboard del central es la vista
     /// de los auditores: los problemas operativos de estación NO se cuentan aquí (tienen su propia
-    /// pestaña "Problemas de estación"), para no inflar las métricas de auditoría.
+    /// pestaña "Problemas de estación"), para no inflar las métricas de auditoría. Si se indica
+    /// <paramref name="estacionId"/>, el dashboard se acota a esa estación (lo pidió auditoría: "no
+    /// mezclar estaciones"); sin él, es la vista global de las 10 estaciones.
     /// </summary>
-    private IQueryable<Alerta> AlertasAuditoria =>
-        _dbContext.Set<Alerta>().Where(a => a.Ambito == AmbitoAlerta.Auditoria);
-
-    public async Task<KpiResponse> GetKpisAsync(CancellationToken ct = default)
+    private IQueryable<Alerta> AlertasAuditoria(int? estacionId = null)
     {
-        var alertas = AlertasAuditoria.AsQueryable();
+        var query = _dbContext.Set<Alerta>().Where(a => a.Ambito == AmbitoAlerta.Auditoria);
+        if (estacionId is > 0) query = query.Where(a => a.EstacionId == estacionId.Value);
+        return query;
+    }
+
+    public async Task<KpiResponse> GetKpisAsync(int? estacionId = null, CancellationToken ct = default)
+    {
+        var alertas = AlertasAuditoria(estacionId);
 
         // Estaciones en línea de verdad: heartbeat del agente dentro de la ventana
         var limiteConexion = DateTime.UtcNow - MonitoreoService.VentanaConexion;
@@ -52,9 +58,10 @@ public sealed class DashboardService : IDashboardService
         };
     }
 
-    public async Task<IReadOnlyList<AlertasPorTipoResponse>> GetAlertasPorTipoAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<AlertasPorTipoResponse>> GetAlertasPorTipoAsync(
+        int? estacionId = null, CancellationToken ct = default)
     {
-        return await AlertasAuditoria
+        return await AlertasAuditoria(estacionId)
             .GroupBy(a => a.TipoDetector)
             .Select(g => new AlertasPorTipoResponse(g.Key.ToString(), g.Count()))
             .ToListAsync(ct);
@@ -62,27 +69,29 @@ public sealed class DashboardService : IDashboardService
 
     public async Task<IReadOnlyList<AlertasPorEstacionResponse>> GetAlertasPorEstacionAsync(CancellationToken ct = default)
     {
-        return await AlertasAuditoria
+        return await AlertasAuditoria()
             .Include(a => a.Estacion)
             .GroupBy(a => new { a.EstacionId, a.Estacion.Nombre })
             .Select(g => new AlertasPorEstacionResponse(g.Key.EstacionId, g.Key.Nombre, g.Count()))
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<AlertasPorNivelResponse>> GetAlertasPorNivelAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<AlertasPorNivelResponse>> GetAlertasPorNivelAsync(
+        int? estacionId = null, CancellationToken ct = default)
     {
-        return await AlertasAuditoria
+        return await AlertasAuditoria(estacionId)
             .GroupBy(a => a.NivelRiesgo)
             .Select(g => new AlertasPorNivelResponse(g.Key.ToString(), g.Count()))
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<TendenciaDiaResponse>> GetTendenciaAsync(int dias, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TendenciaDiaResponse>> GetTendenciaAsync(
+        int dias, int? estacionId = null, CancellationToken ct = default)
     {
         dias = Math.Clamp(dias, 1, 90);
         var desde = DateTime.UtcNow.Date.AddDays(-(dias - 1));
 
-        var agrupadas = await AlertasAuditoria
+        var agrupadas = await AlertasAuditoria(estacionId)
             .Where(a => a.FechaDeteccion >= desde)
             .GroupBy(a => a.FechaDeteccion.Date)
             .Select(g => new
@@ -105,11 +114,12 @@ public sealed class DashboardService : IDashboardService
             .ToList();
     }
 
-    public async Task<IReadOnlyList<TopEmpleadoResponse>> GetTopEmpleadosAsync(int top, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TopEmpleadoResponse>> GetTopEmpleadosAsync(
+        int top, int? estacionId = null, CancellationToken ct = default)
     {
         top = Math.Clamp(top, 1, 50);
 
-        var resultado = await AlertasAuditoria
+        var resultado = await AlertasAuditoria(estacionId)
             .Where(a => a.EmpleadoCodigo != null && a.EmpleadoCodigo != "")
             .GroupBy(a => new { a.EmpleadoCodigo, a.EstacionId, a.Estacion.Nombre })
             .Select(g => new
@@ -141,9 +151,10 @@ public sealed class DashboardService : IDashboardService
             .ToList();
     }
 
-    public async Task<MetricasResolucionResponse> GetMetricasResolucionAsync(CancellationToken ct = default)
+    public async Task<MetricasResolucionResponse> GetMetricasResolucionAsync(
+        int? estacionId = null, CancellationToken ct = default)
     {
-        var resueltas = await AlertasAuditoria
+        var resueltas = await AlertasAuditoria(estacionId)
             .Where(a => EstadosResueltos.Contains(a.Estado))
             .Select(a => new { a.Estado, a.FechaDeteccion, a.FechaResolucion })
             .ToListAsync(ct);
@@ -171,10 +182,10 @@ public sealed class DashboardService : IDashboardService
             TasaAlertasValidas = totalResueltas > 0
                 ? Math.Round((double)confirmadas / totalResueltas * 100, 1)
                 : 0,
-            AlertasUltimas24Horas = await AlertasAuditoria
+            AlertasUltimas24Horas = await AlertasAuditoria(estacionId)
                 .CountAsync(a => a.FechaDeteccion >= hace24Horas, ct),
             TotalResueltas = totalResueltas,
-            TotalPendientes = await AlertasAuditoria
+            TotalPendientes = await AlertasAuditoria(estacionId)
                 .CountAsync(a => a.Estado == EstadoAlerta.Nueva || a.Estado == EstadoAlerta.EnRevision, ct)
         };
     }

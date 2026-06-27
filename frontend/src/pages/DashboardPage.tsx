@@ -1,5 +1,6 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { dashboardService } from "@/services/dashboard.service";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -32,6 +33,7 @@ import {
   Target,
   Activity,
   Users,
+  Printer,
 } from "lucide-react";
 import { TIPO_DETECTOR_LABELS, NIVEL_RIESGO_LABELS } from "@/types/alert";
 import type { TipoDetector, NivelRiesgo } from "@/types/alert";
@@ -54,28 +56,38 @@ function labelNivel(nivel: string): string {
 }
 
 export function DashboardPage() {
+  // Filtro por estación ("no mezclar estaciones", lo pidió auditoría). "" = todas. Acota KPIs,
+  // tendencia, distribución por tipo/nivel, métricas y ranking de empleados. La comparativa
+  // "alertas por estación" queda global (es la vista cruzada) y alimenta el selector.
+  const [estacionFiltro, setEstacionFiltro] = useState("");
+  const estId = estacionFiltro ? Number(estacionFiltro) : undefined;
+
   const { data: kpis, isLoading: loadingKpis } = useQuery({
-    queryKey: ["dashboard", "kpis"],
-    queryFn: dashboardService.getKpis,
+    queryKey: ["dashboard", "kpis", estId],
+    queryFn: () => dashboardService.getKpis(estId),
     refetchInterval: 30_000,
+    // Al cambiar de estación, conservar la vista previa mientras llega la nueva (sin parpadeo a esqueleto).
+    placeholderData: keepPreviousData,
   });
 
   const { data: metricas } = useQuery({
-    queryKey: ["dashboard", "metricas-resolucion"],
-    queryFn: dashboardService.getMetricasResolucion,
+    queryKey: ["dashboard", "metricas-resolucion", estId],
+    queryFn: () => dashboardService.getMetricasResolucion(estId),
     refetchInterval: 60_000,
   });
 
   const { data: tendencia, isLoading: loadingTendencia } = useQuery({
-    queryKey: ["dashboard", "tendencia"],
-    queryFn: () => dashboardService.getTendencia(14),
+    queryKey: ["dashboard", "tendencia", estId],
+    queryFn: () => dashboardService.getTendencia(14, estId),
     refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
   });
 
   const { data: porTipo, isLoading: loadingTipo } = useQuery({
-    queryKey: ["dashboard", "alertas-por-tipo"],
-    queryFn: dashboardService.getAlertasPorTipo,
+    queryKey: ["dashboard", "alertas-por-tipo", estId],
+    queryFn: () => dashboardService.getAlertasPorTipo(estId),
     refetchInterval: 30_000,
+    placeholderData: keepPreviousData,
   });
 
   const { data: porEstacion, isLoading: loadingEstacion } = useQuery({
@@ -85,16 +97,21 @@ export function DashboardPage() {
   });
 
   const { data: porNivel } = useQuery({
-    queryKey: ["dashboard", "alertas-por-nivel"],
-    queryFn: dashboardService.getAlertasPorNivel,
+    queryKey: ["dashboard", "alertas-por-nivel", estId],
+    queryFn: () => dashboardService.getAlertasPorNivel(estId),
     refetchInterval: 30_000,
   });
 
   const { data: topEmpleados, isLoading: loadingEmpleados } = useQuery({
-    queryKey: ["dashboard", "top-empleados"],
-    queryFn: () => dashboardService.getTopEmpleados(8),
+    queryKey: ["dashboard", "top-empleados", estId],
+    queryFn: () => dashboardService.getTopEmpleados(8, estId),
     refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
   });
+
+  const estacionNombre = (porEstacion ?? []).find(
+    (e) => String(e.estacionId) === estacionFiltro,
+  )?.estacionNombre;
 
   if (loadingKpis) {
     return (
@@ -134,23 +151,48 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
             Centro de Monitoreo
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Detección de anomalías transaccionales en tiempo real — 10 estaciones
+            {estacionNombre
+              ? `Anomalías de ${estacionNombre} — vista por estación`
+              : "Detección de anomalías transaccionales en tiempo real — 10 estaciones"}
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-risk-low opacity-60" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-risk-low" />
-          </span>
-          <span className="text-xs font-medium text-muted-foreground">
-            Monitoreo activo
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={estacionFiltro}
+            onChange={(e) => setEstacionFiltro(e.target.value)}
+            aria-label="Filtrar el dashboard por estación"
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 print:hidden"
+          >
+            <option value="">Todas las estaciones</option>
+            {(porEstacion ?? []).map((est) => (
+              <option key={est.estacionId} value={est.estacionId}>
+                {est.estacionNombre}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            title="Imprimir o guardar como PDF esta vista del dashboard"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground print:hidden"
+          >
+            <Printer size={15} /> Imprimir / PDF
+          </button>
+          <div className="flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 print:hidden">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-risk-low opacity-60" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-risk-low" />
+            </span>
+            <span className="text-xs font-medium text-muted-foreground">
+              Monitoreo activo
+            </span>
+          </div>
         </div>
       </div>
 
