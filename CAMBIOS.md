@@ -2454,3 +2454,33 @@ anotada como mejora futura (cruzar el catálogo de empleados y/o exponer el RUC 
 
 Commits: `e5d7bdb` (UX), **`c011374`** (fix del 500). Gate del fix: build Release 0/0, **tests** Domain 40
 / Detectors 189 / Api **77 (0 skip, con BD)** / Monitor 2.
+
+---
+
+## 87. Buscador de alertas COMPLETO: por evidencia (RUC) y por nombre de despachador
+
+**Motivación.** Cerrar la limitación de §86: el buscador no cubría **RUC** (vive en la evidencia) ni
+**nombre de despachador** (se resuelve aparte del código). La auditora pidió explícitamente "placa/RUC/nombre".
+
+**Qué se hizo.**
+
+- **Evidencia buscable (`MetadataJson` jsonb → `text`).** Como esa columna se usa siempre como cadena JSON
+  completa (nada la consulta con operadores jsonb), se cambió su tipo a `text` (migración EF
+  **`BuscarEvidenciaAlertaTexto`**, `AlterColumn` jsonb→text, lossless). Así `lower(text)` SÍ traduce y el
+  `buscar` vuelve a recorrer la evidencia → **placa, RUC, cliente, nº de factura** de la metadata son
+  buscables. Se añadió `RucCliente` (como **`Rucs`**) a la evidencia de la regla de placa para que el RUC
+  esté presente y se muestre.
+- **Búsqueda por NOMBRE (servicio).** `AlertaService.GetFilteredAsync` resuelve contra el catálogo
+  `Empleados` los **códigos cuyo nombre coincide** con el término y el repositorio incluye también las
+  alertas de esos códigos (parámetro `codigosPorNombre`, OR `EmpleadoCodigo IN (...)`). Así "MENDOZA"
+  encuentra las alertas de ese despachador aunque la tabla de alertas solo guarde el código.
+- **Frontend:** etiqueta "RUC / cédulas" y `Rucs` como clave buscable (pastilla-enlace) en el detalle.
+
+**Verificación (gate + QA en vivo en Chrome, con migración aplicada al reiniciar la API):**
+- `_mig.bat`: **build Release 0/0**, **tests** Domain 40 / Detectors 189 / **Api 77 (0 skip, con BD)** /
+  Monitor 2, **eslint OK**, **`tsc -b && vite build` OK**, migración generada.
+- **En vivo:** "MENDOZA" → **8 alertas, todas de JORGE MENDOZA**; "032101000020765" (nº de factura que solo
+  está en la evidencia de #60, no en su descripción) → **1 alerta, la #60**; "CZ0060636" → #60. El buscador
+  cubre ahora **placa, RUC, nº factura, cliente, código y nombre**.
+
+Commit: `69ac236`.
