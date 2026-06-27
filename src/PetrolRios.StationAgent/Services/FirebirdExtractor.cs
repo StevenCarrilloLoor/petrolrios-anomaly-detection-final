@@ -79,6 +79,9 @@ public sealed class FirebirdExtractor
         var top = Math.Clamp(limite <= 0 ? 200 : limite, 1, 1000);
         // Los alias van ENTRE COMILLAS para que Firebird preserve el PascalCase (sin comillas los pasa a
         // MAYÚSCULAS y el frontend, que lee NumeroDocumento/TotalNeto/etc., vería la tabla vacía).
+        // El CAST(col AS VARCHAR(60)) en el filtro por código es CLAVE: en "col CONTAINING @codigo" Firebird
+        // describe el parámetro con el ancho de la columna; si la columna es estrecha (p. ej. PLA_DCTO CHAR(8))
+        // y el código buscado es más largo (un RUC de 13), lanza "string right truncation". El CAST ancho lo evita.
         var sql = $"""
             SELECT FIRST {top}
               SEC_DCTO AS "SecuenciaDocumento", TIP_DCTO AS "TipoDocumento", NUM_DCTO AS "NumeroDocumento",
@@ -89,8 +92,11 @@ public sealed class FirebirdExtractor
             WHERE (@tipo IS NULL OR TIP_DCTO = @tipo)
               AND (@desde IS NULL OR FEC_DCTO >= @desde)
               AND (@hasta IS NULL OR FEC_DCTO <= @hasta)
-              AND (@codigo IS NULL OR RUC_DCTO CONTAINING @codigo OR PLA_DCTO CONTAINING @codigo
-                   OR COD_CLIE CONTAINING @codigo OR NUM_DCTO CONTAINING @codigo)
+              AND (@codigo IS NULL
+                   OR CAST(RUC_DCTO AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(PLA_DCTO AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(COD_CLIE AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(NUM_DCTO AS VARCHAR(60)) CONTAINING @codigo)
             ORDER BY FEC_DCTO DESC
             """;
         var prm = new
