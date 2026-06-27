@@ -14,6 +14,8 @@ import { ProblemasEstacionPage } from "@/pages/ProblemasEstacionPage";
 import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
 import { ConexionesPage } from "@/pages/ConexionesPage";
 import { DatosRecibidosPage } from "@/pages/DatosRecibidosPage";
+import { ConsultasPage } from "@/pages/ConsultasPage";
+import { FacturaPage } from "@/pages/FacturaPage";
 import { ReglasPage } from "@/pages/ReglasPage";
 import { FuentesDatosPage } from "@/pages/FuentesDatosPage";
 import { ReportesPage } from "@/pages/ReportesPage";
@@ -59,6 +61,7 @@ function App() {
                   <Route path="/alertas/:id" element={<DetalleAlertaPage />} />
                   <Route path="/conexiones" element={<ConexionesPage />} />
                   <Route path="/datos-recibidos" element={<DatosRecibidosPage />} />
+                  <Route path="/consultas" element={<ConsultasPage />} />
                   <Route path="/seguridad" element={<SeguridadPage />} />
                   <Route path="/ajustes" element={<AjustesPage />} />
                   <Route path="/aprobar-qr" element={<AprobarQrPage />} />
@@ -88,6 +91,11 @@ function App() {
                   <Route path="/usuarios" element={<UsuariosPage />} />
                   <Route path="/logs" element={<LogsPage />} />
                 </Route>
+              </Route>
+
+              {/* Factura completa: ventana NUEVA standalone (sin sidebar) para comparar lado a lado e imprimir. */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/consultas/factura" element={<FacturaPage />} />
               </Route>
 
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

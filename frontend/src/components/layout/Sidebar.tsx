@@ -14,6 +14,7 @@ import {
   Radio,
   Wrench,
   SlidersHorizontal,
+  FileSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ const navSections: NavSection[] = [
       },
       { to: "/conexiones", label: "Conexiones", icon: <Radio size={20} /> },
       { to: "/datos-recibidos", label: "Datos recibidos", icon: <Database size={20} /> },
+      { to: "/consultas", label: "Consultas", icon: <FileSearch size={20} /> },
     ],
   },
   {
