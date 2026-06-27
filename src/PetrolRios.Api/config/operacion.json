@@ -1,0 +1,5 @@
+{
+  "NivelMinimoCorreo": "Critico",
+  "CronExpression": "* * * * *",
+  "RefrescoSegundos": 5
+}
