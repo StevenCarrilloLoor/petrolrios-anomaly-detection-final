@@ -96,7 +96,23 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Mejoras de auditoría (27-jun-2026) — LAS 4 HECHAS (#1 placa, #2 buscador, #3 cuadre, #4 dashboard):**
+**Ronda ERP/UX (27-jun-2026, EN PROGRESO por etapas — Steven pidió 5 cosas, "tú decides el orden, todo seguido"):**
+(1) pulir UI del detalle de alerta; (2) **hipervínculos de verdad**: nº de documento → factura COMPLETA
+(cabecera DCTO + líneas DESP) y reportes por cliente/RUC y despachador (rango de fechas, **abrir en ventana
+nueva**, imprimir), datos **en vivo de Firebird** (nuevo endpoint on-demand en el agente) + **pestaña
+"Consultas"** (buscar por tipo de doc + fechas + código/RUC/placa/nombre); (3) agente cada **1 s**;
+(4) **refresco configurable** en todas las pantallas; (5) **enriquecer la evidencia de TODAS las reglas**
+(RUC, nº de doc corto, placa, vendedor, turno…) de forma genérica + creador de reglas + hipervínculos
+automáticos. Base: la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`) y `ANALISIS-CONTAPLUS…` §4.
+- **Etapa 1 HECHA (CAMBIOS §89, commit `626c3e0`, gate verde):** tasa de refresco **global y configurable**
+  (`OperacionConfig.RefrescoSegundos`, default 1 s, acotada 1 s…1 h; `GET /api/v1/refresco` para todo rol;
+  selector en Ajustes; `RefrescoContext`/`useRefrescoMs` en TODAS las pantallas) + **agente cada 1 s** por
+  defecto (clamp mín. 5→1). +8 pruebas → Api 94. *(Pendiente: QA en vivo al final, junto con las demás etapas.)*
+- *(Etapas 2–5 pendientes: enriquecer reglas → cola de consulta a Firebird → pestaña Consultas + factura/reportes → pulido UI.)*
+
+---
+
+**Ronda previa — Mejoras de auditoría (27-jun-2026) — LAS 4 HECHAS (#1 placa, #2 buscador, #3 cuadre, #4 dashboard):**
 Steven seleccionó las 4 mejoras del backlog de auditoría (§82) y pidió implementarlas todas:
 (1) 🔴 placa reutilizada N+/día, (2) 🟠 UX de alertas (hipervínculos + copiar + nº factura + buscador),
 (3) 🔴 factura fuera de liquidación, (4) 🟠 dashboard por estación + reportería. Método de trabajo: scripts

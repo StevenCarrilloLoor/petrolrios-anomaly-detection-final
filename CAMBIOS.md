@@ -2538,3 +2538,34 @@ para retenciones de staging menores a la antigüedad de los turnos; hoy no hace 
 Commit: `43fe272` (código + pruebas). Documentación en este commit.
 
 ---
+
+## 89. Tasa de refresco configurable (todas las pantallas) + agente cada 1 s
+
+**Motivación.** Feedback de Steven sobre la entrevista: la auditora quiere el sistema **más rápido** y
+"casi en vivo". Antes cada pantalla refrescaba con un intervalo distinto hardcodeado (10/15/30/60 s) y el
+agente enviaba cada **30 s**.
+
+**Qué se hizo.**
+
+- **Central — tasa de refresco GLOBAL y configurable.** `OperacionConfig` gana `RefrescoSegundos`
+  (por defecto **1 s**, acotado **1 s … 1 h** en `ParametrosOperacionStore`). Nuevo endpoint liviano
+  **`GET /api/v1/refresco`** accesible a **cualquier rol** autenticado (no solo Admin); el `PUT` de
+  operación (solo Admin) lo persiste. En **Ajustes → Operación** hay un selector "Tasa de refresco de las
+  pantallas".
+- **Frontend — un solo ajuste cambia toda la interfaz.** `RefrescoContext` (hooks `useRefrescoMs` /
+  `useRefrescoSegundos`) lee `/refresco` (y se re-lee cada 15 s para propagar cambios a sesiones abiertas).
+  **TODAS** las pantallas lo usan como `refetchInterval`: Alertas, Dashboard, Conexiones, Problemas de
+  estación, Logs, Datos recibidos y Fuentes de datos. Conexiones muestra la tasa real ("cada N s"). La
+  consulta de versión del agente (servidor externo) se deja en 60 s a propósito.
+- **Agente — casi tiempo real.** Intervalo por defecto **30 s → 1 s**; el clamp del `Worker` baja de
+  **mín. 5 s → 1 s** (máx. 1 h); el panel del agente acepta `min=1`.
+- **+8 pruebas** (`ParametrosOperacionStoreTests`): acota 0/negativos al valor por defecto y >máx a 3600 s;
+  conserva nivel+cron junto al refresco.
+
+**Verificación.** Gate oficial en la PC de Steven: **build Release 0/0**, **pruebas 325 / 0 skipped**
+(Domain 40, Monitor 2, Detectors 189, **Api 94 (+8)**), **EF sin migraciones pendientes** (config en
+archivo, sin esquema), **lint + build de frontend OK**.
+
+Commit: `626c3e0`.
+
+---
