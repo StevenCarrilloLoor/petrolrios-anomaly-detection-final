@@ -61,16 +61,17 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
         if (hasta.HasValue) query = query.Where(a => a.FechaDeteccion <= hasta.Value);
 
         // Búsqueda libre (la pidió auditoría): por placa, RUC, nº de factura, cliente o código de
-        // empleado. Esos datos viven en la descripción, la referencia, la evidencia (MetadataJson) o
-        // el código de empleado, así que se busca en esos campos con coincidencia parcial e
-        // insensible a mayúsculas. `ToLower().Contains` se traduce a un LIKE en PostgreSQL.
+        // empleado. Se busca en la descripción, la referencia y el código de empleado — campos de
+        // TEXTO — con coincidencia parcial e insensible a mayúsculas (`ToLower().Contains` → LIKE en
+        // PostgreSQL). La placa, el cliente y el nº de factura aparecen en la descripción de cada
+        // regla, así que se encuentran. NOTA: la evidencia (MetadataJson) es columna `jsonb`, y
+        // aplicarle `lower()` no se puede traducir (rompía con 500); por eso NO se incluye aquí.
         if (!string.IsNullOrWhiteSpace(buscar))
         {
             var termino = buscar.Trim().ToLower();
             query = query.Where(a =>
                 a.Descripcion.ToLower().Contains(termino)
                 || (a.TransaccionReferencia != null && a.TransaccionReferencia.ToLower().Contains(termino))
-                || (a.MetadataJson != null && a.MetadataJson.ToLower().Contains(termino))
                 || (a.EmpleadoCodigo != null && a.EmpleadoCodigo.ToLower().Contains(termino)));
         }
         return query;
