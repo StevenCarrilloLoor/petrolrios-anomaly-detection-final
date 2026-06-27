@@ -2420,3 +2420,37 @@ uso de `AlertasAuditoria` como propiedad → método), **tests** Domain 40 / Det
 2, **eslint OK**, **`tsc -b && vite build` OK**. *Pendiente: QA en vivo en Chrome.*
 
 Commit: `594f186`.
+
+---
+
+## 86. QA en vivo en Chrome (#1/#2/#4) + fix del buscador (jsonb) + lectura total de `ejecutables`
+
+**Lectura de `ejecutables` (a pedido de Steven).** Se leyeron **las 6 subcarpetas completas** (no solo la
+4): arranque/parada (1), BD/demo+Firebird en Docker (2), diagnóstico (3), verificación/gate (4),
+publicación/despliegue (5) e instalación en PC nuevo (6). De ahí se usó: `reiniciar-solo-la-api.bat` +
+`reiniciar-solo-el-frontend.bat` (Vite dev :5173) para el QA sin reconstruir `dist`, el patrón
+`docker exec petrolrios-firebird isql` (carpeta 2) para la verificación de #3, y queda mapeado
+`publicar-solo-el-agente-multiplataforma.bat` para el republish de #3.
+
+**QA en vivo (con API+Vite reiniciados en la PC de Steven):**
+- **#1 ✔** — En **Reglas**, "Placa reutilizada en el dia" aparece con carril **AUDITORÍA**, cadencia
+  **"Todos los días a las 23:55"** (única programada; el resto "cada ciclo") y **umbral 5**. El reinicio
+  de la API sembró la regla (`EnsureReglasNuevasAsync`).
+- **#2 ✔** — El **buscador** filtra de verdad: "CZ0060636" → 1 alerta (#60). En el **detalle**, los chips
+  buscables (Cliente), las listas (nº de factura, despachadores) como pastillas, el botón **copiar** y
+  **"Abrir en ventana nueva"** renderizan bien.
+- **#4 ✔** — El **dashboard** muestra el selector de estación (Todas / EST-001 / …) y el botón **Imprimir/PDF**.
+
+**🐞 Fix encontrado por el QA en vivo (lo que el gate no veía).** El buscador devolvía **HTTP 500**:
+`Alerta.MetadataJson` es columna **`jsonb`**, y `lower()` sobre `jsonb` **no se traduce** en
+Npgsql/EF. Los tests de integración del Api estaban *skipped* (sin BD), por eso el gate pasó. **Fix:** el
+`buscar` solo recorre columnas de **texto** (`Descripcion`, `TransaccionReferencia`, `EmpleadoCodigo`); la
+placa, el cliente y el nº de factura siguen cubiertos porque aparecen en la **descripción** de cada regla.
+Reverificado en vivo: la consulta ahora responde **200** y los 0-resultados muestran el estado vacío
+limpio (antes se quedaba en "Cargando…"). *(Esta vez los tests del Api corrieron con BD: **77 passed, 0
+skipped**.)* **Limitación conocida:** la búsqueda por **RUC** y por **nombre de despachador** no está
+cubierta (el RUC vive solo en la evidencia `jsonb` y el nombre se resuelve aparte del código); queda
+anotada como mejora futura (cruzar el catálogo de empleados y/o exponer el RUC en columna de texto).
+
+Commits: `e5d7bdb` (UX), **`c011374`** (fix del 500). Gate del fix: build Release 0/0, **tests** Domain 40
+/ Detectors 189 / Api **77 (0 skip, con BD)** / Monitor 2.

@@ -124,9 +124,18 @@ en la barra de direcciones funciona (Terminal/VS Code son "clic", no se puede te
   (`StationAgent` debe consultar `LIQU` y enviarla con `NUM_TURN`) + **republicar el agente**, y
   **verificar el enlace `LIQU.NUM_TURN↔DCTO.NUM_TURN` contra datos reales de San Pío** (vía ISQL) ANTES de
   cablear la regla. Luego: regla nueva + tests + seed.
-- **Pendiente transversal: QA en vivo en Chrome** de #1/#2/#4. Requiere **reconstruir/redesplegar el
-  frontend y reiniciar el API** (el reinicio siembra la regla de placa). Hoy corre el build anterior
-  (API `localhost:5170`, UI `8080`; vite dev apagado).
+- **QA en vivo en Chrome — HECHO (CAMBIOS §86):** se reinició API (`reiniciar-solo-la-api.bat`, siembra la
+  regla) + Vite dev (`reiniciar-solo-el-frontend.bat`, :5173) y se verificó: **#1** la regla placa aparece
+  con cadencia "Todos los días 23:55" + umbral 5; **#2** el buscador filtra ("CZ0060636"→#60) y el detalle
+  muestra chips/copiar/ventana-nueva; **#4** el dashboard tiene selector de estación + Imprimir/PDF.
+- **🐞 Fix en vivo (`c011374`):** el buscador daba **500** porque `Alerta.MetadataJson` es **jsonb** y
+  `lower()` sobre jsonb no traduce (los tests de integración estaban *skipped* → el gate no lo vio). Ahora
+  `buscar` solo recorre columnas de texto (Descripcion/Referencia/EmpleadoCodigo). **Limitación:** RUC y
+  nombre de despachador no se buscan (RUC solo en jsonb; nombre se resuelve aparte). Con la BD Docker
+  arriba los tests del Api corren (77, 0 skip).
+- **Lectura COMPLETA de `ejecutables`** (las 6 carpetas), a pedido de Steven. Scripts clave: reiniciar
+  api/front (1), `docker exec petrolrios-firebird isql` (2, así se verificó #3), gate oficial (4),
+  `publicar-solo-el-agente-multiplataforma.bat` (5, para el republish de #3).
 
 **Ronda — Frecuencia/calendario por regla (26-jun-2026) — ✅ COMPLETO (Etapas 1-5):**
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de
