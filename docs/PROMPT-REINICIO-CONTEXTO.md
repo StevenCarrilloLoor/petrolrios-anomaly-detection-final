@@ -96,7 +96,7 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Mejoras de auditoría (27-jun-2026) — EN PROGRESO (4 ítems, el #1 hecho):**
+**Última ronda — Mejoras de auditoría (27-jun-2026) — LAS 4 HECHAS (#1 placa, #2 buscador, #3 cuadre, #4 dashboard):**
 Steven seleccionó las 4 mejoras del backlog de auditoría (§82) y pidió implementarlas todas:
 (1) 🔴 placa reutilizada N+/día, (2) 🟠 UX de alertas (hipervínculos + copiar + nº factura + buscador),
 (3) 🔴 factura fuera de liquidación, (4) 🟠 dashboard por estación + reportería. Método de trabajo: scripts
@@ -120,10 +120,17 @@ en la barra de direcciones funciona (Terminal/VS Code son "clic", no se puede te
   nivel/métricas/top-empleados (la comparativa "por estación" queda global). **Frontend:** selector de
   estación en `DashboardPage` (acota todo salvo la comparativa, `keepPreviousData` para no parpadear) +
   botón **Imprimir/PDF** (`window.print()` + `print:hidden`). Gate verde. *Pendiente: QA Chrome.*
-- **#3 pendiente (la más pesada):** factura fuera de liquidación. Requiere **cambios en el agente**
-  (`StationAgent` debe consultar `LIQU` y enviarla con `NUM_TURN`) + **republicar el agente**, y
-  **verificar el enlace `LIQU.NUM_TURN↔DCTO.NUM_TURN` contra datos reales de San Pío** (vía ISQL) ANTES de
-  cablear la regla. Luego: regla nueva + tests + seed.
+- **#3 HECHO (CAMBIOS §88, commit `43fe272`, gate verde + QA E2E en vivo):** factura fuera de liquidación
+  (cuadre de turno). El agente lee `LIQU` (`LiquidacionDto`, solo lectura, tipo "Liquidacion").
+  `CuadreLiquidacionService` (Infrastructure) marca **turnos CERRADOS** (`EST_TURN='1'`) con facturas FV,
+  fuera del periodo de gracia (umbral `FacturaSinLiquidacionHorasUmbral`, default 12 h), que **no** están en
+  `LIQU`; alerta **idempotente** por turno (`SINLIQU-{est}-{turno}`) sobre el **staging acumulado** (30 d).
+  **No es detector de ventana** (se gestiona aparte del gate, corre 1×/día Calendario 23:50, avanza su
+  agenda); es correcto porque `FEC_LIQU ≥ FFI_TURN` → cierre y `LIQU` viajan juntos. +9 pruebas puras
+  (`CuadreLiquidacionServiceTests`) → **Api 86**; fix ctor en `AnomalyDetectionJobE2ETests`. **QA en vivo:**
+  cerré el turno de prueba 990001 en la Firebird de demo → el agente lo re-extrajo (rebobinando la marca) →
+  **alerta #80** "13 factura(s) por $1674,20 fuera del cuadre", Alto (71.7), evidencia OK. *(Futuro opcional:
+  persistir `LIQU` en tabla del central; hoy no hace falta por el orden temporal.)*
 - **QA en vivo en Chrome — HECHO (CAMBIOS §86):** se reinició API (`reiniciar-solo-la-api.bat`, siembra la
   regla) + Vite dev (`reiniciar-solo-el-frontend.bat`, :5173) y se verificó: **#1** la regla placa aparece
   con cadencia "Todos los días 23:55" + umbral 5; **#2** el buscador filtra ("CZ0060636"→#60) y el detalle

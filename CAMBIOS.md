@@ -2484,3 +2484,57 @@ Commits: `e5d7bdb` (UX), **`c011374`** (fix del 500). Gate del fix: build Releas
   cubre ahora **placa, RUC, nº factura, cliente, código y nombre**.
 
 Commit: `69ac236`.
+
+## 88. Factura fuera de liquidación / cuadre de turno (auditoría #3)
+
+**Motivación.** Tercer ítem 🔴 del backlog de auditoría (§82). Al **cerrar un turno**, todas sus facturas
+deben quedar en la **liquidación** (`LIQU`). Una factura "colgada" —su turno cerró pero **no aparece en
+`LIQU`**— quedó **fuera del cuadre de caja**: facturación sin liquidar, indicio de descuadre o de retención
+de efectivo. Enlace verificado contra la base real (§ commit `cd4008f`): `DCTO.NUM_TURN ↔ LIQU.NUM_TURN`
+(149/149 liquidaciones con turno; las 25 FV sin liquidar eran del turno de prueba).
+
+**Qué se hizo.**
+
+- **Agente lee `LIQU`** (`FirebirdExtractor`): nuevo `LiquidacionDto` (`NUM_LIQU`, `NUM_TURN`, `FEC_LIQU`,
+  `DIF_LIQU`) extraído **solo lectura** (`SELECT … WHERE FEC_LIQU > @Watermark`) y enviado como tipo
+  **"Liquidacion"**. `LIQU` se registra como tabla built-in (no duplicable en el selector).
+- **`CuadreLiquidacionService`** (Infrastructure). Lógica **pura y testeable**
+  `CalcularTurnosSinLiquidar(cierres, liquidaciones, facturas, umbralHoras, ahora)`: devuelve los turnos
+  **CERRADOS** (`EST_TURN='1'`) con cierre **anterior a `ahora − umbralHoras`** (periodo de gracia, da
+  tiempo a que llegue la liquidación) que tienen facturas **FV** pero **no** están en ninguna `LIQU`.
+  `EvaluarEstacionAsync` consulta el **staging acumulado** (30 días), deduplica los lotes reenviados, y
+  crea **una alerta idempotente por turno** (referencia única `SINLIQU-{estacion}-{turno}` → no re-alerta).
+- **Por qué NO es un detector de ventana.** La liquidación llega **después** del cierre (otro lote), así
+  que un detector que solo ve la ventana del ciclo daría falsos positivos. Se consulta el staging directo.
+  Es **correcto** porque `FEC_LIQU ≥ FFI_TURN` siempre (se liquida tras cerrar): si el cierre se extrajo
+  (`FFI_TURN > watermark`), su liquidación —si existe— también → cierre y liquidación viajan juntos, nunca
+  un cierre "huérfano" con su `LIQU` perdida fuera de la ventana.
+- **Integración en el job** (`AnomalyDetectionJob`): el cuadre se gestiona **aparte** del gate de
+  detectores; corre una vez al día sobre el staging, y **avanza su propia** `ProximaEjecucion`/
+  `UltimaEjecucion`. `"Liquidacion"` añadido a `tiposConocidos`.
+- **Regla sembrada** `FacturaSinLiquidacionHorasUmbral` (umbral **12 h** de gracia, ámbito **Auditoría**,
+  activa, **Calendario Diario 23:50**, igual patrón que la regla de placa §83).
+- **Frontend**: etiqueta **"Fecha de cierre del turno"** en la evidencia del detalle de alerta.
+- **+9 pruebas puras** (`CuadreLiquidacionServiceTests`): turno cerrado sin liquidar (reporta), liquidado
+  (no), abierto (no), dentro de gracia (no), sin facturas (no), solo documentos no-FV (no), solo FV cuenta
+  en monto/conteo, varios turnos (solo incumplidores), tolerancia de espacios/mayúsculas. Fix del
+  constructor en `AnomalyDetectionJobE2ETests` (nuevo parámetro `CuadreLiquidacionService`).
+
+**Verificación.** Gate oficial (`_gate.bat`) en la PC de Steven: **build Release 0 warnings/0 errores**;
+**pruebas 317 verdes / 0 skipped** (Domain 40, Monitor 2, **Detectors 189**, **Api 86** — incluye los 9
+del cuadre y el E2E corregido, con BD); **EF sin migraciones pendientes** (no hay cambio de esquema:
+usa staging + alertas para idempotencia); **lint + build de frontend OK**.
+
+**QA E2E en vivo** (`iniciar-todo`, agente local **EST-001** + Firebird en Docker): se cerró el turno de
+prueba **990001** en la Firebird de demo (`EST_TURN='1'`, cierre 26/06 12:00, 13 facturas FV, sin `LIQU`);
+el agente lo re-extrajo (rebobinando la marca de agua) y el job ejecutó el cuadre → **alerta #80**
+*"Turno 990001 cerrado el 26/06/2026 12:00 SIN liquidación: 13 factura(s) por $1674,20 quedaron fuera del
+cuadre"*, nivel **Alto (score 71.7)**, ref `SINLIQU-1-990001`, evidencia con turno, **fecha de cierre**,
+13 nº de factura y 7 RUC, empleado **JORGE MENDOZA (004)** (nombre resuelto). La regla **avanzó su agenda**
+(`UltimaEjecucion` ahora, `ProximaEjecucion` al próximo 23:50) e **idempotente** (sin duplicado en los
+ciclos siguientes). *(Endurecimiento futuro opcional: persistir las liquidaciones en una tabla del central
+para retenciones de staging menores a la antigüedad de los turnos; hoy no hace falta por `FEC_LIQU ≥ FFI_TURN`.)*
+
+Commit: `43fe272` (código + pruebas). Documentación en este commit.
+
+---
