@@ -127,8 +127,14 @@ automáticos. Base: la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`) y 
   PascalCase — confirmado en vivo tras recompilar el agente; el MAYÚSCULAS previo era binario viejo en memoria);
   `5f149a9` `CAST(col AS VARCHAR(60))` antes de `CONTAINING` (evita `string right truncation` cuando el código es
   más largo que una columna estrecha como `PLA_DCTO` CHAR(8)) + `normalizarDoc` case-insensitive en el frontend.
-- *(Etapa 5 pendiente: **pulido UI** del detalle de alerta. Y refinamientos: enlazar la factura desde el detalle
-  de alerta, las líneas DESP de la factura, y extender `Fuente` al resto de reglas.)*
+- **Etapa 5 HECHA + VERIFICADA EN VIVO (CAMBIOS §93, commit `e0a1f4f`, gate verde 334 tests):** el **detalle de
+  alerta enlaza con la factura COMPLETA en vivo**. `AlertaResponse` lleva ahora `EstacionCodigo` (mapeo en
+  `AlertaService`: el diccionario de estaciones pasó a `id→(Nombre,Codigo)`); en la evidencia, las claves de
+  número de factura (`NumeroDocumento`/`NumerosFactura`) muestran una pastilla **"factura"** que abre
+  `/consultas/factura?est=CODIGO&num=NUMERO` en ventana nueva. QA en vivo: alerta #80 → factura
+  `001-001-009900060` completa (cliente CLI060, RUC 1790000000001, turno 990001, total $500). **→ Las 5 etapas
+  de la ronda ERP/UX quedan COMPLETAS.** *(Refinamientos opcionales: líneas DESP en la factura, extender
+  `Fuente` al resto de reglas built-in, enlace despachador→sus despachos.)*
 
 ---
 

@@ -2693,3 +2693,42 @@ saltaba con códigos cortos (`1790`, 4 chars) porque caben en cualquier columna 
 
 Commit: `5f149a9` (código). Cadena de la ronda Consultas: `8d0e651` (cola de solicitudes) → `7166e40`
 (pestaña + factura) → `699dbb1` (alias citados) → `5f149a9` (CAST + normalización).
+
+---
+
+## 93. Etapa 5 ERP/UX: la evidencia de la alerta enlaza con la factura COMPLETA en vivo
+
+**Motivación.** Última de las 5 etapas pedidas (pulido del detalle de alerta) y cierre del enlace ERP que la
+auditora marcó en la entrevista: *"al ver una alerta sospechosa, quiero hacer clic en el número de factura y
+ver la factura completa en una ventana nueva para compararla"*. Hasta ahora el número de factura de la
+evidencia solo abría la bandeja de alertas filtrada; faltaba el salto a la **factura real** (la `FacturaPage`
+de la pestaña Consultas). El refinamiento estaba anotado en PENDIENTES como *"enlazar la factura desde la
+alerta (necesita mapear estacionId→código)"*.
+
+**Qué se hizo.**
+
+- **Backend.** `AlertaResponse` ahora incluye **`EstacionCodigo`** (p. ej. `EST-001`). En `AlertaService`,
+  el diccionario auxiliar de estaciones pasó de `id→nombre` a `id→(Nombre, Codigo)` en sus 5 puntos de
+  construcción (lista paginada, problemas por estación, y los 3 de una sola alerta) y `MapToResponse` estampa
+  ambos. Sin migración (es un DTO, no una entidad; el gate confirma "EF sin cambios de modelo").
+- **Frontend.** El tipo `AlertaResponse` gana `estacionCodigo`. En el detalle (`DetalleAlertaPage`), las
+  claves de evidencia que son **número de factura** (`NumeroDocumento`, `NumerosFactura`) muestran, junto al
+  buscador y el botón copiar, una pastilla **"📄 factura"** que abre
+  `/consultas/factura?est={código}&num={número}` en una **ventana nueva** → la factura completa en vivo
+  (cabecera + importes + Imprimir). Funciona tanto para el valor único como para cada elemento de una lista.
+
+**Verificación.**
+
+- **Gate `_gate.bat`** (PC de Steven): **build Release 0/0**, **tests 334** (Domain 40 / Detectors 193 /
+  Api 99 / Monitor 2), **EF sin cambios de modelo**, **eslint OK**, **`tsc -b && vite build` OK**.
+- **QA en vivo en Chrome:** en la **alerta #80** ("Turno 990001… 13 facturas fuera del cuadre"), la evidencia
+  "Números de factura" lista las 13 con su pastilla **factura**; al abrir la de `001-001-009900060` se ve la
+  **factura completa** traída en vivo de EST-001 (cliente CLI060, RUC 1790000000001, placa QAB9999,
+  despachador 004, turno 990001, base $446.43 / IVA $53.57 / **total $500.00**). Los RUC/cédula siguen como
+  enlaces de búsqueda (sin "factura", correcto: no son números de documento).
+
+**Resultado: las 5 etapas de la ronda ERP/UX quedan COMPLETAS** — (1) refresco configurable + agente 1 s
+`626c3e0`, (2) evidencia identificable automática `1114d65`, (3+4) consulta en vivo + pestaña Consultas
+`8d0e651`/`7166e40`/`699dbb1`/`5f149a9`, (5) este enlace alerta→factura `e0a1f4f`.
+
+Commit: `e0a1f4f` (código).
