@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PetrolRios.Application.Programacion;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
 
@@ -226,6 +227,27 @@ public static class SeedData
             "Despacho de alto volumen sin placa",
             "Genera alerta si un despacho sin placa registrada supera el umbral de galones; patron tipico de desvio de combustible que la ARCERNNR controla con cupos y trazabilidad por placa.",
             "GalonesSinPlacaMaximo", 20.0);
+
+        // Placa reutilizada en el día: cuenta por jornada, así que NO corre "cada ciclo" (vería solo el
+        // lote incremental de minutos) sino una vez al día sobre la ventana del día (Calendario Diario
+        // 23:55, hora de estación). Por eso se siembra con programación, fuera de AddIfMissing.
+        if (!existentes.Contains("PlacaReutilizadaDiaUmbral"))
+        {
+            var placaReutilizada = ReglaDeteccion.Create(
+                TipoDetector.InvoiceAnomaly,
+                "Placa reutilizada en el dia",
+                "Genera alerta si una misma placa se factura mas de N veces en el mismo dia (reutilizacion de placa; caso real de 14 facturas en un dia). Corre una vez al dia sobre la ventana del dia. Umbral configurable: auditoria sugiere bajarlo hasta 2 segun la tolerancia a falsos positivos.",
+                "PlacaReutilizadaDiaUmbral",
+                5.0);
+            placaReutilizada.ProgramacionJson = new ProgramacionEjecucion
+            {
+                Modo = ModoProgramacion.Calendario,
+                CalendarioTipo = TipoCalendario.Diario,
+                Hora = 23,
+                Minuto = 55
+            }.Serializar();
+            nuevas.Add(placaReutilizada);
+        }
 
         if (nuevas.Count > 0)
             await context.ReglasDeteccion.AddRangeAsync(nuevas);
