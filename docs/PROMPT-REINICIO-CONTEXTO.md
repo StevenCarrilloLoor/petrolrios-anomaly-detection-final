@@ -135,6 +135,17 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 - **✅ Feature COMPLETO + QA Chrome en vivo OK** (regla "Despacho Excesivo" cada 30 s muestra cadencia +
   próxima; filtro por tabla y grilla de días 1–31 renderizan bien).
 
+**Ronda — Análisis ContaPlus + entrevista auditoría (27-jun, CAMBIOS §82):** Steven dio entrevista de
+auditoría + docs ContaPlus (PDF/`.txt`, **algo viejos** → verificar contra `docs/contac-schema.sql`; las
+imágenes/entrevista son recientes). **Hallazgo crítico: `FAC_DESP` = FORMA DE PAGO del despacho, NO
+"facturado"** (datos reales {2,4,5,7}; mapa 0-9; PDF §3.4; la auditora no sabía qué era "5"). → Diccionario
+corregido (`FAC_DESP`="Forma de pago", `COD_PAGO`=catálogo real) + comentario de `DetalleFacturaDto`. La
+regla "Despacho no facturado" (y el fix §81) están sobre premisa equivocada — rehacer con cruce
+`DESP.NUM_DESP↔DCTO.NDO_DCTO` (verificar). Síntesis + **backlog de auditoría priorizado** en
+`docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md` (🔴 placa reutilizada N+/día, factura fuera de
+liquidación; 🟠 hipervínculos/buscador/ventana-nueva/dashboard por estación). Cambios no funcionales:
+build verde.
+
 **Ronda — FIX regla "Despacho NO facturado" (26-jun, CAMBIOS §81):** disparaba en TODOS los despachos de San
 Pío. Causa: `DespachoNoFacturadoRule` leía `FAC_DESP` como 0/1 y marcaba todo lo que no fuera "1". En los datos
 reales `FAC_DESP` ∈ {2,4,5,7, vacío} (código de estado de facturación, **nunca "1"**): poblado = ya facturado.

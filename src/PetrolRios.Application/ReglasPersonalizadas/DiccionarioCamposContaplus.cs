@@ -53,7 +53,7 @@ public static class DiccionarioCamposContaplus
             ["COD_CLIE"] = ("Código de cliente", RolCampo.Codigo, "Cliente al que se facturó."),
             ["COD_VEND"] = ("Código del vendedor", RolCampo.Codigo, "Despachador que realizó la venta."),
             ["COD_CHOF"] = ("Código del chofer", RolCampo.Codigo, "Chofer asociado a la venta."),
-            ["COD_PAGO"] = ("Forma de pago", RolCampo.Codigo, "EF=efectivo, TC=tarjeta, CR=crédito…"),
+            ["COD_PAGO"] = ("Forma de pago", RolCampo.Codigo, "Código del catálogo de pagos: 001=contado islas, 002=tarjeta de crédito, 003=tarjeta de débito, 004=cheque, 020=pago ya, CRE=crédito, EFE=efectivo…"),
             ["COD_MANG"] = ("Código de manguera", RolCampo.Codigo, "Manguera/surtidor del despacho."),
             ["PLA_DCTO"] = ("Placa del vehículo", RolCampo.Placa, "Placa del vehículo al que se despachó."),
             ["RUC_DCTO"] = ("RUC / cédula", RolCampo.Identificacion, "Identificación tributaria del cliente."),
@@ -90,7 +90,10 @@ public static class DiccionarioCamposContaplus
             ["COD_PROD"] = ("Código de producto", RolCampo.Codigo, "Producto/combustible despachado."),
             ["NOM_PROD"] = ("Nombre de producto", RolCampo.Nombre, "Nombre del combustible (DIESEL, EXTRA…)."),
             ["FIN_DESP"] = ("Fecha del despacho", RolCampo.Fecha, "Fecha y hora del despacho."),
-            ["FAC_DESP"] = ("¿Facturado?", RolCampo.Estado, "Indica si el despacho ya fue facturado."),
+            // OJO: FAC_DESP NO es "facturado". Es la FORMA DE PAGO del despacho (confirmado por el schema,
+            // los datos reales {2,4,5,7,…} y la documentación técnica de Contaplus). Ver
+            // docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md §1.
+            ["FAC_DESP"] = ("Forma de pago del despacho", RolCampo.Codigo, "Código de forma de pago del despacho (2/5/6=contado, 4/7/8=tarjeta, 3=crédito, 0/1=cheque). NO indica si se facturó."),
             ["EST_DESP"] = ("Estado del despacho", RolCampo.Estado, "Estado del despacho."),
             ["SUR_DESP"] = ("Surtidor", RolCampo.Codigo, "Surtidor que realizó el despacho."),
 

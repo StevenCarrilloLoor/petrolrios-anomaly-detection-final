@@ -32,7 +32,9 @@ public sealed record DetalleFacturaDto
     // COD_CLIE — código de cliente
     public string CodigoCliente { get; init; } = string.Empty;
 
-    // FAC_DESP — código de estado de facturación del despacho. POBLADO (2, 4, 5, 7… según el canal de
-    // liquidación) = ya facturado; VACÍO o "0" = despacho sin liquidar (combustible servido sin cobrar).
+    // FAC_DESP — FORMA DE PAGO del despacho (NO "facturado"). Códigos Contaplus: 2/5/6=contado,
+    // 4/7/8=tarjeta, 3=crédito, 0/1=cheque (RUC/cédula). El nombre "Facturado" del DTO es legado y
+    // engañoso; saber si un despacho se facturó requiere cruzar DESP.NUM_DESP ↔ DCTO.NDO_DCTO.
+    // Ver docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md §1.
     public string Facturado { get; init; } = string.Empty;
 }

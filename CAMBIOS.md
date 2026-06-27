@@ -2283,3 +2283,36 @@ factura `DCTO` agrupa uno o varios despachos `DESP`. Por eso aparecen ambas para
 en verde) / Monitor 2 / Api 77, EF sin cambios. **Para que surta efecto hay que reiniciar el API**
 (`ejecutables/1-INICIAR-Y-DETENER/reiniciar-solo-la-api.bat`); las alertas falsas ya generadas quedan como
 histórico (pueden marcarse como falso positivo).
+
+---
+
+## 82. Análisis ContaPlus + entrevista de auditoría → corrección `FAC_DESP` y backlog
+
+**Motivación.** Steven aportó tres insumos: la **entrevista con la auditora** (qué quieren añadir), la
+**documentación técnica de ContaPlus** (PDF + `.txt`) y **capturas reales del catálogo Forma de Pago** del
+POS. Pidió analizarlo todo y volcarlo al diccionario de datos. **Aviso clave de Steven:** el PDF y el `.txt`
+son **algo viejos** (de hecho el PDF usa nombres idealizados —`COD_DCTO`,`TOT_DCTO`— que NO existen en el
+schema real —`SEC_DCTO`,`TNI_DCTO`—); las **imágenes y la entrevista** son recientes y confiables.
+
+**Qué se hizo.**
+
+- **`docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md`** (nuevo): síntesis completa con (1) tabla de
+  confiabilidad de fuentes, (2) el hallazgo crítico de `FAC_DESP`, (3) diccionario de negocio verificado
+  contra el schema real, (4) catálogo real de `COD_PAGO` (de las capturas) y (5) el **backlog priorizado**
+  de auditoría.
+- **Hallazgo crítico:** **`FAC_DESP` NO es "facturado" — es la FORMA DE PAGO del despacho.** Lo confirman
+  los **datos reales** ({2,4,5,7,…}, imposibles para un 0/1), el `.txt` técnico (mapa 0–9 →
+  contado/crédito/tarjeta/cheque), el PDF (§3.4) y la entrevista (la auditora no sabía qué era "5"). Esto
+  significa que la regla "Despacho no facturado" y el fix §81 están sobre **premisa equivocada** ("0"=cheque,
+  no "sin cobrar"); saber si un despacho se facturó requiere cruzar `DESP.NUM_DESP ↔ DCTO.NDO_DCTO`
+  (documentado, **a verificar contra datos**). Anotado en el doc para rehacer/desactivar la regla.
+- **Diccionario corregido (seguro):** `DiccionarioCamposContaplus` — `FAC_DESP` pasa de "¿Facturado?" a
+  **"Forma de pago del despacho"** (rol Código), y `COD_PAGO` apunta al catálogo real
+  (001/002/003/004/CRE/EFE/020…). Corregido también el comentario de `DetalleFacturaDto.Facturado`.
+- **Backlog de auditoría (en el doc):** 🔴 misma placa/cliente facturada N+ veces al día (caso real: 14×/día,
+  riesgo SRI), factura no incluida en liquidación; 🟠 hipervínculos en alertas + ventana nueva, buscador por
+  placa/RUC/nombre, nº de factura visible, dashboard filtrable por estación; 🟡 botón copiar, donaciones
+  excesivas por vendedor. Confirmaciones: descuento nunca se aplica (umbral 0), turno sin cerrar >24 h.
+
+**Verificación.** Cambios no funcionales (literales de texto + comentarios + un `.md`): build Release verde,
+suites sin cambios. *Pendiente de confirmar con Steven qué del backlog abordar primero.*

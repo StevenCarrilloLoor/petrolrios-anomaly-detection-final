@@ -1,7 +1,14 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 26 de junio de 2026 (frecuencia/calendario por regla COMPLETO + pulido UX **verificado en Chrome**; y **FIX regla "Despacho NO facturado"**: leía mal `FAC_DESP` (lo poblado 2/4/5/7 = ya facturado, no anomalía) → ahora solo marca vacío/"0". Detectors 182 / Api 77. Reiniciar el API para aplicar).
+Última actualización: 27 de junio de 2026 (análisis ContaPlus + entrevista auditoría → `docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md`. **Hallazgo: `FAC_DESP` = forma de pago, NO "facturado"** → diccionario corregido; la regla "Despacho no facturado" hay que rehacerla con cruce `NUM_DESP↔NDO_DCTO`. Backlog de auditoría priorizado anotado).
+
+## 🧾 Backlog de auditoría (entrevista Juan Valdez) — ver docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md
+- [ ] 🔴 **Misma placa/cliente facturada N+ veces al día** (reutilización de placa; caso real 14×/día, riesgo SRI). Regla nueva, ventana diaria, umbral configurable (auditora sugiere 2).
+- [ ] 🔴 **Factura no incluida en ninguna liquidación** (cuadre de turno; requiere enviar `LIQU` + `NUM_TURN`).
+- [ ] 🔴 **Rehacer/desactivar "Despacho no facturado"** (FAC_DESP es forma de pago; usar cruce `DESP.NUM_DESP↔DCTO.NDO_DCTO`, verificar contra datos).
+- [ ] 🟠 Hipervínculos en alertas (cliente/RUC→facturas, factura completa, ventana nueva, despachador→despachos+reporte); buscador por placa/RUC/nombre; nº de factura visible; dashboard filtrable por estación; reportería en la misma pantalla.
+- [ ] 🟡 Botón "copiar"; donaciones/descuentos excesivos por vendedor.
 
 ## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
 Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +
