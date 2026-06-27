@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { monitoreoService } from "@/services/monitoreo.service";
 import { estacionesService } from "@/services/estaciones.service";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRefrescoMs, useRefrescoSegundos } from "@/contexts/RefrescoContext";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -27,8 +28,6 @@ import {
 import type { ReactNode } from "react";
 import type { ProvisionarEstacionResponse } from "@/services/estaciones.service";
 
-const REFRESCO_MS = 10_000;
-
 /** Devuelve true si `disponible` es una versión mayor a `instalada` (semver simple). */
 function hayVersionMasNueva(disponible?: string, instalada?: string | null): boolean {
   if (!disponible || !instalada) return false;
@@ -50,6 +49,8 @@ export function ConexionesPage() {
   const { user } = useAuth();
   const puedeGestionar = user?.rol === "Supervisor" || user?.rol === "Administrador";
   const puedeEliminar = user?.rol === "Administrador";
+  const refrescoMs = useRefrescoMs();
+  const refrescoSeg = useRefrescoSegundos();
 
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [editNombre, setEditNombre] = useState("");
@@ -68,15 +69,16 @@ export function ConexionesPage() {
   } = useQuery({
     queryKey: ["monitoreo", "sistema"],
     queryFn: monitoreoService.getEstadoSistema,
-    refetchInterval: REFRESCO_MS,
+    refetchInterval: refrescoMs,
   });
 
   const { data: conexiones, isLoading: loadingConexiones } = useQuery({
     queryKey: ["monitoreo", "conexiones"],
     queryFn: monitoreoService.getConexiones,
-    refetchInterval: REFRESCO_MS,
+    refetchInterval: refrescoMs,
   });
 
+  // La versión del agente casi nunca cambia y consulta a un servidor externo: se deja en 60 s.
   const { data: ultimaVersion } = useQuery({
     queryKey: ["agente", "version"],
     queryFn: estacionesService.getVersionAgente,
@@ -86,7 +88,7 @@ export function ConexionesPage() {
   const { data: usuariosConectados } = useQuery({
     queryKey: ["monitoreo", "usuarios-conectados"],
     queryFn: monitoreoService.getUsuariosConectados,
-    refetchInterval: REFRESCO_MS,
+    refetchInterval: refrescoMs,
     enabled: puedeGestionar,
   });
 
@@ -152,7 +154,7 @@ export function ConexionesPage() {
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <RefreshCw size={13} className="animate-[spin_3s_linear_infinite]" />
-          Actualización automática cada 10 s · última:{" "}
+          Actualización automática cada {refrescoSeg} s · última:{" "}
           {new Date(dataUpdatedAt).toLocaleTimeString("es-EC")}
         </div>
       </div>

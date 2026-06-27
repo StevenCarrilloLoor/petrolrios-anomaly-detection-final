@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { logsService } from "@/services/logs.service";
+import { useRefrescoMs } from "@/contexts/RefrescoContext";
 import { Spinner } from "@/components/ui/Spinner";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export function LogsPage() {
   const [page, setPage] = useState(1);
+  const refrescoMs = useRefrescoMs();
 
   const { data, isLoading } = useQuery({
     queryKey: ["logs", page],
     queryFn: () => logsService.getAll(page, 50),
-    // Tiempo real: la bitácora se refresca sola sin recargar la página
-    refetchInterval: 10_000,
+    // Tiempo real: la bitácora se refresca sola (tasa de refresco global configurable)
+    refetchInterval: refrescoMs,
   });
 
   if (isLoading) {

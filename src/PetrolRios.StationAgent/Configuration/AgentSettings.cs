@@ -36,7 +36,8 @@ public sealed class AgentSettings
     public string FirebirdWireCrypt { get; set; } = "Disabled";
 
     // ─── Operación ───
-    public int IntervaloSegundos { get; set; } = 30;
+    // Por defecto envía cada 1 s (casi tiempo real); editable desde el panel del agente.
+    public int IntervaloSegundos { get; set; } = 1;
     public bool InicioAutomatico { get; set; } = true;
     public string LocalStorePath { get; set; } = "pending";
     public int PanelPuerto { get; set; } = 5180;

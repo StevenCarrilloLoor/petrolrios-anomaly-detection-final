@@ -97,7 +97,8 @@ public sealed class Worker : BackgroundService
                 _state.RegistrarEvento("ERROR", ex.Message);
             }
 
-            var intervalo = Math.Clamp(settings.IntervaloSegundos, 5, 3600);
+            // Mínimo 1 s (casi tiempo real); máximo 1 h. El default de fábrica es 1 s.
+            var intervalo = Math.Clamp(settings.IntervaloSegundos, 1, 3600);
             await Task.Delay(TimeSpan.FromSeconds(intervalo), stoppingToken);
         }
 

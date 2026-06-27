@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { alertasService } from "@/services/alertas.service";
 import { dashboardService } from "@/services/dashboard.service";
+import { useRefrescoMs } from "@/contexts/RefrescoContext";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -22,6 +23,7 @@ const selectClass =
 export function AlertasPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const refrescoMs = useRefrescoMs();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [tipoDetector, setTipoDetector] = useState("");
@@ -68,8 +70,8 @@ export function AlertasPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["alertas", filters],
     queryFn: () => alertasService.getAll(filters),
-    // Además del refresco por SignalR, sondeo de respaldo cada 15 s
-    refetchInterval: 15_000,
+    // Además del refresco por SignalR, sondeo de respaldo a la tasa global configurable
+    refetchInterval: refrescoMs,
   });
 
   // Estado leído/no leído POR USUARIO: los ids de alertas que YO ya abrí (independiente de los demás:
@@ -77,7 +79,7 @@ export function AlertasPage() {
   const { data: vistas } = useQuery({
     queryKey: ["alertas", "vistas"],
     queryFn: alertasService.getVistas,
-    refetchInterval: 30_000,
+    refetchInterval: refrescoMs,
   });
   const vistasSet = new Set(vistas ?? []);
 

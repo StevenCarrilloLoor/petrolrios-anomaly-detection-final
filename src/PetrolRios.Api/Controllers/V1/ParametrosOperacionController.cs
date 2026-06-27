@@ -67,7 +67,8 @@ public sealed class ParametrosOperacionController : ControllerBase
         }
 
         // Cron válido y job aplicado: ahora sí persistimos (con el cron ya normalizado/recortado).
-        _store.Guardar(new OperacionConfig(config.NivelMinimoCorreo, cron));
+        // La tasa de refresco se acota en el store (1 s … 1 h); 0/negativo cae al valor por defecto.
+        _store.Guardar(new OperacionConfig(config.NivelMinimoCorreo, cron, config.RefrescoSegundos));
 
         return Ok(_store.Actual());
     }

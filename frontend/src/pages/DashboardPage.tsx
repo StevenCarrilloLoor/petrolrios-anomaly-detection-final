@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { dashboardService } from "@/services/dashboard.service";
+import { useRefrescoMs } from "@/contexts/RefrescoContext";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -61,11 +62,12 @@ export function DashboardPage() {
   // "alertas por estación" queda global (es la vista cruzada) y alimenta el selector.
   const [estacionFiltro, setEstacionFiltro] = useState("");
   const estId = estacionFiltro ? Number(estacionFiltro) : undefined;
+  const refrescoMs = useRefrescoMs();
 
   const { data: kpis, isLoading: loadingKpis } = useQuery({
     queryKey: ["dashboard", "kpis", estId],
     queryFn: () => dashboardService.getKpis(estId),
-    refetchInterval: 30_000,
+    refetchInterval: refrescoMs,
     // Al cambiar de estación, conservar la vista previa mientras llega la nueva (sin parpadeo a esqueleto).
     placeholderData: keepPreviousData,
   });
@@ -73,39 +75,39 @@ export function DashboardPage() {
   const { data: metricas } = useQuery({
     queryKey: ["dashboard", "metricas-resolucion", estId],
     queryFn: () => dashboardService.getMetricasResolucion(estId),
-    refetchInterval: 60_000,
+    refetchInterval: refrescoMs,
   });
 
   const { data: tendencia, isLoading: loadingTendencia } = useQuery({
     queryKey: ["dashboard", "tendencia", estId],
     queryFn: () => dashboardService.getTendencia(14, estId),
-    refetchInterval: 60_000,
+    refetchInterval: refrescoMs,
     placeholderData: keepPreviousData,
   });
 
   const { data: porTipo, isLoading: loadingTipo } = useQuery({
     queryKey: ["dashboard", "alertas-por-tipo", estId],
     queryFn: () => dashboardService.getAlertasPorTipo(estId),
-    refetchInterval: 30_000,
+    refetchInterval: refrescoMs,
     placeholderData: keepPreviousData,
   });
 
   const { data: porEstacion, isLoading: loadingEstacion } = useQuery({
     queryKey: ["dashboard", "alertas-por-estacion"],
     queryFn: dashboardService.getAlertasPorEstacion,
-    refetchInterval: 30_000,
+    refetchInterval: refrescoMs,
   });
 
   const { data: porNivel } = useQuery({
     queryKey: ["dashboard", "alertas-por-nivel", estId],
     queryFn: () => dashboardService.getAlertasPorNivel(estId),
-    refetchInterval: 30_000,
+    refetchInterval: refrescoMs,
   });
 
   const { data: topEmpleados, isLoading: loadingEmpleados } = useQuery({
     queryKey: ["dashboard", "top-empleados", estId],
     queryFn: () => dashboardService.getTopEmpleados(8, estId),
-    refetchInterval: 60_000,
+    refetchInterval: refrescoMs,
     placeholderData: keepPreviousData,
   });
 

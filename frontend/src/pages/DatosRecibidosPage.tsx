@@ -2,6 +2,7 @@ import { useState, Fragment } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { datosRecibidosService } from "@/services/datosRecibidos.service";
 import { estacionesService } from "@/services/estaciones.service";
+import { useRefrescoMs } from "@/contexts/RefrescoContext";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import {
@@ -30,6 +31,7 @@ export function DatosRecibidosPage() {
   const [page, setPage] = useState(1);
   const [expandida, setExpandida] = useState<number | null>(null);
   const pageSize = 50;
+  const refrescoMs = useRefrescoMs();
 
   const { data: tipos } = useQuery({
     queryKey: ["datos-recibidos", "tipos"],
@@ -52,6 +54,7 @@ export function DatosRecibidosPage() {
         pageSize,
       }),
     placeholderData: keepPreviousData,
+    refetchInterval: refrescoMs,
   });
 
   const hayFiltros = tipo || estacionId || procesada || q;

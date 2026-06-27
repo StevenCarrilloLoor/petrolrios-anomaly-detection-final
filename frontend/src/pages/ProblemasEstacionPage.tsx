@@ -1,6 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { alertasService } from "@/services/alertas.service";
+import { useRefrescoMs } from "@/contexts/RefrescoContext";
 import type { ProblemaEstacionGrupo } from "@/types/alert";
 import { Wrench, ChevronDown, ChevronRight, MapPin } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -14,6 +15,7 @@ export function ProblemasEstacionPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dias = Number(searchParams.get("dias")) || 7;
   const abierto = searchParams.get("g");
+  const refrescoMs = useRefrescoMs();
 
   const setDias = (d: number) =>
     setSearchParams(
@@ -40,7 +42,7 @@ export function ProblemasEstacionPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["problemas-estacion", dias],
     queryFn: () => alertasService.getProblemasEstacion(undefined, dias),
-    refetchInterval: 30_000,
+    refetchInterval: refrescoMs,
   });
 
   const grupos = data ?? [];

@@ -5,6 +5,7 @@ import {
   type FuenteDatosResponse,
 } from "@/services/fuentesDatos.service";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRefrescoMs } from "@/contexts/RefrescoContext";
 import { esquemaService } from "@/services/esquema.service";
 import { estacionesService } from "@/services/estaciones.service";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
@@ -49,6 +50,7 @@ export function FuentesDatosSection() {
   const confirmar = useConfirm();
   const { user } = useAuth();
   const esAdmin = user?.rol === "Administrador";
+  const refrescoMs = useRefrescoMs();
 
   const [editandoId, setEditandoId] = useState<number | "nueva" | null>(null);
   const [form, setForm] = useState<Formulario>(formularioVacio);
@@ -59,7 +61,7 @@ export function FuentesDatosSection() {
   const { data: fuentes, isLoading } = useQuery({
     queryKey: ["fuentes-datos"],
     queryFn: fuentesDatosService.getAll,
-    refetchInterval: 10_000,
+    refetchInterval: refrescoMs,
   });
 
   // Estaciones para elegir de cuál cargar el esquema (las conectadas tienen heartbeat reciente).

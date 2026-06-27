@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { RefrescoProvider } from "@/contexts/RefrescoContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
@@ -39,6 +40,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <RefrescoProvider>
         <SettingsProvider>
           <NotificationProvider>
             <ConfirmProvider>
@@ -95,6 +97,7 @@ function App() {
             </ConfirmProvider>
           </NotificationProvider>
         </SettingsProvider>
+        </RefrescoProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

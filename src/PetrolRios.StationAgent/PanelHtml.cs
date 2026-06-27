@@ -380,8 +380,8 @@ internal static class PanelHtml
         <div class="fields">
           <div class="field">
             <label>Intervalo de sincronización (segundos)</label>
-            <input id="f-intervalo" type="number" min="5" max="3600">
-            <span class="hint">Cada cuánto extrae y envía (default 30 s)</span>
+            <input id="f-intervalo" type="number" min="1" max="3600">
+            <span class="hint">Cada cuánto extrae y envía (default 1 s)</span>
           </div>
           <div class="field">
             <label>Iniciar en modo automático</label>
@@ -582,7 +582,7 @@ async function cargarConfig(){
     document.getElementById('f-fbcharset').value = c.firebirdCharset || 'NONE';
     document.getElementById('f-fbdialect').value = c.firebirdDialect || 3;
     document.getElementById('f-fbwirecrypt').value = c.firebirdWireCrypt || 'Disabled';
-    document.getElementById('f-intervalo').value = c.intervaloSegundos || 30;
+    document.getElementById('f-intervalo').value = c.intervaloSegundos || 1;
     document.getElementById('f-auto').value = String(c.inicioAutomatico);
     document.getElementById('f-updateurl').value = c.updateFeedUrl || '';
     document.getElementById('f-updateurl2').value = c.updateFeedFallbackUrl || '';
@@ -618,7 +618,7 @@ async function guardarConfig(){
       firebirdCharset: document.getElementById('f-fbcharset').value,
       firebirdDialect: parseInt(document.getElementById('f-fbdialect').value) || 3,
       firebirdWireCrypt: document.getElementById('f-fbwirecrypt').value,
-      intervaloSegundos: parseInt(document.getElementById('f-intervalo').value) || 30,
+      intervaloSegundos: parseInt(document.getElementById('f-intervalo').value) || 1,
       inicioAutomatico: document.getElementById('f-auto').value === 'true',
       updateFeedUrl: document.getElementById('f-updateurl').value,
       updateFeedFallbackUrl: document.getElementById('f-updateurl2').value,

@@ -14,6 +14,13 @@ public sealed class ParametrosOperacionStore : IParametrosOperacion
 {
     private const string CronPorDefecto = "*/5 * * * *";
     private const string NivelPorDefecto = "Critico";
+    private const int RefrescoPorDefecto = 1;      // segundos
+    private const int RefrescoMinimo = 1;
+    private const int RefrescoMaximo = 3600;
+
+    /// <summary>Acota la tasa de refresco a un rango razonable (1 s … 1 h).</summary>
+    private static int NormalizarRefresco(int segundos) =>
+        segundos <= 0 ? RefrescoPorDefecto : Math.Clamp(segundos, RefrescoMinimo, RefrescoMaximo);
 
     private readonly string _ruta;
     private readonly IConfiguration _config;
@@ -37,14 +44,15 @@ public sealed class ParametrosOperacionStore : IParametrosOperacion
                 if (leido is not null)
                     return new OperacionConfig(
                         string.IsNullOrWhiteSpace(leido.NivelMinimoCorreo) ? nivelDefault : leido.NivelMinimoCorreo.Trim(),
-                        string.IsNullOrWhiteSpace(leido.CronExpression) ? cronDefault : leido.CronExpression.Trim());
+                        string.IsNullOrWhiteSpace(leido.CronExpression) ? cronDefault : leido.CronExpression.Trim(),
+                        NormalizarRefresco(leido.RefrescoSegundos));
             }
             catch
             {
                 // Archivo corrupto: se ignora y se usan los valores por defecto.
             }
         }
-        return new OperacionConfig(nivelDefault, cronDefault);
+        return new OperacionConfig(nivelDefault, cronDefault, RefrescoPorDefecto);
     }
 
     public void Guardar(OperacionConfig config)
@@ -54,7 +62,8 @@ public sealed class ParametrosOperacionStore : IParametrosOperacion
 
         var limpio = new OperacionConfig(
             string.IsNullOrWhiteSpace(config.NivelMinimoCorreo) ? NivelPorDefecto : config.NivelMinimoCorreo.Trim(),
-            string.IsNullOrWhiteSpace(config.CronExpression) ? CronPorDefecto : config.CronExpression.Trim());
+            string.IsNullOrWhiteSpace(config.CronExpression) ? CronPorDefecto : config.CronExpression.Trim(),
+            NormalizarRefresco(config.RefrescoSegundos));
 
         File.WriteAllText(_ruta, JsonSerializer.Serialize(limpio, new JsonSerializerOptions { WriteIndented = true }));
     }

@@ -383,6 +383,7 @@ function SeccionOperacion() {
   const [config, setConfig] = useState<OperacionConfig>({
     nivelMinimoCorreo: "Critico",
     cronExpression: "*/5 * * * *",
+    refrescoSegundos: 1,
   });
   const [guardado, setGuardado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -466,6 +467,24 @@ function SeccionOperacion() {
               ))}
               <option value={CRON_PERSONALIZADO}>Personalizado… (avanzado)</option>
             </select>
+          </Campo>
+          <Campo label="Tasa de refresco de las pantallas">
+            <select
+              className={inputCls}
+              value={config.refrescoSegundos}
+              onChange={(e) => setConfig({ ...config, refrescoSegundos: Number(e.target.value) })}
+            >
+              <option value={1}>Cada 1 segundo (casi en vivo)</option>
+              <option value={2}>Cada 2 segundos</option>
+              <option value={5}>Cada 5 segundos</option>
+              <option value={10}>Cada 10 segundos</option>
+              <option value={30}>Cada 30 segundos</option>
+              <option value={60}>Cada 1 minuto</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Cada cuánto TODAS las pantallas vuelven a consultar al servidor. 1 s = casi en vivo; súbelo
+              si el equipo va lento.
+            </p>
           </Campo>
         </div>
 
