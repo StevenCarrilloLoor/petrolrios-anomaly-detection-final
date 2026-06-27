@@ -80,6 +80,8 @@ public sealed class DespachosRapidosRule(RiskScoringEngine scoring) : DetectionR
             EstacionId = context.EstacionId,
             EmpleadoCodigo = vendedores.Count == 1 ? vendedores[0] : null,
             TransaccionReferencia = $"RAPIDOS-{cliente}-{racha[0].SecuenciaDocumento}",
+            // Primera factura de la racha: representante con nº de documento (enlace), RUC y placa.
+            Fuente = racha[0],
             Metadata = new Dictionary<string, object>
             {
                 ["Cliente"] = cliente,

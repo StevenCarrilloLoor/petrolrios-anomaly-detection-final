@@ -52,6 +52,7 @@ public sealed class FueraHorarioRule(RiskScoringEngine scoring) : DetectionRuleB
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = factura.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Fuente = factura,
                 Metadata = new Dictionary<string, object>
                 {
                     ["HoraTransaccion"] = horaTransaccion.ToString("HH:mm"),

@@ -52,6 +52,8 @@ public sealed class ReversionTardiaRule(RiskScoringEngine scoring) : DetectionRu
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = turno.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"TURN_TARJ-{tarjeta.NumeroTarjetaTurno}",
+                // La factura original revertida: aporta su nº de documento (con enlace), RUC, placa y cliente.
+                Fuente = primeraFactura,
                 Metadata = new Dictionary<string, object>
                 {
                     ["NumeroTurno"] = tarjeta.NumeroTurno,
