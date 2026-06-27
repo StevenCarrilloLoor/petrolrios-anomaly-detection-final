@@ -2353,3 +2353,39 @@ warnings/0 errors**; **tests verdes** — Domain 40, **Detectors 189 (+7)**, Api
 integración), Monitor 2. Sin cambio de esquema EF (solo clase de regla + seed de datos).
 
 Commit: `99d3330`.
+
+---
+
+## 84. UX de alertas (auditoría #2): buscador, hipervínculos, copiar, n° de factura
+
+**Motivación.** Backlog de auditoría 🟠 (§82). La auditora pidió que la bandeja funcione "como un ERP":
+poder **buscar** una alerta por placa/RUC/n° de factura/cliente, ver el **número de factura** sin tener
+que leer la referencia técnica larga, **copiar** valores de un clic, y **saltar** desde una alerta a todas
+las demás de la misma placa/cliente (y abrirlas en otra pestaña para comparar).
+
+**Qué se hizo.**
+
+- **Buscador (backend).** `AlertaRepository.ApplyFilters` acepta `buscar`: coincidencia parcial e
+  insensible a mayúsculas (`ToLower().Contains` → `LIKE` en PostgreSQL) sobre **Descripción**, **Referencia**,
+  **MetadataJson** (la evidencia: placa, RUC, cliente, n° de factura) y **EmpleadoCodigo**. Hilo completo
+  `AlertasController` (`?buscar=`) → `IAlertaService`/`AlertaService` → `IAlertaRepository`/`AlertaRepository`
+  (parámetro opcional, no rompe llamadas existentes).
+- **Buscador (frontend).** Caja de búsqueda en `AlertasPage` con **rebote de 350 ms** (no consulta por
+  cada tecla), botón de limpiar, y soporte de `?buscar=…` en la URL para los hipervínculos. Integrada con
+  los filtros existentes (estación, tipo, nivel, estado, fechas) y el botón "Limpiar filtros".
+- **Hipervínculos + n° de factura + copiar (detalle).** En "Evidencia de la detección", los valores
+  **buscables** (placa, n° de factura, cliente, RUC) se muestran como **pastillas con enlace** que abren la
+  bandeja filtrada por ese valor (`/alertas?buscar=…` → "ver todas las alertas de esta placa") **y botón
+  copiar** (✓ de confirmación). Los valores de lista (varios n° de factura, clientes, despachadores de la
+  regla de placa) se muestran como pastillas individuales. La **Referencia** ahora tiene botón copiar, y la
+  cabecera un enlace **"Abrir en ventana nueva"** (comparar alertas lado a lado). Etiquetas nuevas para las
+  claves de la regla de placa (Día, Cantidad de facturas, Números de factura, Clientes, Despachadores).
+- **Nota:** el "ver todas las **facturas** del cliente" (reporte sobre los datos de origen) se hará junto a
+  la mejora #4 (reportería); aquí el salto es a las **alertas** de esa placa/cliente, que es inmediato y no
+  depende de un endpoint de reportes nuevo.
+
+**Verificación.** `_gate2.bat` desde el Explorador (PC de Steven): **build Release 0/0**, **tests** Domain
+40 / Detectors 189 / Api 59 / Monitor 2, **eslint OK**, **`tsc -b && vite build` OK**. *Pendiente: QA en
+vivo en Chrome.*
+
+Commit: `e5d7bdb`.

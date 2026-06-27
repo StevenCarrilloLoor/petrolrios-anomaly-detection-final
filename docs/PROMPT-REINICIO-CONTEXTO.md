@@ -109,8 +109,15 @@ en la barra de direcciones funciona (Terminal/VS Code son "clic", no se puede te
   duplicados). Umbral `PlacaReutilizadaDiaUmbral` (default **5**; auditora sugiere **2**), sembrado idempotente
   en `SeedData`. +7 pruebas → **Detectors 189**. *Pendiente: QA en vivo en Chrome (poner ProximaEjecucion en
   pasado o bajar el umbral para dispararla en una corrida).*
-- **#2/#3/#4 pendientes.** El #3 (factura fuera de liquidación) requiere que el **agente envíe `LIQU` +
-  `NUM_TURN`**; verificar el enlace `LIQU.NUM_TURN↔DCTO.NUM_TURN` contra datos antes de cablear.
+- **#2 HECHO (CAMBIOS §84, commit `e5d7bdb`):** UX de alertas. **Backend:** `?buscar=` en
+  `AlertaRepository.ApplyFilters` (LIKE sobre Descripción/Referencia/MetadataJson/EmpleadoCodigo) hilado
+  por controller→service→repo (parámetro opcional). **Frontend:** caja de búsqueda con rebote 350 ms en
+  `AlertasPage` (placa/RUC/nº factura/cliente/código) + `?buscar=` en URL; en el detalle, evidencia con
+  **pastillas-enlace** (placa/nº factura/cliente → `/alertas?buscar=`) + **botón copiar** + **abrir en
+  ventana nueva** + etiquetas de la regla de placa. Gate verde (build/tests/eslint/vite). *Pendiente: QA Chrome.*
+- **#3/#4 pendientes.** #4 = dashboard filtrable por estación + reportería (incluye "ver facturas del
+  cliente"). #3 (factura fuera de liquidación) requiere que el **agente envíe `LIQU` + `NUM_TURN`**;
+  verificar el enlace `LIQU.NUM_TURN↔DCTO.NUM_TURN` contra datos antes de cablear.
 
 **Ronda — Frecuencia/calendario por regla (26-jun-2026) — ✅ COMPLETO (Etapas 1-5):**
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de

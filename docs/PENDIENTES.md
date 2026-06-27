@@ -7,8 +7,8 @@ Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerid
 - [x] 🔴 **Misma placa facturada N+ veces al día** (reutilización de placa; caso real 14×/día, riesgo SRI). **HECHO `99d3330`**: `PlacaReutilizadaRule` (InvoiceAnomaly), programada **diaria** (Calendario 23:55, ventana del día, sin duplicados), umbral configurable `PlacaReutilizadaDiaUmbral` (default 5; auditora sugiere 2), excluye placa genérica. +7 pruebas → Detectors 189. *Pendiente: QA en vivo en Chrome.*
 - [ ] 🔴 **Factura no incluida en ninguna liquidación** (cuadre de turno; requiere enviar `LIQU` + `NUM_TURN`).
 - [ ] 🔴 **Rehacer/desactivar "Despacho no facturado"** (FAC_DESP es forma de pago; usar cruce `DESP.NUM_DESP↔DCTO.NDO_DCTO`, verificar contra datos).
-- [ ] 🟠 Hipervínculos en alertas (cliente/RUC→facturas, factura completa, ventana nueva, despachador→despachos+reporte); buscador por placa/RUC/nombre; nº de factura visible; dashboard filtrable por estación; reportería en la misma pantalla.
-- [ ] 🟡 Botón "copiar"; donaciones/descuentos excesivos por vendedor.
+- [~] 🟠 UX de alertas (mejora #2, **parcialmente HECHO `e5d7bdb`**): ✅ buscador por placa/RUC/nº factura/cliente/código (backend `?buscar=` + caja con rebote), ✅ nº de factura y placa/cliente como **enlaces** a la bandeja filtrada, ✅ **abrir en ventana nueva**, ✅ botón **copiar**. ⏳ Pendiente (va con #4): "ver todas las **facturas** del cliente" (reporte sobre datos de origen), despachador→despachos+imprimir, **dashboard filtrable por estación**, reportería en pantalla.
+- [x] 🟡 Botón "copiar" en alertas → **HECHO** en `e5d7bdb`. ⏳ Donaciones/descuentos excesivos por vendedor (pendiente).
 
 ## 🧭 Frecuencia/calendario POR REGLA (EN PROGRESO, por etapas)
 Diseño en `docs/PROPUESTA-FRECUENCIA-POR-REGLA.md`. Doble modo (Intervalo seg/min/h/d/sem/mes +
