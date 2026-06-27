@@ -201,8 +201,8 @@ public static class SeedData
             "FechaFuturaToleranciaHoras", 24.0);
         AddIfMissing(TipoDetector.InvoiceAnomaly,
             "Despacho no facturado",
-            "Genera una alerta operativa si un despacho (DESP) con galones servidos no esta marcado como facturado (FAC_DESP); combustible que salio sin cobrarse.",
-            "DespachoNoFacturadoHabilitado", 1.0, AmbitoAlerta.Operativa);
+            "DESHABILITADA por defecto: FAC_DESP es la FORMA DE PAGO del despacho (contado/tarjeta/credito/cheque), no un indicador de 'facturado', por lo que la heuristica daba falsos positivos. La deteccion correcta exige cruzar DESP.NUM_DESP con DCTO.NDO_DCTO sobre el staging con periodo de gracia (trabajo futuro, analogo al cuadre de liquidacion).",
+            "DespachoNoFacturadoHabilitado", 0.0, AmbitoAlerta.Operativa);
         AddIfMissing(TipoDetector.InvoiceAnomaly,
             "Anulaciones recurrentes (kiting)",
             "Genera alerta si un mismo punto de emision tiene anulaciones en varios dias distintos (umbral = dias minimos); posible patron de cancelar y reingresar para rodar la deuda o mover el periodo.",
@@ -281,6 +281,18 @@ public static class SeedData
         {
             fueraHorario.Activa = false;
             fueraHorario.ValorUmbral = 0.0;
+        }
+
+        // Desactivar "Despacho no facturado": FAC_DESP es la FORMA DE PAGO del despacho, no un indicador de
+        // "facturado", así que la heurística generaba falsos positivos (p. ej. ventas de contado con FAC_DESP='0').
+        // La detección correcta exige cruzar DESP.NUM_DESP ↔ DCTO.NDO_DCTO sobre el staging acumulado y con
+        // periodo de gracia (un servicio análogo a CuadreLiquidacionService), no por lote. Hasta tenerlo, off.
+        var despachoNoFacturado = await context.ReglasDeteccion
+            .FirstOrDefaultAsync(r => r.ParametroNombre == "DespachoNoFacturadoHabilitado");
+        if (despachoNoFacturado is not null && despachoNoFacturado.Activa)
+        {
+            despachoNoFacturado.Activa = false;
+            despachoNoFacturado.ValorUmbral = 0.0;
         }
 
         // La columna Ambito no existía antes; las filas anteriores a la migración pudieron quedar

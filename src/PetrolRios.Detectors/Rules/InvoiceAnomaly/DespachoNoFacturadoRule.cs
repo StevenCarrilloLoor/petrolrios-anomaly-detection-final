@@ -4,12 +4,24 @@ using PetrolRios.Domain.Enums;
 
 namespace PetrolRios.Detectors.Rules.InvoiceAnomaly;
 
-/// <summary>Despacho con galones servidos no marcado como facturado (combustible sin cobrar). Operativa.</summary>
+/// <summary>
+/// Despacho (DESP) con galones servidos sin facturar (combustible que salió sin cobrarse). Carril Operativa.
+///
+/// DESHABILITADA POR DEFECTO. El indicador que usaba esta regla — <c>FAC_DESP</c> — NO es un "facturado"
+/// 0/1: en Contaplus es la FORMA DE PAGO del despacho (códigos contado/tarjeta/crédito/cheque; ver el propio
+/// stored procedure del esquema, que mapea <c>FAC_DESP in ('0','1','2','5','6')→CONTADO</c> y
+/// <c>('4','7','8','9')→TARJETAS</c>). Es decir, TODO despacho con un código de FAC_DESP ya fue pagado por
+/// algún medio, así que esta heurística produce falsos positivos (p. ej. dispara sobre ventas de contado
+/// con FAC_DESP='0'). Saber de verdad si un despacho se facturó exige cruzar <c>DESP.NUM_DESP ↔
+/// DCTO.NDO_DCTO</c> sobre el staging acumulado y con periodo de gracia (un servicio análogo al cuadre de
+/// liquidación), no por lote. Hasta tener ese servicio, la regla queda desactivada por el seed.
+/// Ver docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md §1.
+/// </summary>
 public sealed class DespachoNoFacturadoRule(RiskScoringEngine scoring) : DetectionRuleBase(scoring)
 {
     public override TipoDetector Detector => TipoDetector.InvoiceAnomaly;
     public override string Parametro => "DespachoNoFacturadoHabilitado";
-    public override double UmbralPorDefecto => 1.0;
+    public override double UmbralPorDefecto => 0.0;   // deshabilitada por defecto (ver resumen)
     public override AmbitoAlerta AmbitoPorDefecto => AmbitoAlerta.Operativa;
 
     public override IEnumerable<DetectedAnomaly> Evaluar(DetectionContext context, ReglaDeteccion? regla)
