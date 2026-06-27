@@ -145,11 +145,15 @@ public sealed class Worker : BackgroundService
         {
             try
             {
-                var filas = await _extractor.ConsultarDocumentosAsync(
-                    c.TipoDocumento, c.FechaDesde, c.FechaHasta, c.Codigo, c.Limite, ct);
+                // Dos tipos de consulta: DCTO (documentos, por defecto) y DESP (líneas de surtidor de UNA
+                // factura, por su NUM_DESP). Ambas devuelven el mismo sobre { documentos, total } SOLO LECTURA.
+                var filas = string.Equals(c.Tabla, "DESP", StringComparison.OrdinalIgnoreCase)
+                    ? await _extractor.ConsultarDespachosAsync(c.Codigo, c.Limite, ct)
+                    : await _extractor.ConsultarDocumentosAsync(
+                        c.TipoDocumento, c.FechaDesde, c.FechaHasta, c.Codigo, c.Limite, ct);
                 var json = JsonSerializer.Serialize(new { documentos = filas, total = filas.Count });
                 await _serverClient.EnviarResultadoConsultaAsync(c.Id, true, json, null, ct);
-                _state.RegistrarEvento("INFO", $"Consulta en vivo → {filas.Count} documento(s)");
+                _state.RegistrarEvento("INFO", $"Consulta en vivo ({c.Tabla}) → {filas.Count} fila(s)");
             }
             catch (Exception ex)
             {

@@ -1,12 +1,20 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { consultasService, type DocumentoFirebird } from "@/services/consultas.service";
+import {
+  consultasService,
+  type DocumentoFirebird,
+  type DespachoFirebird,
+} from "@/services/consultas.service";
 import { Spinner } from "@/components/ui/Spinner";
-import { FileText, Printer, AlertTriangle } from "lucide-react";
+import { FileText, Printer, AlertTriangle, Fuel } from "lucide-react";
 
 function money(v: unknown): string {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? `$${n.toFixed(2)}` : "—";
+}
+function galones(v: unknown): string {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) : "—";
 }
 function texto(v: unknown): string {
   const s = v == null ? "" : String(v).trim();
@@ -36,6 +44,8 @@ export function FacturaPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [doc, setDoc] = useState<DocumentoFirebird | null>(null);
+  const [lineas, setLineas] = useState<DespachoFirebird[]>([]);
+  const [cargandoLineas, setCargandoLineas] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -60,6 +70,25 @@ export function FacturaPage() {
       activo = false;
     };
   }, [est, num]);
+
+  // Líneas de surtidor (DESP) de la factura: se cargan cuando hay un nº de despacho numérico (NDO_DCTO).
+  useEffect(() => {
+    const desp = String(doc?.NumeroDespacho ?? "").trim();
+    if (!desp || !/^\d+$/.test(desp)) {
+      setLineas([]);
+      return;
+    }
+    let activo = true;
+    setCargandoLineas(true);
+    consultasService
+      .consultarDespachos(est, desp)
+      .then((ls) => activo && setLineas(ls))
+      .catch(() => activo && setLineas([]))
+      .finally(() => activo && setCargandoLineas(false));
+    return () => {
+      activo = false;
+    };
+  }, [doc, est]);
 
   return (
     <div className="mx-auto max-w-3xl p-6">
@@ -117,10 +146,52 @@ export function FacturaPage() {
             </div>
           </div>
 
+          {/* Líneas de surtido (DESP), cruzadas por el «Despacho (origen)» = NDO_DCTO → NUM_DESP. */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Fuel size={15} /> Líneas de surtido
+            </p>
+            {cargandoLineas ? (
+              <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                <Spinner size="sm" /> Consultando el surtido en la estación…
+              </div>
+            ) : lineas.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <th className="py-1.5 pr-3 font-medium">Producto</th>
+                      <th className="py-1.5 pr-3 font-medium">Manguera</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">Galones</th>
+                      <th className="py-1.5 pr-3 text-right font-medium">Precio unit.</th>
+                      <th className="py-1.5 text-right font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineas.map((l, i) => (
+                      <tr key={`${l.NumeroDespacho}-${i}`} className="border-b border-border/50 last:border-0">
+                        <td className="py-1.5 pr-3 text-foreground">{texto(l.Producto)}</td>
+                        <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground">{texto(l.Manguera)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-foreground">{galones(l.Galones)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-foreground">{money(l.PrecioUnitario)}</td>
+                        <td className="py-1.5 text-right font-mono font-medium text-foreground">{money(l.Total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="py-1 text-sm text-muted-foreground">
+                {texto(doc.NumeroDespacho) === "—"
+                  ? "Esta factura no tiene un despacho de surtidor asociado (NDO_DCTO vacío)."
+                  : `Sin líneas de surtido para el despacho ${texto(doc.NumeroDespacho)}.`}
+              </p>
+            )}
+          </div>
+
           <p className="text-xs text-muted-foreground">
-            Datos traídos en vivo de la base de la estación {texto(est)} (solo lectura). El «Despacho (origen)»
-            identifica el surtido (DESP) del que proviene la factura. El detalle de la línea (producto, galones,
-            precio del surtidor) se incorporará cuando se habilite el cruce DESP↔DCTO.
+            Datos traídos en vivo de la base de la estación {texto(est)} (solo lectura): cabecera (DCTO),
+            importes y líneas de surtido (DESP, cruzadas por «Despacho (origen)» = NDO_DCTO → NUM_DESP).
           </p>
         </div>
       )}

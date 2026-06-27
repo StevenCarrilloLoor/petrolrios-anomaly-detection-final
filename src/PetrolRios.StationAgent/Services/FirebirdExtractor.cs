@@ -123,6 +123,43 @@ public sealed class FirebirdExtractor
     }
 
     /// <summary>
+    /// Consulta SOLO LECTURA las líneas de surtidor (DESP) de UNA factura, por su número de despacho
+    /// (<c>NUM_DESP</c>, que en la factura es <c>NDO_DCTO</c>). Devuelve producto, galones, precio unitario y
+    /// total de cada surtido. Es el "detalle de líneas" que completa la vista de la factura. Tolerante: si el
+    /// número no es convertible, Firebird lanza y el Worker lo reporta como error de esa consulta (no rompe el ciclo).
+    /// </summary>
+    public async Task<IReadOnlyList<Dictionary<string, object?>>> ConsultarDespachosAsync(
+        string? numeroDespacho, int limite, CancellationToken ct)
+    {
+        var top = Math.Clamp(limite <= 0 ? 50 : limite, 1, 200);
+        // Alias entre comillas para preservar PascalCase (igual que en ConsultarDocumentosAsync). NUM_DESP es
+        // Double y el número llega como texto (NDO_DCTO Char(20)); se castea el parámetro a DOUBLE para el match
+        // exacto. El frontend solo consulta cuando el nº es numérico, así que el CAST no falla en la práctica.
+        var sql = $"""
+            SELECT FIRST {top}
+              NUM_DESP AS "NumeroDespacho", COD_PROD AS "CodigoProducto", NOM_PROD AS "Producto",
+              COD_MANG AS "Manguera", CAN_DESP AS "Galones", VUN_DESP AS "PrecioUnitario",
+              VTO_DESP AS "Total", FIN_DESP AS "Fecha", FAC_DESP AS "FormaPago", COD_CLIE AS "Cliente"
+            FROM DESP
+            WHERE @numero IS NULL OR NUM_DESP = CAST(@numero AS DOUBLE PRECISION)
+            ORDER BY NUM_DESP
+            """;
+        var prm = new { numero = string.IsNullOrWhiteSpace(numeroDespacho) ? null : numeroDespacho.Trim() };
+
+        using var connection = CreateConnection();
+        var filas = await connection.QueryAsync(new CommandDefinition(sql, prm, cancellationToken: ct));
+        var resultado = new List<Dictionary<string, object?>>();
+        foreach (var fila in filas)
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (var kv in (IDictionary<string, object>)fila)
+                dict[kv.Key] = kv.Value is string s ? s.Trim() : kv.Value;
+            resultado.Add(dict);
+        }
+        return resultado;
+    }
+
+    /// <summary>
     /// Extrae todas las transacciones nuevas desde la marca de agua indicada.
     /// Retorna un diccionario: TipoTransaccion → lista de objetos serializados a JSON.
     /// </summary>
