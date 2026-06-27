@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using PetrolRios.Application.DTOs.Consultas;
 using PetrolRios.StationAgent.Configuration;
 
 namespace PetrolRios.StationAgent.Services;
@@ -92,30 +93,56 @@ public sealed class ServerClient
             var response = await _httpClient.PostAsJsonAsync(
                 Url(settings.ServerUrl, "/api/v1/ingesta/heartbeat"), payload, ct);
             if (!response.IsSuccessStatusCode)
-                return new HeartbeatResultado(false, false);
+                return new HeartbeatResultado(false, false, []);
 
-            // La respuesta puede pedir que reportemos el esquema (el admin lo solicitó desde el central).
+            // La respuesta puede pedir que reportemos el esquema (el admin lo solicitó) y/o traer consultas
+            // en vivo pendientes (un auditor pidió documentos de la Firebird desde el central).
             var reportar = false;
+            List<ConsultaPendiente> consultas = [];
             try
             {
                 var body = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
-                reportar = body.ValueKind == JsonValueKind.Object
-                           && body.TryGetProperty("reportarEsquema", out var r)
-                           && r.ValueKind == JsonValueKind.True;
+                if (body.ValueKind == JsonValueKind.Object)
+                {
+                    reportar = body.TryGetProperty("reportarEsquema", out var r) && r.ValueKind == JsonValueKind.True;
+                    if (body.TryGetProperty("consultas", out var c) && c.ValueKind == JsonValueKind.Array)
+                        consultas = c.Deserialize<List<ConsultaPendiente>>(JsonWeb) ?? [];
+                }
             }
-            catch { /* cuerpo vacío o no-JSON: sin solicitud */ }
+            catch { /* cuerpo vacío o no-JSON: sin solicitudes */ }
 
-            return new HeartbeatResultado(true, reportar);
+            return new HeartbeatResultado(true, reportar, consultas);
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Heartbeat no entregado (servidor no disponible)");
-            return new HeartbeatResultado(false, false);
+            return new HeartbeatResultado(false, false, []);
         }
     }
 
-    /// <summary>Resultado de un heartbeat: si se entregó y si el central pide reportar el esquema.</summary>
-    public sealed record HeartbeatResultado(bool Ok, bool ReportarEsquema);
+    private static readonly System.Text.Json.JsonSerializerOptions JsonWeb =
+        new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    /// <summary>Reporta al central el resultado (o el error) de una consulta en vivo que se tomó del heartbeat.</summary>
+    public async Task EnviarResultadoConsultaAsync(string id, bool ok, string? resultadoJson, string? error, CancellationToken ct)
+    {
+        var settings = _config.Actual;
+        try
+        {
+            await EnsureAuthenticatedAsync(settings, ct);
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            await _httpClient.PostAsJsonAsync(
+                Url(settings.ServerUrl, $"/api/v1/consultas/{id}/resultado"),
+                new { ok, resultadoJson, error }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No se pudo enviar el resultado de la consulta {Id}", id);
+        }
+    }
+
+    /// <summary>Resultado de un heartbeat: si se entregó, si el central pide el esquema y las consultas a correr.</summary>
+    public sealed record HeartbeatResultado(bool Ok, bool ReportarEsquema, IReadOnlyList<ConsultaPendiente> Consultas);
 
     /// <summary>
     /// Prueba la conexión y autenticación con el servidor central (panel del agente).

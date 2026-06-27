@@ -14,15 +14,18 @@ public sealed class IngestaController : ControllerBase
 {
     private readonly IIngestaService _ingestaService;
     private readonly ISolicitudesEsquema _solicitudesEsquema;
+    private readonly IConsultasFirebird _consultas;
     private readonly PetrolRiosDbContext _dbContext;
 
     public IngestaController(
         IIngestaService ingestaService,
         ISolicitudesEsquema solicitudesEsquema,
+        IConsultasFirebird consultas,
         PetrolRiosDbContext dbContext)
     {
         _ingestaService = ingestaService;
         _solicitudesEsquema = solicitudesEsquema;
+        _consultas = consultas;
         _dbContext = dbContext;
     }
 
@@ -60,6 +63,9 @@ public sealed class IngestaController : ControllerBase
 
         await _ingestaService.HeartbeatAsync(request, ct);
         var reportarEsquema = _solicitudesEsquema.TomarPendiente(request.CodigoEstacion);
-        return Ok(new { reportarEsquema });
+        // Consultas en vivo pendientes para esta estación: el agente las correrá SOLO LECTURA y devolverá
+        // el resultado a /api/v1/consultas/{id}/resultado. Se entregan una sola vez (quedan "tomadas").
+        var consultas = _consultas.TomarPendientes(request.CodigoEstacion);
+        return Ok(new { reportarEsquema, consultas });
     }
 }

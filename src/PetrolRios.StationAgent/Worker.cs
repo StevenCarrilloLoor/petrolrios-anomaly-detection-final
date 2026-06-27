@@ -1,3 +1,5 @@
+using System.Text.Json;
+using PetrolRios.Application.DTOs.Consultas;
 using PetrolRios.StationAgent.Configuration;
 using PetrolRios.StationAgent.Services;
 
@@ -75,6 +77,11 @@ public sealed class Worker : BackgroundService
                     if (latido.ReportarEsquema || DateTime.UtcNow - _ultimoReporteEsquema > TimeSpan.FromHours(6))
                         await ReportarEsquemaAsync(stoppingToken);
 
+                    // Consultas EN VIVO pedidas desde el central (documentos de Firebird): correrlas SOLO
+                    // LECTURA y devolver el resultado de cada una. Llegan en el heartbeat (casi en vivo a 1 s).
+                    if (latido.Consultas.Count > 0)
+                        await EjecutarConsultasAsync(latido.Consultas, stoppingToken);
+
                     // Sincronizar el catálogo de empleados (código → nombre) cada ~6 h.
                     if (DateTime.UtcNow - _ultimoSyncEmpleados > TimeSpan.FromHours(6))
                         await SincronizarEmpleadosAsync(stoppingToken);
@@ -125,6 +132,30 @@ public sealed class Worker : BackgroundService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "No se pudo reportar el esquema (se reintenta luego)");
+        }
+    }
+
+    /// <summary>
+    /// Corre las consultas EN VIVO que pidió el central (documentos de DCTO, SOLO LECTURA) y devuelve el
+    /// resultado de cada una. Tolerante a fallos: un error en una consulta se reporta como tal y no rompe el ciclo.
+    /// </summary>
+    private async Task EjecutarConsultasAsync(IReadOnlyList<ConsultaPendiente> consultas, CancellationToken ct)
+    {
+        foreach (var c in consultas)
+        {
+            try
+            {
+                var filas = await _extractor.ConsultarDocumentosAsync(
+                    c.TipoDocumento, c.FechaDesde, c.FechaHasta, c.Codigo, c.Limite, ct);
+                var json = JsonSerializer.Serialize(new { documentos = filas, total = filas.Count });
+                await _serverClient.EnviarResultadoConsultaAsync(c.Id, true, json, null, ct);
+                _state.RegistrarEvento("INFO", $"Consulta en vivo → {filas.Count} documento(s)");
+            }
+            catch (Exception ex)
+            {
+                await _serverClient.EnviarResultadoConsultaAsync(c.Id, false, null, ex.Message, ct);
+                _logger.LogDebug(ex, "Error corriendo la consulta {Id}", c.Id);
+            }
         }
     }
 

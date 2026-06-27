@@ -68,6 +68,51 @@ public sealed class FirebirdExtractor
     }
 
     /// <summary>
+    /// Consulta EN VIVO (SOLO LECTURA) documentos de la tabla DCTO con filtros: tipo de documento, rango de
+    /// fechas y un código libre que coincide con RUC, placa, cliente o número de documento. Devuelve las filas
+    /// como diccionarios (columna→valor) listas para serializar. La usa el agente al recoger una consulta del
+    /// heartbeat. Nunca modifica la base (la conexión es ReadOnly y solo se hace SELECT).
+    /// </summary>
+    public async Task<IReadOnlyList<Dictionary<string, object?>>> ConsultarDocumentosAsync(
+        string? tipoDocumento, DateTime? desde, DateTime? hasta, string? codigo, int limite, CancellationToken ct)
+    {
+        var top = Math.Clamp(limite <= 0 ? 200 : limite, 1, 1000);
+        var sql = $"""
+            SELECT FIRST {top}
+              SEC_DCTO AS SecuenciaDocumento, TIP_DCTO AS TipoDocumento, NUM_DCTO AS NumeroDocumento,
+              FEC_DCTO AS Fecha, COD_CLIE AS Cliente, RUC_DCTO AS Ruc, COD_VEND AS Vendedor,
+              PLA_DCTO AS Placa, COD_PAGO AS FormaPago, NUM_TURN AS NumeroTurno,
+              TSI_DCTO AS TotalSinIva, IVA_DCTO AS Iva, DSC_DCTO AS Descuento, TNI_DCTO AS TotalNeto
+            FROM DCTO
+            WHERE (@tipo IS NULL OR TIP_DCTO = @tipo)
+              AND (@desde IS NULL OR FEC_DCTO >= @desde)
+              AND (@hasta IS NULL OR FEC_DCTO <= @hasta)
+              AND (@codigo IS NULL OR RUC_DCTO CONTAINING @codigo OR PLA_DCTO CONTAINING @codigo
+                   OR COD_CLIE CONTAINING @codigo OR NUM_DCTO CONTAINING @codigo)
+            ORDER BY FEC_DCTO DESC
+            """;
+        var prm = new
+        {
+            tipo = string.IsNullOrWhiteSpace(tipoDocumento) ? null : tipoDocumento.Trim(),
+            desde,
+            hasta,
+            codigo = string.IsNullOrWhiteSpace(codigo) ? null : codigo.Trim(),
+        };
+
+        using var connection = CreateConnection();
+        var filas = await connection.QueryAsync(new CommandDefinition(sql, prm, cancellationToken: ct));
+        var resultado = new List<Dictionary<string, object?>>();
+        foreach (var fila in filas)
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (var kv in (IDictionary<string, object>)fila)
+                dict[kv.Key] = kv.Value is string s ? s.Trim() : kv.Value;
+            resultado.Add(dict);
+        }
+        return resultado;
+    }
+
+    /// <summary>
     /// Extrae todas las transacciones nuevas desde la marca de agua indicada.
     /// Retorna un diccionario: TipoTransaccion → lista de objetos serializados a JSON.
     /// </summary>
