@@ -77,10 +77,25 @@ public sealed class AlertaService : IAlertaService
         int? estacionId, DateTime? desde, DateTime? hasta,
         int page, int pageSize, string? buscar = null, CancellationToken ct = default)
     {
+        // Búsqueda por NOMBRE de despachador: el nombre no vive en la tabla de alertas (solo el código),
+        // así que resolvemos contra el catálogo de empleados qué códigos tienen un nombre que coincide y
+        // el repositorio también incluye las alertas de esos códigos. Así "buscar=MENDOZA" funciona.
+        IReadOnlyCollection<string>? codigosPorNombre = null;
+        if (!string.IsNullOrWhiteSpace(buscar))
+        {
+            var termino = buscar.Trim().ToLower();
+            codigosPorNombre = await _dbContext.Empleados
+                .AsNoTracking()
+                .Where(e => e.Nombre.ToLower().Contains(termino))
+                .Select(e => e.Codigo)
+                .Distinct()
+                .ToListAsync(ct);
+        }
+
         var alertas = await _unitOfWork.Alertas.GetFilteredAsync(
-            tipo, nivel, estado, estacionId, desde, hasta, page, pageSize, buscar, ct);
+            tipo, nivel, estado, estacionId, desde, hasta, page, pageSize, buscar, codigosPorNombre, ct);
         var count = await _unitOfWork.Alertas.GetFilteredCountAsync(
-            tipo, nivel, estado, estacionId, desde, hasta, buscar, ct);
+            tipo, nivel, estado, estacionId, desde, hasta, buscar, codigosPorNombre, ct);
 
         // Cargar nombres de estación
         var estacionIds = alertas.Select(a => a.EstacionId).Distinct().ToList();

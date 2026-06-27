@@ -19,9 +19,9 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
     public async Task<IReadOnlyList<Alerta>> GetFilteredAsync(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
         int? estacionId, DateTime? desde, DateTime? hasta,
-        int page, int pageSize, string? buscar, CancellationToken ct)
+        int page, int pageSize, string? buscar, IReadOnlyCollection<string>? codigosPorNombre, CancellationToken ct)
     {
-        var query = ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta, buscar);
+        var query = ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta, buscar, codigosPorNombre);
         return await query
             .OrderByDescending(a => a.FechaDeteccion)
             .Skip((page - 1) * pageSize)
@@ -32,9 +32,10 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
 
     public async Task<int> GetFilteredCountAsync(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
-        int? estacionId, DateTime? desde, DateTime? hasta, string? buscar, CancellationToken ct)
+        int? estacionId, DateTime? desde, DateTime? hasta, string? buscar,
+        IReadOnlyCollection<string>? codigosPorNombre, CancellationToken ct)
     {
-        return await ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta, buscar).CountAsync(ct);
+        return await ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta, buscar, codigosPorNombre).CountAsync(ct);
     }
 
     public async Task<int> CountByEmpleadoAndTipoAsync(
@@ -46,7 +47,8 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
 
     private IQueryable<Alerta> ApplyFilters(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
-        int? estacionId, DateTime? desde, DateTime? hasta, string? buscar)
+        int? estacionId, DateTime? desde, DateTime? hasta, string? buscar,
+        IReadOnlyCollection<string>? codigosPorNombre)
     {
         // La bandeja de auditoría muestra SOLO alertas de ámbito Auditoría (fraude).
         // Los problemas operativos (turno sin cerrar, despacho no facturado, campos
@@ -61,18 +63,21 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
         if (hasta.HasValue) query = query.Where(a => a.FechaDeteccion <= hasta.Value);
 
         // Búsqueda libre (la pidió auditoría): por placa, RUC, nº de factura, cliente o código de
-        // empleado. Se busca en la descripción, la referencia y el código de empleado — campos de
-        // TEXTO — con coincidencia parcial e insensible a mayúsculas (`ToLower().Contains` → LIKE en
-        // PostgreSQL). La placa, el cliente y el nº de factura aparecen en la descripción de cada
-        // regla, así que se encuentran. NOTA: la evidencia (MetadataJson) es columna `jsonb`, y
-        // aplicarle `lower()` no se puede traducir (rompía con 500); por eso NO se incluye aquí.
+        // empleado. Se busca en la descripción, la referencia, el código de empleado y la EVIDENCIA
+        // (MetadataJson, ahora columna `text`: ahí viven placa/RUC/cliente/nº de factura), con
+        // coincidencia parcial e insensible a mayúsculas (`ToLower().Contains` → LIKE en PostgreSQL).
         if (!string.IsNullOrWhiteSpace(buscar))
         {
             var termino = buscar.Trim().ToLower();
+            // Códigos de empleado cuyo NOMBRE coincide con el término (resueltos en el servicio contra
+            // el catálogo). Lista vacía si ninguno → `IN ()` = falso, sin afectar el resto del OR.
+            var codigos = codigosPorNombre is { Count: > 0 } ? codigosPorNombre.ToList() : new List<string>();
             query = query.Where(a =>
                 a.Descripcion.ToLower().Contains(termino)
                 || (a.TransaccionReferencia != null && a.TransaccionReferencia.ToLower().Contains(termino))
-                || (a.EmpleadoCodigo != null && a.EmpleadoCodigo.ToLower().Contains(termino)));
+                || (a.EmpleadoCodigo != null && a.EmpleadoCodigo.ToLower().Contains(termino))
+                || (a.MetadataJson != null && a.MetadataJson.ToLower().Contains(termino))
+                || (a.EmpleadoCodigo != null && codigos.Contains(a.EmpleadoCodigo)));
         }
         return query;
     }

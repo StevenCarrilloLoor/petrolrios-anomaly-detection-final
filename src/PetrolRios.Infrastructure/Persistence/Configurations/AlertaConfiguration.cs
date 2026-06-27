@@ -13,7 +13,10 @@ public class AlertaConfiguration : IEntityTypeConfiguration<Alerta>
         builder.Property(a => a.Descripcion).HasMaxLength(1000).IsRequired();
         builder.Property(a => a.EmpleadoCodigo).HasMaxLength(20);
         builder.Property(a => a.TransaccionReferencia).HasMaxLength(100);
-        builder.Property(a => a.MetadataJson).HasColumnType("jsonb");
+        // Evidencia de la alerta. Se guarda y se lee siempre como cadena JSON completa (nada la
+        // consulta con operadores jsonb), y necesitamos poder BUSCARLA como texto (placa/RUC/cliente/
+        // nº de factura viven aquí). Por eso es `text`: `lower(text)` SÍ se traduce; `lower(jsonb)` no.
+        builder.Property(a => a.MetadataJson).HasColumnType("text");
 
         // Indices para filtrado frecuente
         builder.HasIndex(a => a.FechaDeteccion);

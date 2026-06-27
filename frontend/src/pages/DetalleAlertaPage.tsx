@@ -96,6 +96,7 @@ const METADATA_LABELS: Record<string, string> = {
   CantidadFacturas: "Cantidad de facturas",
   NumerosFactura: "Números de factura",
   Clientes: "Clientes",
+  Rucs: "RUC / cédulas",
   Vendedores: "Despachadores",
 };
 
@@ -108,6 +109,7 @@ const CLAVES_BUSCABLES = new Set([
   "Cliente",
   "Clientes",
   "Ruc",
+  "Rucs",
   "RucCliente",
 ]);
 

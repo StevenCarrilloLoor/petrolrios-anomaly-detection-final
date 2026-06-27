@@ -67,6 +67,11 @@ public sealed class PlacaReutilizadaRule(RiskScoringEngine scoring) : DetectionR
             .Where(c => c.Length > 0)
             .Distinct()
             .ToList();
+        var rucs = facturas
+            .Select(f => f.RucCliente.Trim())
+            .Where(r => r.Length > 0)
+            .Distinct()
+            .ToList();
         var documentos = facturas
             .Select(f => f.NumeroDocumento.Trim())
             .Where(n => n.Length > 0)
@@ -97,6 +102,7 @@ public sealed class PlacaReutilizadaRule(RiskScoringEngine scoring) : DetectionR
                 ["MontoTotal"] = montoTotal,
                 ["NumerosFactura"] = documentos,
                 ["Clientes"] = clientes,
+                ["Rucs"] = rucs,
                 ["Vendedores"] = vendedores
             }
         });

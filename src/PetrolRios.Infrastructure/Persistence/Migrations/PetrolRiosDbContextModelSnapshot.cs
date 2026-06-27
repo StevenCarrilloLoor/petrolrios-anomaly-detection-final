@@ -61,7 +61,7 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("MetadataJson")
-                        .HasColumnType("jsonb");
+                        .HasColumnType("text");
 
                     b.Property<int>("NivelRiesgo")
                         .HasColumnType("integer");
