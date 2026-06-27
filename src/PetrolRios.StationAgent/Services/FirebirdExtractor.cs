@@ -112,6 +112,7 @@ public sealed class FirebirdExtractor
         items.AddRange(await ExtractTypeAsync<AnulacionDto>(connection, "Anulacion", GetAnulacionesSql, efectivo, r => r.FechaAnulacion, ct));
         items.AddRange(await ExtractTypeAsync<CreditoDto>(connection, "Credito", GetCreditosSql, efectivo, r => r.FechaCabecera, ct));
         items.AddRange(await ExtractTypeAsync<TarjetaTurnoDto>(connection, "TarjetaTurno", GetTarjetasSql, efectivo, _ => DateTime.UtcNow, ct));
+        items.AddRange(await ExtractTypeAsync<LiquidacionDto>(connection, "Liquidacion", GetLiquidacionesSql, efectivo, r => r.FechaLiquidacion, ct));
 
         // Fuentes de extracción configurables (multi-tabla). Se combinan dos orígenes:
         //   1) El catálogo CENTRAL (registrado una sola vez por el ingeniero en el servidor;
@@ -702,6 +703,14 @@ public sealed class FirebirdExtractor
         FROM TURN_TARJ tt
         INNER JOIN TURN t ON tt.NUM_TURN = t.NUM_TURN
         WHERE t.FFI_TURN > @Watermark ORDER BY t.FFI_TURN
+        """;
+
+    // Liquidaciones de turno (LIQU). Para el cuadre: un turno cerrado sin fila aquí quedó sin liquidar.
+    private const string GetLiquidacionesSql = """
+        SELECT
+            NUM_LIQU  AS NumeroLiquidacion,  NUM_TURN  AS NumeroTurno,
+            FEC_LIQU  AS FechaLiquidacion,   DIF_LIQU  AS Diferencia
+        FROM LIQU WHERE FEC_LIQU > @Watermark ORDER BY FEC_LIQU
         """;
 
     #endregion

@@ -54,6 +54,7 @@ const ACTION_STYLES: Record<string, { label: string; className: string }> = {
 
 const METADATA_LABELS: Record<string, string> = {
   NumeroTurno: "Número de turno",
+  FechaCierre: "Fecha de cierre del turno",
   VentasEfectivo: "Ventas en efectivo",
   DepositosEfectivo: "Depósitos en efectivo",
   Diferencia: "Diferencia",

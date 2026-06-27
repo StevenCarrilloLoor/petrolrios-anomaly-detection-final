@@ -19,6 +19,7 @@ public static class FuenteDatosPolicy
             ["ANUL"] = "Anulacion",
             ["CRED_CABE"] = "Credito",
             ["TURN_TARJ"] = "TarjetaTurno",
+            ["LIQU"] = "Liquidacion",
         };
 
     /// <summary>¿La tabla ya se procesa automáticamente como una fuente built-in?</summary>

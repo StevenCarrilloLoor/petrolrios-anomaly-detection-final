@@ -21,6 +21,7 @@ public static class CatalogoTiposTransaccion
             ["Anulaciones"] = ("Anulación", "ANUL"),   // variante enviada por agentes antiguos
             ["Credito"] = ("Crédito", "CRED_CABE"),
             ["TarjetaTurno"] = ("Tarjeta de turno", "TURN_TARJ"),
+            ["Liquidacion"] = ("Liquidación de turno", "LIQU"),
             ["Dcto"] = ("Documento", "DCTO"),          // fuente "Dcto" del selector (duplicaba a Factura)
         };
 

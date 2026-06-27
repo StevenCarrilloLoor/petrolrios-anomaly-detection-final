@@ -37,6 +37,7 @@ public static class DependencyInjection
 
         // Job de detección
         services.AddScoped<Jobs.AnomalyDetectionJob>();
+        services.AddScoped<Services.CuadreLiquidacionService>(); // cuadre de liquidación de turno (#3)
 
         // Tiempo real entre instancias: fan-out de alertas por PostgreSQL LISTEN/NOTIFY.
         // (El listener BackgroundService se registra en Program.cs, donde está el hosting.)

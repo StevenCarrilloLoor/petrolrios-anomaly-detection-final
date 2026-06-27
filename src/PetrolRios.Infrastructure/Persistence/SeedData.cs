@@ -249,6 +249,28 @@ public static class SeedData
             nuevas.Add(placaReutilizada);
         }
 
+        // Factura fuera de liquidación / cuadre de turno (mejora #3): al cerrar un turno, sus facturas
+        // deben quedar liquidadas (LIQU). La liquidación llega DESPUÉS del cierre (otro lote), así que no
+        // es un detector de ventana: lo evalúa CuadreLiquidacionService sobre el staging acumulado, una vez
+        // al día (Calendario Diario 23:50). Umbral = horas de gracia tras el cierre antes de alertar.
+        if (!existentes.Contains("FacturaSinLiquidacionHorasUmbral"))
+        {
+            var cuadre = ReglaDeteccion.Create(
+                TipoDetector.InvoiceAnomaly,
+                "Factura fuera de liquidacion (cuadre de turno)",
+                "Genera alerta si un turno CERRADO no aparece en la liquidacion (LIQU) y tiene facturas: combustible facturado que quedo fuera del cuadre de caja. Corre una vez al dia sobre el staging acumulado (30 dias). Umbral = horas de gracia tras el cierre del turno antes de alertar (da tiempo a que llegue su liquidacion).",
+                "FacturaSinLiquidacionHorasUmbral",
+                12.0);
+            cuadre.ProgramacionJson = new ProgramacionEjecucion
+            {
+                Modo = ModoProgramacion.Calendario,
+                CalendarioTipo = TipoCalendario.Diario,
+                Hora = 23,
+                Minuto = 50
+            }.Serializar();
+            nuevas.Add(cuadre);
+        }
+
         if (nuevas.Count > 0)
             await context.ReglasDeteccion.AddRangeAsync(nuevas);
 

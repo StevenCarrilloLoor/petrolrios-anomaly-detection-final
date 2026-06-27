@@ -29,7 +29,16 @@ public sealed class AnomalyDetectionJob
     private readonly IAlertaBroadcaster _broadcaster;
     private readonly IEmailNotificacionService _emailService;
     private readonly IParametrosOperacion _parametros;
+    private readonly Services.CuadreLiquidacionService _cuadre;
     private readonly ILogger<AnomalyDetectionJob> _logger;
+
+    /// <summary>Parámetro de la regla del cuadre de liquidación (mejora #3). No es un detector de
+    /// ventana: lo evalúa <see cref="Services.CuadreLiquidacionService"/> sobre el staging acumulado y
+    /// de forma idempotente, por eso se gestiona aparte del gate de detectores.</summary>
+    private const string ParametroCuadre = "FacturaSinLiquidacionHorasUmbral";
+
+    /// <summary>Días de staging hacia atrás que mira el cuadre (acota el costo; los turnos son diarios).</summary>
+    private const int DiasLookbackCuadre = 30;
 
     public AnomalyDetectionJob(
         IEnumerable<IAnomalyDetector> detectors,
@@ -38,6 +47,7 @@ public sealed class AnomalyDetectionJob
         IAlertaBroadcaster broadcaster,
         IEmailNotificacionService emailService,
         IParametrosOperacion parametros,
+        Services.CuadreLiquidacionService cuadre,
         ILogger<AnomalyDetectionJob> logger)
     {
         _detectors = detectors;
@@ -46,6 +56,7 @@ public sealed class AnomalyDetectionJob
         _broadcaster = broadcaster;
         _emailService = emailService;
         _parametros = parametros;
+        _cuadre = cuadre;
         _logger = logger;
     }
 
@@ -124,6 +135,7 @@ public sealed class AnomalyDetectionJob
 
             foreach (var r in reglas)
             {
+                if (r.ParametroNombre == ParametroCuadre) continue;  // el cuadre no es un detector de ventana (ver abajo)
                 var prog = ProgramacionEjecucion.Leer(r.ProgramacionJson);
                 if (prog.Modo == ModoProgramacion.CadaCiclo) { biCadaCiclo.Add(r.Id); continue; }
                 if (!activaOriginalBi[r.Id]) continue;               // programada pero desactivada: ni corre ni agenda
@@ -132,6 +144,16 @@ public sealed class AnomalyDetectionJob
                 else if (ahora >= r.ProximaEjecucion.Value)
                     corridasProgramadas.Add((r, null, prog));        // le toca: se evalúa por ventana en la Pasada B
             }
+
+            // ── Cuadre de liquidación (mejora #3): se gestiona aparte del gate de detectores ──
+            // No es un detector de ventana: lo evalúa CuadreLiquidacionService sobre el staging acumulado,
+            // de forma idempotente. Solo programable (nunca "cada ciclo": es costoso y el cuadre es diario).
+            var reglaCuadre = reglas.FirstOrDefault(r => r.ParametroNombre == ParametroCuadre);
+            var progCuadre = reglaCuadre is null ? null : ProgramacionEjecucion.Leer(reglaCuadre.ProgramacionJson);
+            var cuadreActivo = reglaCuadre is not null && activaOriginalBi[reglaCuadre.Id];
+            var cuadreAnclar = cuadreActivo && reglaCuadre!.ProximaEjecucion is null;         // primer anclaje: espera su turno
+            var cuadreToca = cuadreActivo && reglaCuadre!.ProximaEjecucion is not null
+                          && ahora >= reglaCuadre.ProximaEjecucion.Value;
             foreach (var r in reglasPersonalizadas)
             {
                 var prog = ProgramacionEjecucion.Leer(r.ProgramacionJson);
@@ -213,6 +235,12 @@ public sealed class AnomalyDetectionJob
                     // UltimaEjecucion evita el solape entre corridas → sin alertas duplicadas).
                 }
 
+                // ── Cuadre de liquidación (#3): turnos cerrados sin liquidar (idempotente, sobre el
+                // staging acumulado; no usa la ventana del Pass B porque la liquidación llega tras el cierre).
+                if (cuadreToca)
+                    totalAlertas += await _cuadre.EvaluarEstacionAsync(
+                        estacion, reglaCuadre!.ValorUmbral, reglaCuadre.Ambito, DiasLookbackCuadre, ct);
+
                 // Digest de problemas operativos al contacto de la estación (carril Operativa)
                 await NotificarOperativasEstacionAsync(estacion, operativasDeEstacion, ct);
 
@@ -222,6 +250,15 @@ public sealed class AnomalyDetectionJob
             // Avanzar la programación (anclar las nuevas + mover la próxima de las que corrieron), una
             // sola vez por ciclo: la regla corre para todas las estaciones, su próxima fecha es global.
             await AvanzarProgramacionAsync(anclajes, corridasProgramadas, ahora, ct);
+
+            // Avanzar la agenda del cuadre (#3): primer anclaje (espera su turno) o avance tras correr.
+            // Se carga con tracking aparte porque 'reglas' está sin tracking (ver carga arriba).
+            if (reglaCuadre is not null && (cuadreAnclar || cuadreToca))
+            {
+                var eCuadre = await _dbContext.ReglasDeteccion.FirstAsync(r => r.Id == reglaCuadre.Id, ct);
+                if (cuadreToca) eCuadre.UltimaEjecucion = ahora;
+                eCuadre.ProximaEjecucion = CalcularProximaUtc(progCuadre!, ahora);
+            }
 
             await _dbContext.SaveChangesAsync(ct);
 
@@ -301,7 +338,7 @@ public sealed class AnomalyDetectionJob
         var tiposConocidos = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "Factura", "DetalleFactura", "CierreTurno", "DepositoTurno",
-            "Anulacion", "Credito", "TarjetaTurno"
+            "Anulacion", "Credito", "TarjetaTurno", "Liquidacion"
         };
         var fuentesGenericas = staging
             .Where(s => !tiposConocidos.Contains(s.TipoTransaccion))

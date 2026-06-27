@@ -91,6 +91,11 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
         parametrosMock.Setup(p => p.Actual())
             .Returns(new PetrolRios.Application.DTOs.Configuracion.OperacionConfig("Critico", "*/5 * * * *"));
 
+        var cuadre = new PetrolRios.Infrastructure.Services.CuadreLiquidacionService(
+            _dbContext,
+            _broadcasterMock.Object,
+            sp.GetRequiredService<ILogger<PetrolRios.Infrastructure.Services.CuadreLiquidacionService>>());
+
         _job = new AnomalyDetectionJob(
             detectors,
             unitOfWorkMock.Object,
@@ -98,6 +103,7 @@ public sealed class AnomalyDetectionJobE2ETests : IDisposable
             _broadcasterMock.Object,
             emailMock.Object,
             parametrosMock.Object,
+            cuadre,
             sp.GetRequiredService<ILogger<AnomalyDetectionJob>>());
     }
 
