@@ -47,6 +47,7 @@ public sealed class PlacaGenericaRule(RiskScoringEngine scoring) : DetectionRule
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = factura.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Fuente = factura,
                 Metadata = new Dictionary<string, object>
                 {
                     ["Placa"] = PlacaGenerica,

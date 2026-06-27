@@ -45,9 +45,14 @@ public abstract class RuleBasedDetector : IAnomalyDetector
             if (config is { Activa: false }) continue; // regla desactivada: no se evalúa
 
             var nuevas = regla.Evaluar(context, config);
-            // Si la regla pidió aviso por correo, marcar sus anomalías para que el job lo envíe.
-            if (config?.NotificarCorreo == true)
-                foreach (var a in nuevas) a.NotificarCorreo = true;
+            foreach (var a in nuevas)
+            {
+                // Evidencia identificable automática (RUC, nº doc, placa, cliente, turno, fecha, monto…)
+                // a partir de la Fuente de la anomalía. No pisa lo que la regla ya puso.
+                EvidenciaEnriquecida.Enriquecer(a.Metadata, a.Fuente);
+                // Si la regla pidió aviso por correo, marcar sus anomalías para que el job lo envíe.
+                if (config?.NotificarCorreo == true) a.NotificarCorreo = true;
+            }
             anomalies.AddRange(nuevas);
         }
 

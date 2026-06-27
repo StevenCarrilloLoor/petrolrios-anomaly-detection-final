@@ -84,6 +84,15 @@ public sealed class DetectedAnomaly
     public Dictionary<string, object> Metadata { get; init; } = [];
 
     /// <summary>
+    /// Objeto de origen de la anomalía (p. ej. una <c>FacturaDto</c>, <c>CierreTurnoDto</c>, <c>CreditoDto</c>…).
+    /// El enriquecedor central refleja de aquí los campos IDENTIFICABLES estándar (RUC, nº de documento,
+    /// placa, vendedor, cliente, turno, fecha, monto, forma de pago) hacia <see cref="Metadata"/>, sin pisar
+    /// las claves que ya puso la regla. Así toda alerta trae la misma información identificable, de forma
+    /// automática y escalable: una regla nueva solo fija <c>Fuente</c> y hereda la evidencia enriquecida.
+    /// </summary>
+    public object? Fuente { get; init; }
+
+    /// <summary>
     /// La regla que originó esta anomalía pidió aviso por correo cuando se dispara (además del aviso
     /// automático de las críticas). Lo marca el orquestador (built-in) o el detector (personalizadas)
     /// desde la configuración de la regla; el job envía el correo. Es settable para poder estamparlo

@@ -42,6 +42,7 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
                     NivelRiesgo = nivel,
                     EstacionId = context.EstacionId,
                     TransaccionReferencia = $"DESP-{detalle.NumeroDespacho}",
+                    Fuente = detalle,
                     Metadata = new Dictionary<string, object>
                     {
                         ["Producto"] = producto,

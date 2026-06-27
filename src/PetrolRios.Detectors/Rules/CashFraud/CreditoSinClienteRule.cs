@@ -40,6 +40,7 @@ public sealed class CreditoSinClienteRule(RiskScoringEngine scoring) : Detection
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = factura.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Fuente = factura,
                 Metadata = new Dictionary<string, object>
                 {
                     ["NumeroDocumento"] = factura.NumeroDocumento,

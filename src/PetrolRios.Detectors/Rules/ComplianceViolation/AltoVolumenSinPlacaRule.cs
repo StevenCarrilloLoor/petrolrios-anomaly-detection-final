@@ -40,6 +40,7 @@ public sealed class AltoVolumenSinPlacaRule(RiskScoringEngine scoring) : Detecti
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = factura.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Fuente = factura,
                 Metadata = new Dictionary<string, object>
                 {
                     ["NumeroDocumento"] = factura.NumeroDocumento,

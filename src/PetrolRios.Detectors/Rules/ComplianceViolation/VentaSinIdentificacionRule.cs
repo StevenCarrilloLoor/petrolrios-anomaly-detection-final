@@ -39,6 +39,7 @@ public sealed class VentaSinIdentificacionRule(RiskScoringEngine scoring) : Dete
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = factura.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Fuente = factura,
                 Metadata = new Dictionary<string, object>
                 {
                     ["NumeroDocumento"] = factura.NumeroDocumento,

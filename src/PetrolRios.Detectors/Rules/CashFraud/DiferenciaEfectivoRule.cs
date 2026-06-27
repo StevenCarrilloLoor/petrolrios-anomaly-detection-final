@@ -54,6 +54,7 @@ public sealed class DiferenciaEfectivoRule(RiskScoringEngine scoring) : Detectio
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = turno.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"TURN-{turno.NumeroTurno}",
+                Fuente = turno,
                 Metadata = new Dictionary<string, object>
                 {
                     ["NumeroTurno"] = turno.NumeroTurno,

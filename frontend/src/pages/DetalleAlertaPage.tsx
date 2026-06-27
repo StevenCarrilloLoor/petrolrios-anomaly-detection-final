@@ -98,6 +98,9 @@ const METADATA_LABELS: Record<string, string> = {
   NumerosFactura: "Números de factura",
   Clientes: "Clientes",
   Rucs: "RUC / cédulas",
+  Ruc: "RUC / cédula",
+  Fecha: "Fecha",
+  FormaPago: "Forma de pago",
   Vendedores: "Despachadores",
 };
 

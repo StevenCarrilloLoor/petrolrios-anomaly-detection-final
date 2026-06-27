@@ -36,6 +36,7 @@ public sealed class CamposObligatoriosRule(RiskScoringEngine scoring) : Detectio
                 EstacionId = context.EstacionId,
                 EmpleadoCodigo = factura.CodigoVendedor.Trim(),
                 TransaccionReferencia = $"DCTO-{factura.SecuenciaDocumento}",
+                Fuente = factura,
                 Metadata = new Dictionary<string, object>
                 {
                     ["NumeroDocumento"] = factura.NumeroDocumento,
