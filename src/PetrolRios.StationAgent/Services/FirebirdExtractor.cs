@@ -77,12 +77,14 @@ public sealed class FirebirdExtractor
         string? tipoDocumento, DateTime? desde, DateTime? hasta, string? codigo, int limite, CancellationToken ct)
     {
         var top = Math.Clamp(limite <= 0 ? 200 : limite, 1, 1000);
+        // Los alias van ENTRE COMILLAS para que Firebird preserve el PascalCase (sin comillas los pasa a
+        // MAYÚSCULAS y el frontend, que lee NumeroDocumento/TotalNeto/etc., vería la tabla vacía).
         var sql = $"""
             SELECT FIRST {top}
-              SEC_DCTO AS SecuenciaDocumento, TIP_DCTO AS TipoDocumento, NUM_DCTO AS NumeroDocumento,
-              FEC_DCTO AS Fecha, COD_CLIE AS Cliente, RUC_DCTO AS Ruc, COD_VEND AS Vendedor,
-              PLA_DCTO AS Placa, COD_PAGO AS FormaPago, NUM_TURN AS NumeroTurno,
-              TSI_DCTO AS TotalSinIva, IVA_DCTO AS Iva, DSC_DCTO AS Descuento, TNI_DCTO AS TotalNeto
+              SEC_DCTO AS "SecuenciaDocumento", TIP_DCTO AS "TipoDocumento", NUM_DCTO AS "NumeroDocumento",
+              FEC_DCTO AS "Fecha", COD_CLIE AS "Cliente", RUC_DCTO AS "Ruc", COD_VEND AS "Vendedor",
+              PLA_DCTO AS "Placa", COD_PAGO AS "FormaPago", NUM_TURN AS "NumeroTurno",
+              TSI_DCTO AS "TotalSinIva", IVA_DCTO AS "Iva", DSC_DCTO AS "Descuento", TNI_DCTO AS "TotalNeto"
             FROM DCTO
             WHERE (@tipo IS NULL OR TIP_DCTO = @tipo)
               AND (@desde IS NULL OR FEC_DCTO >= @desde)
