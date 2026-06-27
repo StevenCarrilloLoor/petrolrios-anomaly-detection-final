@@ -31,6 +31,7 @@ export interface AlertaResponse {
   transaccionReferencia: string | null;
   estacionId: number;
   estacionNombre: string;
+  estacionCodigo: string;
   metadataJson: string | null;
   // Asignación: a quién está asignada la alerta, quién la asignó y cuándo (null si nunca se asignó).
   asignadoAId?: number | null;

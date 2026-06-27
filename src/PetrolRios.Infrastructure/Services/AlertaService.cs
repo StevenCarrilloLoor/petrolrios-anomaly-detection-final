@@ -99,9 +99,11 @@ public sealed class AlertaService : IAlertaService
 
         // Cargar nombres de estación
         var estacionIds = alertas.Select(a => a.EstacionId).Distinct().ToList();
-        var estaciones = await _dbContext.Estaciones
+        var estaciones = (await _dbContext.Estaciones
             .Where(e => estacionIds.Contains(e.Id))
-            .ToDictionaryAsync(e => e.Id, e => e.Nombre, ct);
+            .Select(e => new { e.Id, e.Nombre, e.Codigo })
+            .ToListAsync(ct))
+            .ToDictionary(e => e.Id, e => (e.Nombre, e.Codigo));
 
         // Resolver el nombre del empleado (código → nombre) para mostrarlo junto al código.
         var empleados = await _empleados.CargarAsync(
@@ -144,7 +146,7 @@ public sealed class AlertaService : IAlertaService
 
         var estaciones = alertas
             .GroupBy(a => a.EstacionId)
-            .ToDictionary(g => g.Key, g => g.First().Estacion.Nombre);
+            .ToDictionary(g => g.Key, g => (g.First().Estacion.Nombre, g.First().Estacion.Codigo));
 
         var empleados = await _empleados.CargarAsync(
             alertas.Select(a => (a.EstacionId, a.EmpleadoCodigo)), ct);
@@ -156,7 +158,7 @@ public sealed class AlertaService : IAlertaService
             .Select(g => new ProblemaEstacionGrupo
             {
                 EstacionId = g.Key.EstacionId,
-                EstacionNombre = estaciones.GetValueOrDefault(g.Key.EstacionId, ""),
+                EstacionNombre = estaciones.GetValueOrDefault(g.Key.EstacionId).Nombre ?? "",
                 Fecha = g.Key.Fecha,
                 Total = g.Count(),
                 Problemas = g.Select(a => MapToResponse(a, estaciones, empleados, asignaciones)).ToList()
@@ -174,7 +176,7 @@ public sealed class AlertaService : IAlertaService
 
         if (alerta is null) return null;
 
-        var estaciones = new Dictionary<int, string> { [alerta.EstacionId] = alerta.Estacion.Nombre };
+        var estaciones = new Dictionary<int, (string Nombre, string Codigo)> { [alerta.EstacionId] = (alerta.Estacion.Nombre, alerta.Estacion.Codigo) };
         var empleados = await _empleados.CargarAsync([(alerta.EstacionId, alerta.EmpleadoCodigo)], ct);
         var asignaciones = await CargarAsignacionesAsync([alerta.Id], ct);
         return MapToResponse(alerta, estaciones, empleados, asignaciones);
@@ -199,7 +201,7 @@ public sealed class AlertaService : IAlertaService
 
         await _dbContext.SaveChangesAsync(ct);
 
-        var estaciones = new Dictionary<int, string> { [alerta.EstacionId] = alerta.Estacion.Nombre };
+        var estaciones = new Dictionary<int, (string Nombre, string Codigo)> { [alerta.EstacionId] = (alerta.Estacion.Nombre, alerta.Estacion.Codigo) };
         var empleados = await _empleados.CargarAsync([(alerta.EstacionId, alerta.EmpleadoCodigo)], ct);
         var asignaciones = await CargarAsignacionesAsync([alerta.Id], ct);
         return MapToResponse(alerta, estaciones, empleados, asignaciones);
@@ -231,7 +233,7 @@ public sealed class AlertaService : IAlertaService
         // Avisar al asignado por correo y en tiempo real. No debe romper la asignación si falla el envío.
         await NotificarAsignacionAsync(alerta, auditor, asignador, ct);
 
-        var estaciones = new Dictionary<int, string> { [alerta.EstacionId] = alerta.Estacion.Nombre };
+        var estaciones = new Dictionary<int, (string Nombre, string Codigo)> { [alerta.EstacionId] = (alerta.Estacion.Nombre, alerta.Estacion.Codigo) };
         var empleados = await _empleados.CargarAsync([(alerta.EstacionId, alerta.EmpleadoCodigo)], ct);
         var asignaciones = await CargarAsignacionesAsync([alerta.Id], ct);
         return MapToResponse(alerta, estaciones, empleados, asignaciones);
@@ -348,10 +350,11 @@ public sealed class AlertaService : IAlertaService
     }
 
     private static AlertaResponse MapToResponse(
-        Alerta a, Dictionary<int, string> estaciones, DirectorioEmpleados empleados,
+        Alerta a, Dictionary<int, (string Nombre, string Codigo)> estaciones, DirectorioEmpleados empleados,
         IReadOnlyDictionary<int, AsignacionInfo> asignaciones)
     {
         asignaciones.TryGetValue(a.Id, out var asig);
+        var est = estaciones.GetValueOrDefault(a.EstacionId);
         return new()
         {
             Id = a.Id,
@@ -366,7 +369,8 @@ public sealed class AlertaService : IAlertaService
             EmpleadoNombre = empleados.Nombre(a.EstacionId, a.EmpleadoCodigo),
             TransaccionReferencia = a.TransaccionReferencia,
             EstacionId = a.EstacionId,
-            EstacionNombre = estaciones.GetValueOrDefault(a.EstacionId, ""),
+            EstacionNombre = est.Nombre ?? "",
+            EstacionCodigo = est.Codigo ?? "",
             MetadataJson = a.MetadataJson,
             AsignadoAId = asig?.AuditorId,
             AsignadoANombre = asig?.AuditorNombre,

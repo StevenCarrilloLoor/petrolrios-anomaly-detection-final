@@ -17,6 +17,8 @@ public sealed record AlertaResponse
     public string? TransaccionReferencia { get; init; }
     public int EstacionId { get; init; }
     public string EstacionNombre { get; init; } = string.Empty;
+    /// <summary>Código de la estación (p. ej. "EST-001"). Permite enlazar la evidencia con la consulta en vivo (FacturaPage).</summary>
+    public string EstacionCodigo { get; init; } = string.Empty;
     public string? MetadataJson { get; init; }
 
     // --- Asignación (a quién está asignada la alerta y quién la asignó). Null si nunca se asignó. ---

@@ -23,6 +23,7 @@ import {
   Check,
   ExternalLink,
   Search,
+  FileText,
 } from "lucide-react";
 
 const STATE_TRANSITIONS: Record<string, string[]> = {
@@ -116,6 +117,10 @@ const CLAVES_BUSCABLES = new Set([
   "Rucs",
   "RucCliente",
 ]);
+
+// Claves cuyo valor es un NÚMERO DE FACTURA: además del buscador, ofrecen "Ver factura" → abre la factura
+// COMPLETA en vivo (FacturaPage) en una ventana nueva, para compararla lado a lado (lo pidió la auditora).
+const CLAVES_FACTURA = new Set(["NumeroDocumento", "NumerosFactura"]);
 
 export function DetalleAlertaPage() {
   const { id } = useParams<{ id: string }>();
@@ -331,6 +336,7 @@ export function DetalleAlertaPage() {
                   <ValorEvidencia
                     clave={clave}
                     valor={valor}
+                    estacionCodigo={alerta.estacionCodigo}
                     onBuscar={(q) =>
                       navigate(`/alertas?buscar=${encodeURIComponent(q)}`)
                     }
@@ -576,13 +582,16 @@ function CopyButton({ value }: { value: string }) {
 function ValorEvidencia({
   clave,
   valor,
+  estacionCodigo,
   onBuscar,
 }: {
   clave: string;
   valor: unknown;
+  estacionCodigo: string;
   onBuscar: (q: string) => void;
 }) {
   const buscable = CLAVES_BUSCABLES.has(clave);
+  const esFactura = CLAVES_FACTURA.has(clave);
 
   if (Array.isArray(valor)) {
     const items = valor.map(String).filter((v) => v.length > 0);
@@ -591,17 +600,30 @@ function ValorEvidencia({
     return (
       <span className="flex flex-wrap justify-end gap-1">
         {items.map((v, i) => (
-          <ChipValor key={`${v}-${i}`} value={v} buscable={buscable} onBuscar={onBuscar} />
+          <ChipValor
+            key={`${v}-${i}`}
+            value={v}
+            buscable={buscable}
+            esFactura={esFactura}
+            estacionCodigo={estacionCodigo}
+            onBuscar={onBuscar}
+          />
         ))}
       </span>
     );
   }
 
   const texto = formatearValor(valor);
-  if (buscable && texto !== "—") {
+  if ((buscable || esFactura) && texto !== "—") {
     return (
       <span className="flex justify-end">
-        <ChipValor value={texto} buscable onBuscar={onBuscar} />
+        <ChipValor
+          value={texto}
+          buscable={buscable}
+          esFactura={esFactura}
+          estacionCodigo={estacionCodigo}
+          onBuscar={onBuscar}
+        />
       </span>
     );
   }
@@ -612,16 +634,24 @@ function ValorEvidencia({
   );
 }
 
-/** Pastilla de un valor: enlace de búsqueda (si aplica) + botón copiar. */
+/**
+ * Pastilla de un valor: enlace de búsqueda (si aplica) + "Ver factura" (si es un n° de factura y tenemos
+ * el código de estación) + botón copiar. "Ver factura" abre la factura COMPLETA en vivo en una ventana nueva.
+ */
 function ChipValor({
   value,
   buscable,
+  esFactura,
+  estacionCodigo,
   onBuscar,
 }: {
   value: string;
   buscable: boolean;
+  esFactura: boolean;
+  estacionCodigo: string;
   onBuscar: (q: string) => void;
 }) {
+  const verFactura = esFactura && estacionCodigo.length > 0;
   return (
     <span className="inline-flex items-center gap-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs ring-1 ring-border">
       {buscable ? (
@@ -636,6 +666,17 @@ function ChipValor({
         </button>
       ) : (
         <span className="font-medium text-foreground">{value}</span>
+      )}
+      {verFactura && (
+        <a
+          href={`/consultas/factura?est=${encodeURIComponent(estacionCodigo)}&num=${encodeURIComponent(value)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={`Ver la factura ${value} completa en una ventana nueva`}
+          className="inline-flex shrink-0 items-center gap-0.5 rounded bg-primary/10 px-1 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+        >
+          <FileText size={11} /> factura
+        </a>
       )}
       <CopyButton value={value} />
     </span>
