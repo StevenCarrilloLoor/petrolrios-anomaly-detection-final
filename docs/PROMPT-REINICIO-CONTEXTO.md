@@ -114,14 +114,19 @@ automáticos. Base: la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`) y 
   pago, sin pisar lo de la regla. `Fuente` fijada en 10 reglas (incl. diferencia de efectivo, la del caso de la
   auditora). Frontend etiqueta/enlaza las claves nuevas. +4 pruebas → Detectors 193. *(Falta: extender `Fuente`
   al resto de reglas built-in + a las personalizadas.)*
-- **Etapas 3–4 HECHAS (CAMBIOS §91, commits `8d0e651` + `7166e40` + fix `699dbb1`, gate verde + QA E2E en vivo):**
-  **consulta en vivo a Firebird**. Cola `IConsultasFirebird` (en memoria, espejo de `ISolicitudesEsquema`):
-  `ConsultasController` (POST encolar / GET sondear / POST resultado del agente); el heartbeat (1 s) entrega las
-  consultas pendientes; el agente corre `FirebirdExtractor.ConsultarDocumentosAsync` (SELECT SOLO LECTURA sobre
-  DCTO por tipo+fechas+código que CONTAINING RUC/placa/cliente/nº) y devuelve. Frontend: **pestaña "Consultas"**
-  + **`/consultas/factura`** (factura completa en **ventana nueva**, imprimir). +5 pruebas → Api 99. **QA E2E:**
-  consulta `FV`/`1790` → el agente devolvió **50 facturas reales**. 🐞 Fix `699dbb1`: alias del SELECT entre
-  comillas (Firebird los devolvía en MAYÚSCULAS → la tabla salía vacía; lo cazó la consulta real, no el gate).
+- **Etapas 3–4 HECHAS + VERIFICADAS EN VIVO (CAMBIOS §91–92, commits `8d0e651` + `7166e40` + `699dbb1` + `5f149a9`,
+  gate verde 334 tests + QA en Chrome):** **consulta en vivo a Firebird**. Cola `IConsultasFirebird` (en memoria,
+  espejo de `ISolicitudesEsquema`): `ConsultasController` (POST encolar / GET sondear / POST resultado del agente);
+  el heartbeat (1 s) entrega las consultas pendientes; el agente corre `FirebirdExtractor.ConsultarDocumentosAsync`
+  (SELECT SOLO LECTURA sobre DCTO por tipo+fechas+código que CONTAINING RUC/placa/cliente/nº) y devuelve. Frontend:
+  **pestaña "Consultas"** + **`/consultas/factura`** (factura completa en **ventana nueva**, imprimir). +5 pruebas
+  → Api 99. **QA en vivo en Chrome (§92):** buscar por RUC largo `1301790737` → **21 facturas FV reales** en la
+  tabla + **factura completa en ventana nueva** (Nº `006103000014084`, FV, cliente ZZ0067712, RUC, placa GPO0947,
+  despachador DD0000006, turno 161, base $6.09 / IVA $0.91). 🐞 **Dos fixes cazados por el QA real (el gate no los
+  veía, la prueba del agente usa JSON fijo):** `699dbb1` alias del SELECT entre comillas (Firebird preserva
+  PascalCase — confirmado en vivo tras recompilar el agente; el MAYÚSCULAS previo era binario viejo en memoria);
+  `5f149a9` `CAST(col AS VARCHAR(60))` antes de `CONTAINING` (evita `string right truncation` cuando el código es
+  más largo que una columna estrecha como `PLA_DCTO` CHAR(8)) + `normalizarDoc` case-insensitive en el frontend.
 - *(Etapa 5 pendiente: **pulido UI** del detalle de alerta. Y refinamientos: enlazar la factura desde el detalle
   de alerta, las líneas DESP de la factura, y extender `Fuente` al resto de reglas.)*
 

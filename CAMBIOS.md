@@ -2648,3 +2648,48 @@ Commits: `8d0e651` (cola agente+central), `7166e40` (pestaña Consultas + factur
 *(Pendiente: enlazar la factura desde el detalle de alerta; líneas DESP; pulido UI.)*
 
 ---
+
+---
+
+## 92. Consulta en vivo: fix de truncado (`CAST` en `CONTAINING`) + normalización de claves — cazado por QA en vivo
+
+**Motivación.** QA en vivo de la pestaña **Consultas** (§91 / tarea #140): al buscar por un **RUC largo**
+(`1301790737`, 10+ dígitos) la UI mostraba el banner rojo
+*"arithmetic exception, numeric overflow, or string truncation — string right truncation"* y la tabla
+quedaba vacía. El gate no lo veía (la prueba unitaria del agente usa un JSON fijo, no toca Firebird); lo
+destapó la consulta real contra la base de la estación.
+
+**Causa raíz.** En `col CONTAINING @codigo`, **Firebird describe el parámetro con el ancho de la columna**.
+Algunas columnas del filtro son estrechas (p. ej. `PLA_DCTO` es `CHAR(8)`); cuando el código buscado es más
+largo que la columna (un RUC de 13), el motor rechaza el *bind* con *string right truncation*. El bug no
+saltaba con códigos cortos (`1790`, 4 chars) porque caben en cualquier columna — por eso el E2E anterior
+(que usaba `1790`) pasó sin verlo.
+
+**Qué se hizo.**
+
+- **Agente (`FirebirdExtractor.ConsultarDocumentosAsync`).** El filtro por código ahora hace
+  `CAST(col AS VARCHAR(60)) CONTAINING @codigo` sobre las cuatro columnas (`RUC_DCTO`, `PLA_DCTO`,
+  `COD_CLIE`, `NUM_DCTO`). Al castear a un VARCHAR ancho, el parámetro se describe con 60 de ancho y el
+  valor siempre cabe; la búsqueda por subcadena (case-insensitive) sigue igual. Comentario en el código
+  explicando el porqué.
+- **Frontend (`consultas.service.ts`).** Defensa en profundidad: `normalizarDoc` reasigna cada campo del
+  documento por nombre **case-insensitive** (`NumeroDocumento`/`NUMERODOCUMENTO`/…), de modo que la tabla y
+  la factura renderizan **venga como venga la caja** desde el driver de Firebird (importa para la base real
+  de San Pío, cuyo locale/driver podría diferir del de desarrollo).
+
+**Verificación.**
+
+- **Gate `_gate.bat`** (PC de Steven, Explorador): **build Release 0/0**, **tests 334** (Domain 40 /
+  Detectors 193 / Api 99 / Monitor 2), **EF sin cambios de modelo**, **eslint OK**, **`tsc -b && vite build`
+  OK**.
+- **E2E en vivo** (agente recompilado, EST-001 contra la Firebird real): la consulta por RUC `1301790737`
+  devuelve **21 facturas FV reales** (antes: error de truncado). Además se confirma que los alias citados
+  (commit `699dbb1`) ahora sí preservan **PascalCase** (`SecuenciaDocumento`, `Ruc`, `TotalNeto`…): el
+  MAYÚSCULAS anterior era un binario viejo en memoria, no el código.
+- **Chrome (UI completa):** la tabla de **Consultas** lista los 21 documentos (Nº, fecha, tipo, cliente,
+  RUC, placa, turno, total) sin banner de error; **"Ver factura"** abre la **FacturaPage** en ventana nueva
+  con la cabecera completa (Nº `006103000014084`, FV, 5/6/2025, cliente ZZ0067712, RUC `1301790737`, placa
+  GPO0947, despachador DD0000006, turno 161) e importes (base $6.09, IVA $0.91) y botón **Imprimir**.
+
+Commit: `5f149a9` (código). Cadena de la ronda Consultas: `8d0e651` (cola de solicitudes) → `7166e40`
+(pestaña + factura) → `699dbb1` (alias citados) → `5f149a9` (CAST + normalización).
