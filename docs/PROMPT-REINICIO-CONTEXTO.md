@@ -96,6 +96,19 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**CIERRE DE PENDIENTES (27-jun-2026, §94, commits `25334b6`/`ac371aa`/`f239a3a`, gate verde 334 tests + QA en
+vivo):** (a) **`Fuente` extendida a las 4 reglas de factura restantes** (FueraHorario, FechaFueraDeRango,
+ReversionTardia, DespachosRapidos) → su evidencia hereda RUC/nº doc (enlace)/placa/cliente/turno/forma de
+pago/monto; las reglas **agregadas** (por empleado/vendedor/placa) y las de **crédito/turno/tarjeta NO se
+tocan** (no tienen documento único; sería redundante/engañoso). (b) **«Despacho no facturado» DESACTIVADA por
+defecto (#136)**: `FAC_DESP` es la FORMA DE PAGO del despacho, no un flag 0/1 de facturado (lo confirma el
+stored procedure del esquema) → la heurística daba falsos positivos; off por `SeedData` (Activa=false, espejo
+del patrón de FueraHorario); QA en vivo: toggle inactivo. La detección correcta exige el cruce
+`DESP.NUM_DESP↔DCTO.NDO_DCTO` con staging+gracia (futuro). (c) **Despachador (COD_VEND) buscable en Consultas +
+Nº de despacho (NDO_DCTO) en la factura** («Despacho (origen)»); QA en vivo: 200 docs por «005»; factura real
+`006102000024646` → despacho **39904** (confirma que el cruce es viable). Refinamiento restante (opcional): el
+detalle de la **línea** DESP (producto/galones/precio) dentro de la factura.
+
 **Ronda ERP/UX (27-jun-2026, EN PROGRESO por etapas — Steven pidió 5 cosas, "tú decides el orden, todo seguido"):**
 (1) pulir UI del detalle de alerta; (2) **hipervínculos de verdad**: nº de documento → factura COMPLETA
 (cabecera DCTO + líneas DESP) y reportes por cliente/RUC y despachador (rango de fechas, **abrir en ventana

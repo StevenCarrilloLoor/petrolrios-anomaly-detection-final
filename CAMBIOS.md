@@ -2732,3 +2732,45 @@ alerta (necesita mapear estacionId→código)"*.
 `8d0e651`/`7166e40`/`699dbb1`/`5f149a9`, (5) este enlace alerta→factura `e0a1f4f`.
 
 Commit: `e0a1f4f` (código).
+
+---
+
+## 94. Cierre de pendientes: evidencia universal, regla DespachoNoFacturado y despachador/Nº de despacho
+
+Ronda "arregla todo lo que falta" (a pedido de Steven). Tres cambios lógicos e independientes, cada uno con
+su gate verde (build Release 0/0, **334 tests** — Domain 40 / Detectors 193 / Api 99 / Monitor 2 —, EF sin
+cambios de modelo, eslint + `tsc -b && vite build` OK).
+
+**94.1 · Evidencia identificable en las 4 reglas de factura que faltaban (`25334b6`).** La evidencia
+automática (`EvidenciaEnriquecida`, vía `DetectedAnomaly.Fuente`) ya cubría 10 reglas; se auditaron las 25 y
+se añadió `Fuente` a las **4 restantes basadas en factura**: `FueraHorarioRule`, `FechaFueraDeRangoRule`
+(rama de factura), `ReversionTardiaRule` (la factura original revertida) y `DespachosRapidosRule` (la primera
+factura de la racha). Ahora esas alertas heredan automáticamente RUC, nº de documento (con enlace a la
+factura), placa, cliente, turno, forma de pago y monto. **Las reglas agregadas** (por empleado/vendedor/placa:
+gineteo, efectivo corporativo, tasa de anulaciones, múltiple combustible, anulaciones recurrentes) **y las de
+crédito/turno/tarjeta NO se tocaron a propósito**: no tienen un documento único que enriquecer; `FacturaDto`
+es el único DTO cuyos nombres calzan con el mapa estándar (RucCliente, NumeroDocumento, Placa, CodigoCliente,
+NumeroTurno, CodigoPago, FechaDocumento, TotalNeto), así que forzar `Fuente` ahí sería redundante o engañoso.
+Las reglas personalizadas ya enriquecen por su propio mecanismo (campos a mostrar + relaciones).
+
+**94.2 · "Despacho no facturado" deshabilitada por defecto — #136 (`ac371aa`).** La regla se apoyaba en
+`FAC_DESP`, que **NO es un indicador 0/1 de "facturado"**: en Contaplus es la FORMA DE PAGO del despacho
+(contado/tarjeta/crédito/cheque). Lo confirma el propio stored procedure del esquema
+(`FAC_DESP in ('0','1','2','5','6')→CONTADO`, `('4','7','8','9')→TARJETAS`): todo despacho con un código de
+FAC_DESP ya fue pagado, así que la heurística producía falsos positivos (disparaba sobre ventas de contado con
+`FAC_DESP='0'`). La detección correcta exige cruzar `DESP.NUM_DESP ↔ DCTO.NDO_DCTO` sobre el staging acumulado
+con periodo de gracia (un servicio análogo a `CuadreLiquidacionService`), no por lote. Se deshabilita por
+defecto (`UmbralPorDefecto=0` + bloque de reconciliación en `SeedData` que la pone `Activa=false`, espejo del
+patrón ya usado para "Fuera de horario") y se documenta el rework correcto como trabajo futuro. La lógica de
+la regla y sus pruebas unitarias quedan intactas (en el test `config` es null → corre); solo cambia el seed.
+
+**94.3 · Despachador buscable + Nº de despacho en la consulta/factura (`f239a3a`).** La consulta en vivo
+(`FirebirdExtractor.ConsultarDocumentosAsync`) ahora también busca por **`COD_VEND`** (despachador → sus
+despachos por rango de fechas, lo pidió la auditora) y devuelve **`NDO_DCTO` como `NumeroDespacho`**; la
+`FacturaPage` muestra el campo **"Despacho (origen)"** y la `ConsultasPage` lo anuncia en su ayuda y etiqueta.
+El **detalle de la línea de surtidor** (producto, galones, precio unitario) requiere el cruce
+`DESP.NUM_DESP ↔ DCTO.NDO_DCTO` (tipos distintos: `Char(20)` vs `Double`, el mismo cruce diferido en #136);
+se documenta como pendiente en vez de forzar un join frágil que arriesgue la consulta principal (que hoy
+funciona perfecta).
+
+Commits: `25334b6`, `ac371aa`, `f239a3a`.
