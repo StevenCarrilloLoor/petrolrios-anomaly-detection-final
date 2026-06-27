@@ -1,10 +1,10 @@
 # Backlog / pendientes — PetrolRíos
 
 Lista viva de lo acordado en las sesiones, con estado. Orden = prioridad sugerida.
-Última actualización: 27 de junio de 2026 (análisis ContaPlus + entrevista auditoría → `docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md`. **Hallazgo: `FAC_DESP` = forma de pago, NO "facturado"** → diccionario corregido; la regla "Despacho no facturado" hay que rehacerla con cruce `NUM_DESP↔NDO_DCTO`. Backlog de auditoría priorizado anotado).
+Última actualización: 27 de junio de 2026 (backlog auditoría #1 **HECHO**: regla "Placa reutilizada en el día" `99d3330` — Detectors 189. Antes: análisis ContaPlus + corrección `FAC_DESP` `f7cf7cb`).
 
 ## 🧾 Backlog de auditoría (entrevista Juan Valdez) — ver docs/ANALISIS-CONTAPLUS-Y-ENTREVISTA-AUDITORIA.md
-- [ ] 🔴 **Misma placa/cliente facturada N+ veces al día** (reutilización de placa; caso real 14×/día, riesgo SRI). Regla nueva, ventana diaria, umbral configurable (auditora sugiere 2).
+- [x] 🔴 **Misma placa facturada N+ veces al día** (reutilización de placa; caso real 14×/día, riesgo SRI). **HECHO `99d3330`**: `PlacaReutilizadaRule` (InvoiceAnomaly), programada **diaria** (Calendario 23:55, ventana del día, sin duplicados), umbral configurable `PlacaReutilizadaDiaUmbral` (default 5; auditora sugiere 2), excluye placa genérica. +7 pruebas → Detectors 189. *Pendiente: QA en vivo en Chrome.*
 - [ ] 🔴 **Factura no incluida en ninguna liquidación** (cuadre de turno; requiere enviar `LIQU` + `NUM_TURN`).
 - [ ] 🔴 **Rehacer/desactivar "Despacho no facturado"** (FAC_DESP es forma de pago; usar cruce `DESP.NUM_DESP↔DCTO.NDO_DCTO`, verificar contra datos).
 - [ ] 🟠 Hipervínculos en alertas (cliente/RUC→facturas, factura completa, ventana nueva, despachador→despachos+reporte); buscador por placa/RUC/nombre; nº de factura visible; dashboard filtrable por estación; reportería en la misma pantalla.

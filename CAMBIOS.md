@@ -2316,3 +2316,40 @@ schema real —`SEC_DCTO`,`TNI_DCTO`—); las **imágenes y la entrevista** son 
 
 **Verificación.** Cambios no funcionales (literales de texto + comentarios + un `.md`): build Release verde,
 suites sin cambios. *Pendiente de confirmar con Steven qué del backlog abordar primero.*
+
+Commit: `f7cf7cb`.
+
+---
+
+## 83. Regla nueva (auditoría #1): "Placa reutilizada en el día"
+
+**Motivación.** Primer ítem 🔴 del backlog de auditoría (§82). La auditora describió un caso real: **14
+facturas en un mismo día a la misma placa**. Es el patrón de *reutilización de placa* — el despachador
+carga ventas a una placa "comodín" de un cliente frecuente para cuadrar efectivo o emitir facturas
+ficticias, lo que expone a la estación a una **denuncia ante el SRI**. La regla existente "Despachos
+rápidos sucesivos" usa una ventana de **minutos**; faltaba la mirada **por jornada**.
+
+**Qué se hizo.**
+
+- **`PlacaReutilizadaRule`** (`src/PetrolRios.Detectors/Rules/InvoiceAnomaly/`, carril Auditoría). Agrupa
+  las facturas por **(placa normalizada, día)** y alerta cuando una placa supera el umbral en el día.
+  **Excluye** la placa genérica `ZZZ999949` (consumidor final, que aparece legítimamente cientos de veces;
+  su exceso lo controla `PlacaGenericaRule`) y las placas vacías. Mete en la evidencia: placa, día, conteo,
+  umbral, monto total, **números de factura**, clientes y vendedores involucrados (más riesgo si varios
+  despachadores cargaron la misma placa el mismo día). Se auto-registra por reflexión (no toca la DI).
+- **Programación diaria.** Como el conteo es *por jornada*, la regla **no corre "cada ciclo"** (vería solo
+  el lote incremental de minutos): se siembra con **Calendario Diario 23:55** (hora de estación), de modo
+  que el Pass B del job la evalúe una vez al día sobre la **ventana del día** (`DiasVentanaSugerida=1`),
+  con ventanas no solapadas → sin alertas duplicadas. Encaja con el "ejecutar la regla tras el cierre" que
+  pidió la auditora y con el motor de programación por regla (§79/Etapas 1–5).
+- **Umbral configurable** (`PlacaReutilizadaDiaUmbral`, **default 5**). Se sembró conservador para no
+  inundar en el primer despliegue; la **auditora sugiere bajarlo hasta 2** y es editable en un clic desde
+  Reglas. Sembrado idempotente en `SeedData.EnsureReglasNuevasAsync` (también aplica a bases existentes).
+- **+7 pruebas** (`PlacaReutilizadaRuleTests`): sobre umbral, en umbral (no dispara), placa genérica
+  excluida, placas distintas, repartida en dos días (no dispara), umbral configurable a 2, regla inactiva.
+
+**Verificación.** `_gate1.bat` lanzado desde el Explorador (en la PC de Steven): **build Release 0
+warnings/0 errors**; **tests verdes** — Domain 40, **Detectors 189 (+7)**, Api 59 (+18 skip de
+integración), Monitor 2. Sin cambio de esquema EF (solo clase de regla + seed de datos).
+
+Commit: `99d3330`.

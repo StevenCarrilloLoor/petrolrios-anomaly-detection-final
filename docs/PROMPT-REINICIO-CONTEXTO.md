@@ -96,7 +96,23 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**Última ronda — Frecuencia/calendario por regla (26-jun-2026) — ✅ COMPLETO (Etapas 1-5):**
+**Última ronda — Mejoras de auditoría (27-jun-2026) — EN PROGRESO (4 ítems, el #1 hecho):**
+Steven seleccionó las 4 mejoras del backlog de auditoría (§82) y pidió implementarlas todas:
+(1) 🔴 placa reutilizada N+/día, (2) 🟠 UX de alertas (hipervínculos + copiar + nº factura + buscador),
+(3) 🔴 factura fuera de liquidación, (4) 🟠 dashboard por estación + reportería. Método de trabajo: scripts
+`.bat` lanzados desde el **Explorador** (full tier) — el portapapeles ya está concedido, así que el pegado
+en la barra de direcciones funciona (Terminal/VS Code son "clic", no se puede teclear en ellos).
+- **#1 HECHO (CAMBIOS §83, commit `99d3330`):** `PlacaReutilizadaRule` (InvoiceAnomaly, carril Auditoría).
+  Agrupa facturas por **(placa, día)** y alerta si una placa supera el umbral en el día. Excluye placa
+  genérica `ZZZ999949` y vacías. **Programada DIARIA** (Calendario 23:55 EC; el conteo es por jornada, así
+  que NO corre "cada ciclo": el Pass B la evalúa una vez/día sobre la ventana del día, `DiasVentana=1`, sin
+  duplicados). Umbral `PlacaReutilizadaDiaUmbral` (default **5**; auditora sugiere **2**), sembrado idempotente
+  en `SeedData`. +7 pruebas → **Detectors 189**. *Pendiente: QA en vivo en Chrome (poner ProximaEjecucion en
+  pasado o bajar el umbral para dispararla en una corrida).*
+- **#2/#3/#4 pendientes.** El #3 (factura fuera de liquidación) requiere que el **agente envíe `LIQU` +
+  `NUM_TURN`**; verificar el enlace `LIQU.NUM_TURN↔DCTO.NUM_TURN` contra datos antes de cablear.
+
+**Ronda — Frecuencia/calendario por regla (26-jun-2026) — ✅ COMPLETO (Etapas 1-5):**
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de
   **doble modo** validado. **Cronos** (NuGet) calcula próximas fechas con `L`=último día, bisiestos, TZ →
   se usa para el modo Calendario (no reinventar la matemática).
