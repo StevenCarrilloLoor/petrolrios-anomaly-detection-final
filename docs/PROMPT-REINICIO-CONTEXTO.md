@@ -114,10 +114,16 @@ automáticos. Base: la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`) y 
   pago, sin pisar lo de la regla. `Fuente` fijada en 10 reglas (incl. diferencia de efectivo, la del caso de la
   auditora). Frontend etiqueta/enlaza las claves nuevas. +4 pruebas → Detectors 193. *(Falta: extender `Fuente`
   al resto de reglas built-in + a las personalizadas.)*
-- *(Etapas 3–5 pendientes: **cola de consulta en vivo a Firebird** (entidad + agente on-demand + central) →
-  **pestaña Consultas + factura completa + reportes** cliente/RUC/despachador en ventana nueva → **pulido UI**
-  del detalle. La etapa 3 es la más grande: espejo de `ISolicitudesEsquema`, el agente recoge la consulta en
-  su heartbeat (1 s) y devuelve datos SOLO LECTURA de Firebird.)*
+- **Etapas 3–4 HECHAS (CAMBIOS §91, commits `8d0e651` + `7166e40` + fix `699dbb1`, gate verde + QA E2E en vivo):**
+  **consulta en vivo a Firebird**. Cola `IConsultasFirebird` (en memoria, espejo de `ISolicitudesEsquema`):
+  `ConsultasController` (POST encolar / GET sondear / POST resultado del agente); el heartbeat (1 s) entrega las
+  consultas pendientes; el agente corre `FirebirdExtractor.ConsultarDocumentosAsync` (SELECT SOLO LECTURA sobre
+  DCTO por tipo+fechas+código que CONTAINING RUC/placa/cliente/nº) y devuelve. Frontend: **pestaña "Consultas"**
+  + **`/consultas/factura`** (factura completa en **ventana nueva**, imprimir). +5 pruebas → Api 99. **QA E2E:**
+  consulta `FV`/`1790` → el agente devolvió **50 facturas reales**. 🐞 Fix `699dbb1`: alias del SELECT entre
+  comillas (Firebird los devolvía en MAYÚSCULAS → la tabla salía vacía; lo cazó la consulta real, no el gate).
+- *(Etapa 5 pendiente: **pulido UI** del detalle de alerta. Y refinamientos: enlazar la factura desde el detalle
+  de alerta, las líneas DESP de la factura, y extender `Fuente` al resto de reglas.)*
 
 ---
 
