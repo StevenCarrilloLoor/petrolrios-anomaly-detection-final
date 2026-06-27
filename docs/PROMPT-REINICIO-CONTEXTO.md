@@ -115,9 +115,18 @@ en la barra de direcciones funciona (Terminal/VS Code son "clic", no se puede te
   `AlertasPage` (placa/RUC/nº factura/cliente/código) + `?buscar=` en URL; en el detalle, evidencia con
   **pastillas-enlace** (placa/nº factura/cliente → `/alertas?buscar=`) + **botón copiar** + **abrir en
   ventana nueva** + etiquetas de la regla de placa. Gate verde (build/tests/eslint/vite). *Pendiente: QA Chrome.*
-- **#3/#4 pendientes.** #4 = dashboard filtrable por estación + reportería (incluye "ver facturas del
-  cliente"). #3 (factura fuera de liquidación) requiere que el **agente envíe `LIQU` + `NUM_TURN`**;
-  verificar el enlace `LIQU.NUM_TURN↔DCTO.NUM_TURN` contra datos antes de cablear.
+- **#4 HECHO (CAMBIOS §85, commit `594f186`):** dashboard por estación. **Backend:** `AlertasAuditoria`
+  ahora es método `AlertasAuditoria(int? estacionId)`; `?estacionId=` opcional en KPIs/tendencia/tipo/
+  nivel/métricas/top-empleados (la comparativa "por estación" queda global). **Frontend:** selector de
+  estación en `DashboardPage` (acota todo salvo la comparativa, `keepPreviousData` para no parpadear) +
+  botón **Imprimir/PDF** (`window.print()` + `print:hidden`). Gate verde. *Pendiente: QA Chrome.*
+- **#3 pendiente (la más pesada):** factura fuera de liquidación. Requiere **cambios en el agente**
+  (`StationAgent` debe consultar `LIQU` y enviarla con `NUM_TURN`) + **republicar el agente**, y
+  **verificar el enlace `LIQU.NUM_TURN↔DCTO.NUM_TURN` contra datos reales de San Pío** (vía ISQL) ANTES de
+  cablear la regla. Luego: regla nueva + tests + seed.
+- **Pendiente transversal: QA en vivo en Chrome** de #1/#2/#4. Requiere **reconstruir/redesplegar el
+  frontend y reiniciar el API** (el reinicio siembra la regla de placa). Hoy corre el build anterior
+  (API `localhost:5170`, UI `8080`; vite dev apagado).
 
 **Ronda — Frecuencia/calendario por regla (26-jun-2026) — ✅ COMPLETO (Etapas 1-5):**
 - Investigación (pedida): **Quartz** = SimpleTrigger (intervalo) vs CronTrigger (calendario) → diseño de

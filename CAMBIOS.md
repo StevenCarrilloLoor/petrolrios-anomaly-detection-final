@@ -2389,3 +2389,34 @@ las demás de la misma placa/cliente (y abrirlas en otra pestaña para comparar)
 vivo en Chrome.*
 
 Commit: `e5d7bdb`.
+
+---
+
+## 85. Dashboard por estación (auditoría #4)
+
+**Motivación.** Backlog de auditoría 🟠 (§82): *"el dashboard mezcla todas las estaciones; las alertas ya
+se filtran, el dashboard no"*. La auditora quiere ver el panel **acotado a una estación** y poder
+**imprimir/exportar** desde la misma pantalla.
+
+**Qué se hizo.**
+
+- **Backend.** `DashboardService.AlertasAuditoria` pasó de propiedad a **método `AlertasAuditoria(int?
+  estacionId)`** que, si llega `estacionId`, agrega `.Where(a => a.EstacionId == …)`. Se enhebró por
+  `IDashboardService`/`DashboardController` (parámetro `?estacionId=`, opcional) en **KPIs, tendencia,
+  distribución por tipo, por nivel, métricas de resolución y ranking de empleados**. La comparativa
+  **"alertas por estación" queda global** (es la vista cruzada y alimenta el selector). Las tarjetas
+  "estaciones en línea / totales" siguen siendo de flota (no se filtran). Parámetro opcional → no rompe
+  llamadas existentes.
+- **Frontend.** `DashboardPage` tiene un **selector de estación** (Todas / cada estación) que acota todos
+  los paneles salvo la comparativa; `estacionId` entra en las `queryKeys` y se usa `keepPreviousData` para
+  cambiar de estación **sin parpadeo a esqueleto**. El subtítulo refleja la estación elegida. Botón
+  **"Imprimir / PDF"** (`window.print()`, con `print:hidden` en los controles para una impresión limpia)
+  → reportería en la misma pantalla. El service del frontend pasa `estacionId` a los 6 endpoints.
+- **Nota:** el Excel completo sigue en la pestaña **Reportes** (no se duplicó); aquí se cubre el "imprimir
+  /PDF sin salir del dashboard".
+
+**Verificación.** `_gate3.bat` desde el Explorador (PC de Steven): **build Release 0/0** (tras corregir un
+uso de `AlertasAuditoria` como propiedad → método), **tests** Domain 40 / Detectors 189 / Api 59 / Monitor
+2, **eslint OK**, **`tsc -b && vite build` OK**. *Pendiente: QA en vivo en Chrome.*
+
+Commit: `594f186`.
