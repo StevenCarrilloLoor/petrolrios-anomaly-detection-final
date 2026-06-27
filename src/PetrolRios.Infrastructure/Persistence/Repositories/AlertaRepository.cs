@@ -19,9 +19,9 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
     public async Task<IReadOnlyList<Alerta>> GetFilteredAsync(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
         int? estacionId, DateTime? desde, DateTime? hasta,
-        int page, int pageSize, CancellationToken ct)
+        int page, int pageSize, string? buscar, CancellationToken ct)
     {
-        var query = ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta);
+        var query = ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta, buscar);
         return await query
             .OrderByDescending(a => a.FechaDeteccion)
             .Skip((page - 1) * pageSize)
@@ -32,9 +32,9 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
 
     public async Task<int> GetFilteredCountAsync(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
-        int? estacionId, DateTime? desde, DateTime? hasta, CancellationToken ct)
+        int? estacionId, DateTime? desde, DateTime? hasta, string? buscar, CancellationToken ct)
     {
-        return await ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta).CountAsync(ct);
+        return await ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta, buscar).CountAsync(ct);
     }
 
     public async Task<int> CountByEmpleadoAndTipoAsync(
@@ -46,7 +46,7 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
 
     private IQueryable<Alerta> ApplyFilters(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
-        int? estacionId, DateTime? desde, DateTime? hasta)
+        int? estacionId, DateTime? desde, DateTime? hasta, string? buscar)
     {
         // La bandeja de auditoría muestra SOLO alertas de ámbito Auditoría (fraude).
         // Los problemas operativos (turno sin cerrar, despacho no facturado, campos
@@ -59,6 +59,20 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
         if (estacionId.HasValue) query = query.Where(a => a.EstacionId == estacionId.Value);
         if (desde.HasValue) query = query.Where(a => a.FechaDeteccion >= desde.Value);
         if (hasta.HasValue) query = query.Where(a => a.FechaDeteccion <= hasta.Value);
+
+        // Búsqueda libre (la pidió auditoría): por placa, RUC, nº de factura, cliente o código de
+        // empleado. Esos datos viven en la descripción, la referencia, la evidencia (MetadataJson) o
+        // el código de empleado, así que se busca en esos campos con coincidencia parcial e
+        // insensible a mayúsculas. `ToLower().Contains` se traduce a un LIKE en PostgreSQL.
+        if (!string.IsNullOrWhiteSpace(buscar))
+        {
+            var termino = buscar.Trim().ToLower();
+            query = query.Where(a =>
+                a.Descripcion.ToLower().Contains(termino)
+                || (a.TransaccionReferencia != null && a.TransaccionReferencia.ToLower().Contains(termino))
+                || (a.MetadataJson != null && a.MetadataJson.ToLower().Contains(termino))
+                || (a.EmpleadoCodigo != null && a.EmpleadoCodigo.ToLower().Contains(termino)));
+        }
         return query;
     }
 }

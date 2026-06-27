@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { alertasService } from "@/services/alertas.service";
 import { dashboardService } from "@/services/dashboard.service";
 import { Badge } from "@/components/ui/Badge";
@@ -14,13 +14,14 @@ import {
   NIVEL_RIESGO_LABELS,
   ESTADO_ALERTA_LABELS,
 } from "@/types/alert";
-import { ChevronLeft, ChevronRight, FilterX, SearchX, UserCheck } from "lucide-react";
+import { ChevronLeft, ChevronRight, FilterX, Search, SearchX, UserCheck, X } from "lucide-react";
 
 const selectClass =
   "rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 
 export function AlertasPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [tipoDetector, setTipoDetector] = useState("");
@@ -29,6 +30,22 @@ export function AlertasPage() {
   const [estacionId, setEstacionId] = useState("");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
+  // Búsqueda libre (placa/RUC/nº factura/cliente/código). `buscarInput` es lo que se teclea;
+  // `buscar` es el término ya "asentado" (con rebote de 350 ms) que de verdad consulta el backend,
+  // para no disparar una petición por cada tecla. El valor inicial sale de ?buscar=… en la URL, que
+  // usan los hipervínculos del detalle ("ver todas las alertas de esta placa"); como la lista se
+  // re-monta al navegar desde el detalle, basta con leerlo aquí (sin efecto de sincronización).
+  const [buscarInput, setBuscarInput] = useState(searchParams.get("buscar") ?? "");
+  const [buscar, setBuscar] = useState(searchParams.get("buscar") ?? "");
+
+  // Rebote del buscador: 350 ms tras dejar de teclear.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBuscar(buscarInput.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [buscarInput]);
 
   const { data: estaciones } = useQuery({
     queryKey: ["dashboard", "alertas-por-estacion"],
@@ -45,6 +62,7 @@ export function AlertasPage() {
     estacionId: estacionId ? Number(estacionId) : undefined,
     fechaDesde: fechaDesde || undefined,
     fechaHasta: fechaHasta ? `${fechaHasta}T23:59:59` : undefined,
+    buscar: buscar || undefined,
   };
 
   const { data, isLoading } = useQuery({
@@ -64,7 +82,7 @@ export function AlertasPage() {
   const vistasSet = new Set(vistas ?? []);
 
   const hayFiltros =
-    tipoDetector || nivelRiesgo || estado || estacionId || fechaDesde || fechaHasta;
+    tipoDetector || nivelRiesgo || estado || estacionId || fechaDesde || fechaHasta || buscar;
 
   function limpiarFiltros() {
     setTipoDetector("");
@@ -73,6 +91,8 @@ export function AlertasPage() {
     setEstacionId("");
     setFechaDesde("");
     setFechaHasta("");
+    setBuscarInput("");
+    setBuscar("");
     setPage(1);
   }
 
@@ -95,6 +115,31 @@ export function AlertasPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background p-4">
+        <div className="relative">
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
+          <input
+            type="search"
+            value={buscarInput}
+            onChange={(e) => setBuscarInput(e.target.value)}
+            placeholder="Buscar placa, RUC, n° factura, cliente…"
+            aria-label="Buscar alertas por placa, RUC, número de factura, cliente o código"
+            className={`${selectClass} w-72 pl-9 pr-8`}
+          />
+          {buscarInput && (
+            <button
+              type="button"
+              onClick={() => setBuscarInput("")}
+              aria-label="Limpiar búsqueda"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
         <select
           value={tipoDetector}
           onChange={(e) => actualizar(setTipoDetector)(e.target.value)}

@@ -16,6 +16,7 @@ public interface IAlertaRepository : IRepository<Alerta>
         DateTime? hasta = null,
         int page = 1,
         int pageSize = 20,
+        string? buscar = null,
         CancellationToken ct = default);
 
     Task<int> GetFilteredCountAsync(
@@ -25,6 +26,7 @@ public interface IAlertaRepository : IRepository<Alerta>
         int? estacionId = null,
         DateTime? desde = null,
         DateTime? hasta = null,
+        string? buscar = null,
         CancellationToken ct = default);
 
     Task<int> CountByEmpleadoAndTipoAsync(

@@ -19,6 +19,10 @@ import {
   UserPlus,
   UserCheck,
   FileWarning,
+  Copy,
+  Check,
+  ExternalLink,
+  Search,
 } from "lucide-react";
 
 const STATE_TRANSITIONS: Record<string, string[]> = {
@@ -87,7 +91,25 @@ const METADATA_LABELS: Record<string, string> = {
   CodigoBanco: "Código de banco",
   MontoReversion: "Monto de reversión",
   DiferenciaMinutos: "Diferencia (min)",
+  // Regla "Placa reutilizada en el día"
+  Dia: "Día",
+  CantidadFacturas: "Cantidad de facturas",
+  NumerosFactura: "Números de factura",
+  Clientes: "Clientes",
+  Vendedores: "Despachadores",
 };
+
+// Claves de la evidencia cuyo valor es buscable (placa, RUC, n° de factura, cliente): se muestran como
+// enlace que abre la bandeja de alertas filtrada por ese valor ("ver todas las alertas de esta placa").
+const CLAVES_BUSCABLES = new Set([
+  "Placa",
+  "NumeroDocumento",
+  "NumerosFactura",
+  "Cliente",
+  "Clientes",
+  "Ruc",
+  "RucCliente",
+]);
 
 export function DetalleAlertaPage() {
   const { id } = useParams<{ id: string }>();
@@ -210,12 +232,24 @@ export function DetalleAlertaPage() {
 
   return (
     <div className="space-y-6">
-      <button
-        onClick={() => navigate(volverA)}
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft size={16} /> {volverLabel}
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => navigate(volverA)}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft size={16} /> {volverLabel}
+        </button>
+        {/* Abrir esta misma alerta en otra pestaña, para compararla lado a lado (lo pidió auditoría). */}
+        <a
+          href={`/alertas/${alertaId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          title="Abrir esta alerta en una ventana nueva"
+        >
+          <ExternalLink size={15} /> Abrir en ventana nueva
+        </a>
+      </div>
 
       {/* Cabecera */}
       <div className="rounded-xl border border-border bg-background p-6 shadow-sm">
@@ -262,7 +296,15 @@ export function DetalleAlertaPage() {
             />
           )}
           {alerta.transaccionReferencia && (
-            <InfoField label="Referencia" value={alerta.transaccionReferencia} />
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Referencia</p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <span className="break-all font-mono text-xs">
+                  {alerta.transaccionReferencia}
+                </span>
+                <CopyButton value={alerta.transaccionReferencia} />
+              </p>
+            </div>
           )}
         </div>
 
@@ -275,14 +317,18 @@ export function DetalleAlertaPage() {
               {Object.entries(metadata).map(([clave, valor]) => (
                 <div
                   key={clave}
-                  className="flex items-baseline justify-between gap-3 border-b border-border/50 py-1.5 last:border-0"
+                  className="flex items-start justify-between gap-3 border-b border-border/50 py-1.5 last:border-0"
                 >
-                  <span className="text-xs text-muted-foreground">
+                  <span className="shrink-0 text-xs text-muted-foreground">
                     {METADATA_LABELS[clave] ?? clave}
                   </span>
-                  <span className="text-right font-mono text-xs font-medium text-foreground">
-                    {formatearValor(valor)}
-                  </span>
+                  <ValorEvidencia
+                    clave={clave}
+                    valor={valor}
+                    onBuscar={(q) =>
+                      navigate(`/alertas?buscar=${encodeURIComponent(q)}`)
+                    }
+                  />
                 </div>
               ))}
             </div>
@@ -486,4 +532,106 @@ function formatearValor(valor: unknown): string {
   if (typeof valor === "boolean") return valor ? "Sí" : "No";
   if (Array.isArray(valor)) return valor.map(String).join(", ");
   return String(valor);
+}
+
+/** Botón pequeño para copiar un valor al portapapeles, con confirmación breve (✓). */
+function CopyButton({ value }: { value: string }) {
+  const [copiado, setCopiado] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopiado(true);
+          setTimeout(() => setCopiado(false), 1200);
+        } catch {
+          /* el portapapeles puede no estar disponible; no es crítico */
+        }
+      }}
+      title="Copiar al portapapeles"
+      aria-label="Copiar al portapapeles"
+      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {copiado ? (
+        <Check size={12} className="text-green-600" />
+      ) : (
+        <Copy size={12} />
+      )}
+    </button>
+  );
+}
+
+/**
+ * Renderiza un valor de la evidencia. Si la clave es "buscable" (placa, RUC, n° de factura, cliente),
+ * el valor se muestra como enlace que abre la bandeja filtrada por ese valor + botón copiar. Los
+ * valores de lista (varios n° de factura, clientes, despachadores) se muestran como pastillas.
+ */
+function ValorEvidencia({
+  clave,
+  valor,
+  onBuscar,
+}: {
+  clave: string;
+  valor: unknown;
+  onBuscar: (q: string) => void;
+}) {
+  const buscable = CLAVES_BUSCABLES.has(clave);
+
+  if (Array.isArray(valor)) {
+    const items = valor.map(String).filter((v) => v.length > 0);
+    if (items.length === 0)
+      return <span className="text-right font-mono text-xs text-foreground">—</span>;
+    return (
+      <span className="flex flex-wrap justify-end gap-1">
+        {items.map((v, i) => (
+          <ChipValor key={`${v}-${i}`} value={v} buscable={buscable} onBuscar={onBuscar} />
+        ))}
+      </span>
+    );
+  }
+
+  const texto = formatearValor(valor);
+  if (buscable && texto !== "—") {
+    return (
+      <span className="flex justify-end">
+        <ChipValor value={texto} buscable onBuscar={onBuscar} />
+      </span>
+    );
+  }
+  return (
+    <span className="text-right font-mono text-xs font-medium text-foreground">
+      {texto}
+    </span>
+  );
+}
+
+/** Pastilla de un valor: enlace de búsqueda (si aplica) + botón copiar. */
+function ChipValor({
+  value,
+  buscable,
+  onBuscar,
+}: {
+  value: string;
+  buscable: boolean;
+  onBuscar: (q: string) => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs ring-1 ring-border">
+      {buscable ? (
+        <button
+          type="button"
+          onClick={() => onBuscar(value)}
+          title={`Ver todas las alertas con "${value}"`}
+          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+        >
+          <Search size={11} className="shrink-0 opacity-70" />
+          {value}
+        </button>
+      ) : (
+        <span className="font-medium text-foreground">{value}</span>
+      )}
+      <CopyButton value={value} />
+    </span>
+  );
 }

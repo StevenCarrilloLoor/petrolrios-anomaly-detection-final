@@ -75,12 +75,12 @@ public sealed class AlertaService : IAlertaService
     public async Task<PaginatedResponse<AlertaResponse>> GetFilteredAsync(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
         int? estacionId, DateTime? desde, DateTime? hasta,
-        int page, int pageSize, CancellationToken ct = default)
+        int page, int pageSize, string? buscar = null, CancellationToken ct = default)
     {
         var alertas = await _unitOfWork.Alertas.GetFilteredAsync(
-            tipo, nivel, estado, estacionId, desde, hasta, page, pageSize, ct);
+            tipo, nivel, estado, estacionId, desde, hasta, page, pageSize, buscar, ct);
         var count = await _unitOfWork.Alertas.GetFilteredCountAsync(
-            tipo, nivel, estado, estacionId, desde, hasta, ct);
+            tipo, nivel, estado, estacionId, desde, hasta, buscar, ct);
 
         // Cargar nombres de estación
         var estacionIds = alertas.Select(a => a.EstacionId).Distinct().ToList();

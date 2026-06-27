@@ -18,6 +18,8 @@ export interface AlertaFilters {
   estacionId?: number;
   fechaDesde?: string;
   fechaHasta?: string;
+  /** Búsqueda libre: placa, RUC, nº de factura, cliente o código de empleado. */
+  buscar?: string;
 }
 
 export const alertasService = {
@@ -34,6 +36,7 @@ export const alertasService = {
           estacionId: filters.estacionId,
           fechaDesde: filters.fechaDesde,
           fechaHasta: filters.fechaHasta,
+          buscar: filters.buscar,
         },
       })
       .then((r) => r.data),

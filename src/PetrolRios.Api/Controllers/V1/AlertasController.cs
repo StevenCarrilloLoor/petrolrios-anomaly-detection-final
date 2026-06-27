@@ -34,6 +34,7 @@ public sealed class AlertasController : ControllerBase
         [FromQuery] int? estacionId,
         [FromQuery] DateTime? fechaDesde,
         [FromQuery] DateTime? fechaHasta,
+        [FromQuery] string? buscar = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken ct = default)
@@ -42,7 +43,7 @@ public sealed class AlertasController : ControllerBase
             return Forbid();
 
         var result = await _alertaService.GetFilteredAsync(
-            tipo, nivelRiesgo, estado, estacionId, fechaDesde, fechaHasta, page, pageSize, ct);
+            tipo, nivelRiesgo, estado, estacionId, fechaDesde, fechaHasta, page, pageSize, buscar, ct);
         return Ok(result);
     }
 

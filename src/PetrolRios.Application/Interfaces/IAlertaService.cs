@@ -9,7 +9,7 @@ public interface IAlertaService
     Task<PaginatedResponse<AlertaResponse>> GetFilteredAsync(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
         int? estacionId, DateTime? desde, DateTime? hasta,
-        int page, int pageSize, CancellationToken ct = default);
+        int page, int pageSize, string? buscar = null, CancellationToken ct = default);
 
     /// <summary>
     /// Problemas operativos (carril Operativa) agrupados por estación y día, para la pestaña
