@@ -2807,3 +2807,44 @@ queda cerrada, y el round ERP/UX no tiene pendientes.**
 
 Commit: `a173b5a` (código). QA en vivo: factura `006102000024646` → línea de surtido manguera 02, **1.01 gal
 @ $2.47 = $2.50** (cabecera + importes + línea, todo en vivo de la estación).
+
+---
+
+## 96. Ronda ERP/UX (pedido de auditoría): hipervínculos relacionados + Consultas usable + fecha visible
+
+**Motivación.** Steven revisó en vivo y pidió —con la entrevista de la auditora como base
+(`docs/Juan Valdez - Transcripcion ES.txt`)— que los hipervínculos de la alerta abran la **data
+RELACIONADA en vivo en una ventana nueva** (comportamiento ERP: "clic en el cliente → sus facturas; clic en
+el vendedor → sus despachos; que se abra una ventana nueva para comparar"), **NO** la bandeja de alertas
+filtrada como hacían antes; que se pueda **imprimir** lo filtrado al investigar un caso; y arregló el detalle
+que la propia auditora notó: los botones de fecha "se desaparecen porque están negros" (tema oscuro). Plan por
+etapas A–F (ver `docs/PENDIENTES.md`).
+
+**Etapa A — Consultas usable + deep-link + imprimir + fecha visible (`ConsultasPage.tsx`).**
+- **Deep-link con autobúsqueda:** la página lee `?est&tipo&codigo&desde&hasta` y busca sola; mantiene la
+  consulta en la URL (enlazable / abrible en ventana nueva). Es el destino de los hipervínculos de la Etapa B.
+- **Fecha visible:** los `input[type=date]` llevan `[color-scheme:dark]` → el icono del calendario se ve en
+  el tema oscuro (lo que reportó la auditora).
+- **Imprimir lo filtrado:** botón Imprimir + encabezado solo-impresión con el resumen de filtros aplicados
+  (`print:hidden`/`print:block`, `print:bg-white`), para llevarse el caso investigado.
+- **Filtros más claros:** botón Limpiar, resumen de filtros aplicados (pastillas), columna Despachador, filas zebra.
+- **Celdas relacionables (ERP):** cliente/RUC/placa/despachador de cada fila abren la consulta relacionada por
+  ese valor en una **ventana nueva**.
+
+**Etapa B — Hipervínculos ERP en el detalle de alerta (`DetalleAlertaPage.tsx`).**
+- Los chips de evidencia que identifican una ENTIDAD (placa, RUC, cliente, despachador/`Vendedores`) ya **NO**
+  navegan a `/alertas?buscar=` (lo que Steven no quería); abren la **consulta EN VIVO de todo lo relacionado en
+  una ventana nueva** (`abrirConsultaRelacionada` → `/consultas?est=&codigo=`). El nº de factura mantiene su
+  enlace a la **factura completa** (`/consultas/factura`). Si la alerta no trae código de estación, cae de
+  vuelta al buscador de la bandeja.
+
+**Verificación.** Frontend (PC de Steven): **eslint 0** + **`tsc -b && vite build` OK** (`_verify_frontend.bat`).
+**QA en vivo en Chrome:** deep-link `?est=EST-001&codigo=<RUC>` → prellena y trae 6 documentos reales (CLI222);
+las celdas son botones "ver relacionado en ventana nueva"; **ambos** `input[type=date]` tienen
+`color-scheme: dark` (icono visible); botón Imprimir presente. En la alerta **#80**: **13** enlaces de factura
+a `/consultas/factura`, **0** enlaces a `/alertas?buscar` (comportamiento viejo eliminado), **7** RUC como
+botones "ver relacionado".
+
+Commit: `3050c94` (código, etapas A+B). Pendiente de la ronda: **C** (factura con más datos + presentación),
+**D** (auditoría del agente + consultar una tabla X auto-estructurada), **E** (rediseño del dashboard), **F**
+(reporte liquidación→facturas).
