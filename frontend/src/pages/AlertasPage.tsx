@@ -26,10 +26,12 @@ export function AlertasPage() {
   const refrescoMs = useRefrescoMs();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
-  const [tipoDetector, setTipoDetector] = useState("");
-  const [nivelRiesgo, setNivelRiesgo] = useState("");
-  const [estado, setEstado] = useState("");
-  const [estacionId, setEstacionId] = useState("");
+  // Los filtros se inicializan desde la URL (?tipo, ?nivel, ?estado, ?estacionId) para que los drill-downs
+  // del dashboard ("ver las críticas", "ver las nuevas", "ver las de esta estación") lleguen ya filtrados.
+  const [tipoDetector, setTipoDetector] = useState(searchParams.get("tipo") ?? "");
+  const [nivelRiesgo, setNivelRiesgo] = useState(searchParams.get("nivel") ?? "");
+  const [estado, setEstado] = useState(searchParams.get("estado") ?? "");
+  const [estacionId, setEstacionId] = useState(searchParams.get("estacionId") ?? "");
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
   // Búsqueda libre (placa/RUC/nº factura/cliente/código). `buscarInput` es lo que se teclea;
