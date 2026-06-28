@@ -155,6 +155,8 @@ public sealed class Worker : BackgroundService
                 else if (string.IsNullOrWhiteSpace(c.Tabla) || string.Equals(c.Tabla, "DCTO", StringComparison.OrdinalIgnoreCase))
                     filas = await _extractor.ConsultarDocumentosAsync(
                         c.TipoDocumento, c.FechaDesde, c.FechaHasta, c.Codigo, c.Limite, ct);
+                else if (string.Equals(c.Tabla, "LIQUIDACIONES", StringComparison.OrdinalIgnoreCase))
+                    filas = await _extractor.ConsultarLiquidacionesAsync(c.FechaDesde, c.FechaHasta, c.Limite, ct);
                 else
                     filas = await _extractor.ConsultarTablaGenericaAsync(c.Tabla, c.Limite, ct);
                 var json = JsonSerializer.Serialize(new { documentos = filas, total = filas.Count });

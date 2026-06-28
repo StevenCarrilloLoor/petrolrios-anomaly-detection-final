@@ -97,6 +97,43 @@ function normalizarDespacho(raw: Record<string, unknown>): DespachoFirebird {
   return out as DespachoFirebird;
 }
 
+/** Una fila del cuadre de liquidaciones (una liquidación + una de sus facturas). Claves = alias del SELECT. */
+export interface LiquidacionFila {
+  NumeroLiquidacion?: number;
+  NumeroTurno?: number;
+  FechaLiquidacion?: string;
+  ClienteLiquidacion?: string;
+  SaldoFinal?: number;
+  Faltante?: number;
+  Sobrante?: number;
+  Diferencia?: number;
+  NumeroDocumento?: string;
+  SecuenciaDocumento?: number;
+  TipoDocumento?: string;
+  FechaDocumento?: string;
+  Cliente?: string;
+  Ruc?: string;
+  Placa?: string;
+  Vendedor?: string;
+  FormaPago?: string;
+  TotalNeto?: number;
+  [k: string]: unknown;
+}
+
+const CAMPOS_LIQU = [
+  "NumeroLiquidacion", "NumeroTurno", "FechaLiquidacion", "ClienteLiquidacion", "SaldoFinal", "Faltante",
+  "Sobrante", "Diferencia", "NumeroDocumento", "SecuenciaDocumento", "TipoDocumento", "FechaDocumento",
+  "Cliente", "Ruc", "Placa", "Vendedor", "FormaPago", "TotalNeto",
+] as const;
+
+function normalizarLiqu(raw: Record<string, unknown>): LiquidacionFila {
+  const porMinuscula: Record<string, unknown> = {};
+  for (const k of Object.keys(raw)) porMinuscula[k.toLowerCase()] = raw[k];
+  const out: Record<string, unknown> = { ...raw };
+  for (const campo of CAMPOS_LIQU) out[campo] = porMinuscula[campo.toLowerCase()];
+  return out as LiquidacionFila;
+}
+
 export const consultasService = {
   async lanzar(s: SolicitudConsulta): Promise<string> {
     const { data } = await api.post<{ id: string }>("/consultas", s);
@@ -158,5 +195,23 @@ export const consultasService = {
     signal?: AbortSignal,
   ): Promise<Record<string, unknown>[]> {
     return this.sondearFilas({ codigoEstacion, tabla: tabla.trim(), limite }, signal);
+  },
+
+  /**
+   * Cuadre de liquidaciones: cada liquidación con las facturas de su turno (LIQU.NUM_TURN ↔ DCTO.NUM_TURN),
+   * en un rango de fechas. Devuelve filas (liquidación + factura) que la página agrupa por liquidación.
+   */
+  async consultarLiquidaciones(
+    codigoEstacion: string,
+    fechaDesde: string | null,
+    fechaHasta: string | null,
+    limite = 1000,
+    signal?: AbortSignal,
+  ): Promise<LiquidacionFila[]> {
+    const filas = await this.sondearFilas(
+      { codigoEstacion, tabla: "LIQUIDACIONES", fechaDesde, fechaHasta, limite },
+      signal,
+    );
+    return filas.map(normalizarLiqu);
   },
 };

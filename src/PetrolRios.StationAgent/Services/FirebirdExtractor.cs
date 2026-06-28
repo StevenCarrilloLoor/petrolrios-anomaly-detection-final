@@ -213,6 +213,46 @@ public sealed class FirebirdExtractor
     }
 
     /// <summary>
+    /// Consulta SOLO LECTURA el CUADRE de liquidaciones de un período (pedido de la auditora): cada
+    /// liquidación (LIQU) con las facturas (DCTO, FV) de su turno, cruzando <c>LIQU.NUM_TURN ↔ DCTO.NUM_TURN</c>.
+    /// Devuelve una fila por (liquidación, factura) — el frontend las agrupa por liquidación y suma. LEFT JOIN
+    /// para no ocultar liquidaciones sin facturas. Filtra por <c>FEC_LIQU</c> en el rango dado. Tolerante.
+    /// </summary>
+    public async Task<IReadOnlyList<Dictionary<string, object?>>> ConsultarLiquidacionesAsync(
+        DateTime? desde, DateTime? hasta, int limite, CancellationToken ct)
+    {
+        var top = Math.Clamp(limite <= 0 ? 500 : limite, 1, 2000);
+        var sql = $"""
+            SELECT FIRST {top}
+              l.NUM_LIQU AS "NumeroLiquidacion", l.NUM_TURN AS "NumeroTurno", l.FEC_LIQU AS "FechaLiquidacion",
+              l.COD_CLIE AS "ClienteLiquidacion", l.SFI_LIQU AS "SaldoFinal", l.FAL_LIQU AS "Faltante",
+              l.SOB_LIQU AS "Sobrante", l.DIF_LIQU AS "Diferencia",
+              d.NUM_DCTO AS "NumeroDocumento", d.SEC_DCTO AS "SecuenciaDocumento", d.TIP_DCTO AS "TipoDocumento",
+              d.FEC_DCTO AS "FechaDocumento", d.COD_CLIE AS "Cliente", d.RUC_DCTO AS "Ruc", d.PLA_DCTO AS "Placa",
+              d.COD_VEND AS "Vendedor", d.COD_PAGO AS "FormaPago",
+              (d.TSI_DCTO + d.IVA_DCTO) AS "TotalNeto"
+            FROM LIQU l
+            LEFT JOIN DCTO d ON d.NUM_TURN = l.NUM_TURN AND d.TIP_DCTO = 'FV'
+            WHERE (@desde IS NULL OR l.FEC_LIQU >= @desde)
+              AND (@hasta IS NULL OR l.FEC_LIQU <= @hasta)
+            ORDER BY l.FEC_LIQU DESC, l.NUM_LIQU, d.FEC_DCTO
+            """;
+        var prm = new { desde, hasta };
+
+        using var connection = CreateConnection();
+        var filas = await connection.QueryAsync(new CommandDefinition(sql, prm, cancellationToken: ct));
+        var resultado = new List<Dictionary<string, object?>>();
+        foreach (var fila in filas)
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (var kv in (IDictionary<string, object>)fila)
+                dict[kv.Key] = kv.Value is string s ? s.Trim() : kv.Value;
+            resultado.Add(dict);
+        }
+        return resultado;
+    }
+
+    /// <summary>
     /// Extrae todas las transacciones nuevas desde la marca de agua indicada.
     /// Retorna un diccionario: TipoTransaccion → lista de objetos serializados a JSON.
     /// </summary>

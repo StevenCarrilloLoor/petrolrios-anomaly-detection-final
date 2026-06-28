@@ -18,6 +18,7 @@ import {
   Printer,
   X,
   Table2,
+  Scale,
 } from "lucide-react";
 
 const inputClass =
@@ -197,12 +198,20 @@ export function ConsultasPage() {
             rango de fechas y un código que coincide con RUC, placa, cliente, despachador o número de documento.
             Haz clic en un RUC, placa, cliente o despachador para ver todo lo relacionado en una ventana nueva.
           </p>
-          <Link
-            to="/consultas/tabla"
-            className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-          >
-            <Table2 size={14} /> Explorar cualquier tabla (avanzado)
-          </Link>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+            <Link
+              to="/consultas/tabla"
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+              <Table2 size={14} /> Explorar cualquier tabla (avanzado)
+            </Link>
+            <Link
+              to="/consultas/liquidaciones"
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            >
+              <Scale size={14} /> Cuadre de liquidaciones
+            </Link>
+          </div>
         </div>
         {docs && docs.length > 0 && (
           <button
