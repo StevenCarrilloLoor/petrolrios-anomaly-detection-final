@@ -136,6 +136,12 @@ comparación sistema‑vs‑API, detector tolerancia cero). Se hace por etapas v
   mínimo del día en histórico). **E4** `/salud` (modo + estado escalonado OK/Warning/Error/Critico/Urgente) + `/historial`
   (`bfb2a0f`). **Anti-detección:** construido respetuoso, NO evasión de anti-bot. _Para verlo en vivo: reconstruir la
   API (aplica migración + siembra); el scraping corre solo según el schedule o se fuerza con POST /refrescar._
+- **E6 (`4089106`, §109, idea de Steven):** la API ya NO pisa el precio del sistema (desacople); **precio EFECTIVO
+  por preferencia** `PreciosCombustibleService.Vigente` (Auto = corrección manual del admin manda, si no la API válida,
+  si no el sistema; o forzar Api/Sistema) — lo usan dashboard y detectores. **Preferencia configurable solo Admin**
+  (`OperacionConfig.PreferenciaPreciosCombustible`, en Ajustes → Operación) + **botón "Ejecutar refresco de precios"**.
+  El dashboard muestra el precio vigente + ambos (sistema y API) con su fecha para comparar. Día 28 = schedule Inactivo
+  (de ahí "API sin dato aún"); usar el botón para forzar el scrape. Gate verde 379.
 
 ---
 

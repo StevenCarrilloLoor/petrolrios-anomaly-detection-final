@@ -3252,3 +3252,30 @@ validación con bandas + fallback al sistema), auditado (`precios_combustible_lo
 **Anti-detección:** se construyó respetuoso (no evasión). **Para verlo en vivo:** reconstruir la API (migración +
 siembra); el scraping corre solo según el schedule, o se fuerza con `POST /refrescar`. Commits: `0238142`, `9e91a20`,
 `8ef2715`, `bfb2a0f`.
+
+---
+
+## 109. Precios — Etapa 6: preferencia Sistema‑vs‑API + desacople + comparación en el dashboard (idea de Steven)
+
+Steven pidió poder **comparar** el precio del sistema y el de la API, con **preferencia configurable** sobre cuál
+manda, mostrar **ambos con su fecha**, y un **botón para ejecutar el job**. (`4089106`, gate verde 379.)
+
+**Desacople.** La API ya **no pisa** el precio del sistema: `RegistrarApi` solo guarda el valor observado
+(`PrecioApi`/`FuenteApi`/`PrecioApiActualizadoEn`), sin tocar `PrecioGalon`. Así quedan los dos por separado para
+comparar y cazar errores.
+
+**Precio EFECTIVO según preferencia** (`PreciosCombustibleService.Vigente`, usado por el dashboard Y los detectores):
+**"Sistema"** = siempre el del sistema; **"Api"** = el scrapeado si es válido; **"Auto"** (default) = la corrección
+manual del admin si está vigente (autoritativa, gana sobre la API), si no la API válida, si no el sistema. Resuelve
+el caso de Steven: si el sistema refleja un período viejo y la API el nuevo → API; pero si el admin ya fijó el precio
+del período → manda el sistema aunque la API scrapee algo después.
+
+**Preferencia configurable (solo Admin).** `OperacionConfig.PreferenciaPreciosCombustible` (Auto/Api/Sistema), validada
+en `ParametrosOperacionController`. En **Ajustes → Operación**: un selector para cambiarla + un botón **"Ejecutar
+refresco de precios"** que fuerza la cascada sin esperar al calendario (para probar que el scraping funciona).
+
+**Dashboard.** La tarjeta muestra el **precio vigente** con su origen (badge "vía API" / "vía sistema") y, debajo,
+**ambos** —Sistema y API— cada uno con su **fecha**, resaltando el vigente. Nota: hoy (día 28) el schedule está
+**Inactivo** (solo scrapea días 1–10 y 11–12), por eso se ve "API: sin dato aún"; el botón nuevo es justo para forzarlo.
+
+**Verificación.** Gate `_gate.bat` VERDE (build 0/0, **379 pruebas**, EF sin cambios de modelo, frontend OK). Commit: `4089106`.
