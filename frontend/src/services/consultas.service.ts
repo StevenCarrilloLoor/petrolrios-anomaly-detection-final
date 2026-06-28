@@ -145,4 +145,18 @@ export const consultasService = {
     );
     return filas.map(normalizarDespacho);
   },
+
+  /**
+   * Consulta GENÉRICA de CUALQUIER tabla de la estación (auto-estructurada): devuelve las filas crudas
+   * tal cual (todas las columnas), para renderizarlas con columnas dinámicas. El agente valida que la
+   * tabla exista (lista blanca anti-inyección) y corre `SELECT FIRST n * FROM "tabla"` SOLO LECTURA.
+   */
+  async consultarTabla(
+    codigoEstacion: string,
+    tabla: string,
+    limite = 100,
+    signal?: AbortSignal,
+  ): Promise<Record<string, unknown>[]> {
+    return this.sondearFilas({ codigoEstacion, tabla: tabla.trim(), limite }, signal);
+  },
 };

@@ -147,10 +147,16 @@ public sealed class Worker : BackgroundService
             {
                 // Dos tipos de consulta: DCTO (documentos, por defecto) y DESP (líneas de surtidor de UNA
                 // factura, por su NUM_DESP). Ambas devuelven el mismo sobre { documentos, total } SOLO LECTURA.
-                var filas = string.Equals(c.Tabla, "DESP", StringComparison.OrdinalIgnoreCase)
-                    ? await _extractor.ConsultarDespachosAsync(c.Codigo, c.Limite, ct)
-                    : await _extractor.ConsultarDocumentosAsync(
+                // Enrutado por tabla: DESP (líneas de surtidor de una factura), DCTO/vacío (documentos),
+                // o CUALQUIER otra tabla → consulta GENÉRICA auto-estructurada (etapa D: explorar tablas X).
+                IReadOnlyList<Dictionary<string, object?>> filas;
+                if (string.Equals(c.Tabla, "DESP", StringComparison.OrdinalIgnoreCase))
+                    filas = await _extractor.ConsultarDespachosAsync(c.Codigo, c.Limite, ct);
+                else if (string.IsNullOrWhiteSpace(c.Tabla) || string.Equals(c.Tabla, "DCTO", StringComparison.OrdinalIgnoreCase))
+                    filas = await _extractor.ConsultarDocumentosAsync(
                         c.TipoDocumento, c.FechaDesde, c.FechaHasta, c.Codigo, c.Limite, ct);
+                else
+                    filas = await _extractor.ConsultarTablaGenericaAsync(c.Tabla, c.Limite, ct);
                 var json = JsonSerializer.Serialize(new { documentos = filas, total = filas.Count });
                 await _serverClient.EnviarResultadoConsultaAsync(c.Id, true, json, null, ct);
                 _state.RegistrarEvento("INFO", $"Consulta en vivo ({c.Tabla}) → {filas.Count} fila(s)");

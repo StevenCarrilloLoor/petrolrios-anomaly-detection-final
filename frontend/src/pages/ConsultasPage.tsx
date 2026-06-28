@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { estacionesService } from "@/services/estaciones.service";
 import {
   consultasService,
@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Printer,
   X,
+  Table2,
 } from "lucide-react";
 
 const inputClass =
@@ -196,6 +197,12 @@ export function ConsultasPage() {
             rango de fechas y un código que coincide con RUC, placa, cliente, despachador o número de documento.
             Haz clic en un RUC, placa, cliente o despachador para ver todo lo relacionado en una ventana nueva.
           </p>
+          <Link
+            to="/consultas/tabla"
+            className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            <Table2 size={14} /> Explorar cualquier tabla (avanzado)
+          </Link>
         </div>
         {docs && docs.length > 0 && (
           <button

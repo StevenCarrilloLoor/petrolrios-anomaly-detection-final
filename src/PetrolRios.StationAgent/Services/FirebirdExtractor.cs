@@ -139,6 +139,43 @@ public sealed class FirebirdExtractor
     }
 
     /// <summary>
+    /// Consulta GENÉRICA SOLO LECTURA de CUALQUIER tabla de la base (auto-estructurada): valida el nombre
+    /// contra la lista real de tablas (lista blanca anti-inyección, ya que un identificador no se parametriza)
+    /// y devuelve las primeras <paramref name="limite"/> filas con TODAS sus columnas tal cual. Permite
+    /// explorar cualquier tabla "medianamente importante" sin cablear nada (extiende la consulta on-demand,
+    /// que antes solo cubría DCTO/DESP — etapa D). Tolerante: tabla inexistente → excepción que el Worker
+    /// reporta como error de esa consulta (no rompe el ciclo).
+    /// </summary>
+    public async Task<IReadOnlyList<Dictionary<string, object?>>> ConsultarTablaGenericaAsync(
+        string? tabla, int limite, CancellationToken ct)
+    {
+        var nombre = (tabla ?? string.Empty).Trim().ToUpperInvariant();
+        if (nombre.Length == 0)
+            throw new InvalidOperationException("Indique la tabla a consultar.");
+
+        // Lista blanca anti-inyección: el nombre DEBE ser una tabla real de la base (no se puede parametrizar
+        // un identificador). Mismo patrón de seguridad que DescribirTablaAsync.
+        var tablas = await ListarTablasAsync(ct);
+        if (!tablas.Any(t => t.Equals(nombre, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException($"La tabla '{tabla}' no existe en la base de la estación.");
+
+        var top = Math.Clamp(limite <= 0 ? 200 : limite, 1, 1000);
+        var sql = $"SELECT FIRST {top} * FROM \"{nombre}\"";
+
+        using var connection = CreateConnection();
+        var filas = await connection.QueryAsync(new CommandDefinition(sql, cancellationToken: ct));
+        var resultado = new List<Dictionary<string, object?>>();
+        foreach (var fila in filas)
+        {
+            var dict = new Dictionary<string, object?>();
+            foreach (var kv in (IDictionary<string, object>)fila)
+                dict[kv.Key] = kv.Value is string s ? s.Trim() : kv.Value;
+            resultado.Add(dict);
+        }
+        return resultado;
+    }
+
+    /// <summary>
     /// Consulta SOLO LECTURA las líneas de surtidor (DESP) de UNA factura, por su número de despacho
     /// (<c>NUM_DESP</c>, que en la factura es <c>NDO_DCTO</c>). Devuelve producto, galones, precio unitario y
     /// total de cada surtido. Es el "detalle de líneas" que completa la vista de la factura. Tolerante: si el

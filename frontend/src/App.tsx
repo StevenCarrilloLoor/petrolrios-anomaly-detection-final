@@ -15,6 +15,7 @@ import { DetalleAlertaPage } from "@/pages/DetalleAlertaPage";
 import { ConexionesPage } from "@/pages/ConexionesPage";
 import { DatosRecibidosPage } from "@/pages/DatosRecibidosPage";
 import { ConsultasPage } from "@/pages/ConsultasPage";
+import { ExplorarTablaPage } from "@/pages/ExplorarTablaPage";
 import { FacturaPage } from "@/pages/FacturaPage";
 import { ReglasPage } from "@/pages/ReglasPage";
 import { FuentesDatosPage } from "@/pages/FuentesDatosPage";
@@ -62,6 +63,7 @@ function App() {
                   <Route path="/conexiones" element={<ConexionesPage />} />
                   <Route path="/datos-recibidos" element={<DatosRecibidosPage />} />
                   <Route path="/consultas" element={<ConsultasPage />} />
+                  <Route path="/consultas/tabla" element={<ExplorarTablaPage />} />
                   <Route path="/seguridad" element={<SeguridadPage />} />
                   <Route path="/ajustes" element={<AjustesPage />} />
                   <Route path="/aprobar-qr" element={<AprobarQrPage />} />
