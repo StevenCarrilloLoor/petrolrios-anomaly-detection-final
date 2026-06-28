@@ -20,8 +20,17 @@ public sealed record FacturaDto
     // COD_CLIE — código de cliente
     public string CodigoCliente { get; init; } = string.Empty;
 
-    // TNI_DCTO — total neto con IVA
-    public double TotalNeto { get; init; }
+    private readonly double _totalNeto;
+
+    // TNI_DCTO — total neto con IVA. En la Contaplus real suele llegar en 0; en ese caso se usa el
+    // total real = TotalSinIva (TSI_DCTO) + Iva (IVA_DCTO). Así el monto queda correcto en scoring,
+    // umbrales de reglas, evidencia, factura y reportes — para datos existentes (se recalcula al leer
+    // el staging) y nuevos — sin tener que re-extraer. En el demo (TNI poblado) devuelve el TNI tal cual.
+    public double TotalNeto
+    {
+        get => _totalNeto != 0 ? _totalNeto : TotalSinIva + Iva;
+        init => _totalNeto = value;
+    }
 
     // TSI_DCTO — total sin IVA
     public double TotalSinIva { get; init; }

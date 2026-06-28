@@ -102,7 +102,9 @@ public sealed class FirebirdExtractor
               d.COD_PAGO AS "FormaPago", d.NUM_TURN AS "NumeroTurno", d.NUM_CONS AS "Consecutivo",
               d.AUT_DCTO AS "Autorizacion", d.GUI_DCTO AS "Guia", d.OBS_DCTO AS "Observaciones",
               d.SUB_DCTO AS "Subtotal", d.TSI_DCTO AS "TotalSinIva", d.IVA_DCTO AS "Iva",
-              d.DSC_DCTO AS "Descuento", d.TNI_DCTO AS "TotalNeto", d.NDO_DCTO AS "NumeroDespacho"
+              d.DSC_DCTO AS "Descuento", d.NDO_DCTO AS "NumeroDespacho",
+              -- TNI_DCTO suele venir en 0 en la Contaplus real → total real = TSI + IVA (igual que el getter de FacturaDto)
+              (CASE WHEN d.TNI_DCTO <> 0 THEN d.TNI_DCTO ELSE d.TSI_DCTO + d.IVA_DCTO END) AS "TotalNeto"
             FROM DCTO d
             LEFT JOIN CLIE c ON c.COD_CLIE = d.COD_CLIE
             LEFT JOIN VEND v ON v.COD_VEND = d.COD_VEND
