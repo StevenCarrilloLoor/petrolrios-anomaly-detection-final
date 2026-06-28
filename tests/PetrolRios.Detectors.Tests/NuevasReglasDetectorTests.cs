@@ -162,23 +162,43 @@ public class NuevasReglasDetectorTests
         result.Where(a => a.Descripcion.Contains("Total inconsistente")).Should().BeEmpty();
     }
 
-    // ─── Payment Fraud: despachos rápidos sucesivos ───
+    // ─── Payment Fraud: despachos rápidos (acumulable, dinámico por RUC/placa, mínimo 2) ───
 
     [Fact]
-    public async Task PaymentFraud_DespachosRapidosSucesivos_GeneraAlerta()
+    public async Task PaymentFraud_DespachosRapidosMismoRuc_GeneraAlertaAcumulableAmbos()
     {
         var inicio = DateTime.UtcNow.AddHours(-1);
         var facturas = new List<FacturaDto>
         {
-            TestHelpers.CreateFactura(secuencia: 1, codigoCliente: "C009", fecha: inicio),
-            TestHelpers.CreateFactura(secuencia: 2, codigoCliente: "C009", fecha: inicio.AddMinutes(5)),
-            TestHelpers.CreateFactura(secuencia: 3, codigoCliente: "C009", fecha: inicio.AddMinutes(9))
+            TestHelpers.CreateFactura(secuencia: 1, ruc: "1799999999", fecha: inicio),
+            TestHelpers.CreateFactura(secuencia: 2, ruc: "1799999999", fecha: inicio.AddMinutes(5)),
+            TestHelpers.CreateFactura(secuencia: 3, ruc: "1799999999", fecha: inicio.AddMinutes(9))
         };
         var context = TestHelpers.CreateContext(facturas: facturas);
 
         var result = await _paymentFraud.DetectAsync(context, CancellationToken.None);
 
-        result.Should().Contain(a => a.Descripcion.Contains("Despachos rápidos sucesivos"));
+        var alerta = result.Should().ContainSingle(a => a.Descripcion.Contains("Despachos rápidos")).Subject;
+        alerta.EsAcumulable.Should().BeTrue();
+        alerta.EventosEnLote.Should().Be(3);
+        alerta.TransaccionReferencia.Should().StartWith("RAPIDOS-RUC-1799999999-");
+    }
+
+    [Fact]
+    public async Task PaymentFraud_DosDespachosRapidos_GeneraAlertaMedio()
+    {
+        // Mínimo bajado a 2: dos despachos del mismo RUC en pocos minutos ya es sospechoso (nivel inicial Medio).
+        var inicio = DateTime.UtcNow.AddHours(-1);
+        var facturas = new List<FacturaDto>
+        {
+            TestHelpers.CreateFactura(secuencia: 1, ruc: "1788888888", fecha: inicio),
+            TestHelpers.CreateFactura(secuencia: 2, ruc: "1788888888", fecha: inicio.AddMinutes(4))
+        };
+        var context = TestHelpers.CreateContext(facturas: facturas);
+
+        var result = await _paymentFraud.DetectAsync(context, CancellationToken.None);
+
+        result.Should().Contain(a => a.Descripcion.Contains("Despachos rápidos") && a.NivelRiesgo == NivelRiesgo.Medio);
     }
 
     [Fact]
@@ -187,9 +207,9 @@ public class NuevasReglasDetectorTests
         var inicio = DateTime.UtcNow.AddHours(-3);
         var facturas = new List<FacturaDto>
         {
-            TestHelpers.CreateFactura(secuencia: 1, codigoCliente: "C009", fecha: inicio),
-            TestHelpers.CreateFactura(secuencia: 2, codigoCliente: "C009", fecha: inicio.AddMinutes(40)),
-            TestHelpers.CreateFactura(secuencia: 3, codigoCliente: "C009", fecha: inicio.AddMinutes(90))
+            TestHelpers.CreateFactura(secuencia: 1, ruc: "1777777777", fecha: inicio),
+            TestHelpers.CreateFactura(secuencia: 2, ruc: "1777777777", fecha: inicio.AddMinutes(40)),
+            TestHelpers.CreateFactura(secuencia: 3, ruc: "1777777777", fecha: inicio.AddMinutes(90))
         };
         var context = TestHelpers.CreateContext(facturas: facturas);
 
@@ -199,20 +219,22 @@ public class NuevasReglasDetectorTests
     }
 
     [Fact]
-    public async Task PaymentFraud_DosDespachosRapidos_NoGeneraAlerta()
+    public async Task PaymentFraud_MismaPlacaRucsDistintos_GeneraCasoPorPlaca()
     {
-        // Solo 2 transacciones rápidas: por debajo del mínimo de 3
+        // Misma placa con RUCs distintos en minutos → caso por PLACA (reutilización de placa por el despachador).
         var inicio = DateTime.UtcNow.AddHours(-1);
         var facturas = new List<FacturaDto>
         {
-            TestHelpers.CreateFactura(secuencia: 1, codigoCliente: "C009", fecha: inicio),
-            TestHelpers.CreateFactura(secuencia: 2, codigoCliente: "C009", fecha: inicio.AddMinutes(4))
+            TestHelpers.CreateFactura(secuencia: 1, placa: "PXX1234", ruc: "1700000001", fecha: inicio),
+            TestHelpers.CreateFactura(secuencia: 2, placa: "PXX1234", ruc: "1700000002", fecha: inicio.AddMinutes(3)),
+            TestHelpers.CreateFactura(secuencia: 3, placa: "PXX1234", ruc: "1700000003", fecha: inicio.AddMinutes(6))
         };
         var context = TestHelpers.CreateContext(facturas: facturas);
 
         var result = await _paymentFraud.DetectAsync(context, CancellationToken.None);
 
-        result.Where(a => a.Descripcion.Contains("Despachos rápidos")).Should().BeEmpty();
+        result.Should().Contain(a => a.TransaccionReferencia != null
+            && a.TransaccionReferencia.StartsWith("RAPIDOS-PLA-PXX1234-"));
     }
 
     // ─── Compliance: venta sin placa en monto mayor ───

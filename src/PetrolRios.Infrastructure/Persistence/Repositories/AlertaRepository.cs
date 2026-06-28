@@ -12,7 +12,7 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
     public async Task<IReadOnlyList<Alerta>> GetByEstacionAsync(int estacionId, CancellationToken ct = default) =>
         await DbSet
             .Where(a => a.EstacionId == estacionId)
-            .OrderByDescending(a => a.FechaDeteccion)
+            .OrderByDescending(a => a.FechaActualizacion)
             .Include(a => a.Estacion)
             .ToListAsync(ct);
 
@@ -23,7 +23,7 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
     {
         var query = ApplyFilters(tipo, nivel, estado, estacionId, desde, hasta, buscar, codigosPorNombre);
         return await query
-            .OrderByDescending(a => a.FechaDeteccion)
+            .OrderByDescending(a => a.FechaActualizacion)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Include(a => a.Estacion)
@@ -50,11 +50,12 @@ public class AlertaRepository : RepositoryBase<Alerta>, IAlertaRepository
         int? estacionId, DateTime? desde, DateTime? hasta, string? buscar,
         IReadOnlyCollection<string>? codigosPorNombre)
     {
-        // La bandeja de auditoría muestra SOLO alertas de ámbito Auditoría (fraude).
-        // Los problemas operativos (turno sin cerrar, despacho no facturado, campos
-        // faltantes) van exclusivamente a "Problemas de estación" y al Monitor de estación,
-        // para no confundir a los auditores con incidencias que resuelve la propia estación.
-        IQueryable<Alerta> query = DbSet.Where(a => a.Ambito == AmbitoAlerta.Auditoria);
+        // La bandeja de auditoría muestra las alertas de ámbito Auditoría (fraude) Y las de ámbito Ambos
+        // (importan a la estación Y al central, p. ej. despachos rápidos). Los problemas SOLO operativos
+        // (turno sin cerrar, despacho no facturado, campos faltantes) van exclusivamente a "Problemas de
+        // estación" y al Monitor, para no confundir a los auditores con incidencias que resuelve la estación.
+        IQueryable<Alerta> query = DbSet.Where(a =>
+            a.Ambito == AmbitoAlerta.Auditoria || a.Ambito == AmbitoAlerta.Ambos);
         if (tipo.HasValue) query = query.Where(a => a.TipoDetector == tipo.Value);
         if (nivel.HasValue) query = query.Where(a => a.NivelRiesgo == nivel.Value);
         if (estado.HasValue) query = query.Where(a => a.Estado == estado.Value);

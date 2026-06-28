@@ -54,6 +54,16 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.Property<int>("Estado")
                         .HasColumnType("integer");
 
+                    b.Property<int>("EventosAcumulados")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTime>("FechaActualizacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
                     b.Property<DateTime>("FechaDeteccion")
                         .HasColumnType("timestamp with time zone");
 
@@ -89,6 +99,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Estado");
 
+                    b.HasIndex("FechaActualizacion");
+
                     b.HasIndex("FechaDeteccion");
 
                     b.HasIndex("NivelRiesgo");
@@ -96,6 +108,8 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.HasIndex("TipoDetector");
 
                     b.HasIndex("EstacionId", "FechaDeteccion");
+
+                    b.HasIndex("EstacionId", "TransaccionReferencia");
 
                     b.HasIndex("Ambito", "EstacionId", "FechaDeteccion");
 

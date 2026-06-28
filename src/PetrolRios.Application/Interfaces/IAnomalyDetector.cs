@@ -84,6 +84,18 @@ public sealed class DetectedAnomaly
     public Dictionary<string, object> Metadata { get; init; } = [];
 
     /// <summary>
+    /// Si es true, esta anomalía representa un CASO acumulable (p. ej. despachos rápidos del mismo RUC/placa
+    /// en el día). El job, en vez de crear una alerta nueva cada vez, busca una alerta ABIERTA con la misma
+    /// <see cref="TransaccionReferencia"/> y le acumula <see cref="EventosEnLote"/> ocurrencias, escalando el
+    /// nivel por el conteo total (<c>Alerta.EscalarPorConteo</c>) y subiéndola arriba (re-emerge como Nueva).
+    /// Si no hay una abierta, la crea con ese conteo inicial.
+    /// </summary>
+    public bool EsAcumulable { get; init; }
+
+    /// <summary>Cuántas ocurrencias del caso aporta este lote (para acumular en la alerta). Default 1.</summary>
+    public int EventosEnLote { get; init; } = 1;
+
+    /// <summary>
     /// Objeto de origen de la anomalía (p. ej. una <c>FacturaDto</c>, <c>CierreTurnoDto</c>, <c>CreditoDto</c>…).
     /// El enriquecedor central refleja de aquí los campos IDENTIFICABLES estándar (RUC, nº de documento,
     /// placa, vendedor, cliente, turno, fecha, monto, forma de pago) hacia <see cref="Metadata"/>, sin pisar

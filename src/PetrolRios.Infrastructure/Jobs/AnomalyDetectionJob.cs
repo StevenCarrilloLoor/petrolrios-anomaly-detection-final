@@ -396,6 +396,33 @@ public sealed class AnomalyDetectionJob
         {
             foreach (var anomaly in anomalies)
             {
+                var metadataJson = JsonSerializer.Serialize(anomaly.Metadata);
+
+                // Caso ACUMULABLE (p. ej. despachos rápidos del mismo RUC/placa): si ya hay una alerta
+                // ABIERTA del mismo caso (misma referencia), se acumula y se escala en vez de crear otra.
+                // Así no se inunda la bandeja y la severidad crece con la reincidencia (re-emerge arriba).
+                if (anomaly.EsAcumulable && !string.IsNullOrWhiteSpace(anomaly.TransaccionReferencia))
+                {
+                    var abierta = await _dbContext.Alertas.FirstOrDefaultAsync(a =>
+                        a.EstacionId == anomaly.EstacionId
+                        && a.TransaccionReferencia == anomaly.TransaccionReferencia
+                        && (a.Estado == EstadoAlerta.Nueva || a.Estado == EstadoAlerta.EnRevision), ct);
+
+                    if (abierta is not null)
+                    {
+                        var aporte = Math.Max(anomaly.EventosEnLote, 1);
+                        var (escScore, escNivel) = Alerta.EscalarPorConteo(abierta.EventosAcumulados + aporte);
+                        abierta.Acumular(aporte, escScore, escNivel, anomaly.Descripcion, metadataJson, DateTime.UtcNow);
+                        generadas++;
+                        if (abierta.Ambito is AmbitoAlerta.Operativa or AmbitoAlerta.Ambos)
+                            operativasDeEstacion.Add(abierta);
+                        await NotifyAlertAsync(abierta, estacion.Id);
+                        if ((int)abierta.NivelRiesgo >= (int)nivelMinCorreo)
+                            await NotificarNivelPorCorreoAsync(abierta, estacion, ct);
+                        continue;
+                    }
+                }
+
                 var alerta = Alerta.Create(
                     anomaly.TipoDetector,
                     anomaly.NivelRiesgo,
@@ -404,9 +431,10 @@ public sealed class AnomalyDetectionJob
                     anomaly.EstacionId,
                     anomaly.EmpleadoCodigo,
                     anomaly.TransaccionReferencia,
-                    JsonSerializer.Serialize(anomaly.Metadata),
+                    metadataJson,
                     ejecucion.Id,
-                    anomaly.Ambito);
+                    anomaly.Ambito,
+                    eventosAcumulados: anomaly.EsAcumulable ? Math.Max(anomaly.EventosEnLote, 1) : 1);
 
                 await _dbContext.Alertas.AddAsync(alerta, ct);
                 generadas++;

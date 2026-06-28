@@ -209,8 +209,8 @@ public static class SeedData
             "AnulacionRecurrenteDiasMinimo", 3.0);
         AddIfMissing(TipoDetector.PaymentFraud,
             "Despachos rapidos sucesivos",
-            "Genera alerta si el mismo cliente registra 3 o mas despachos consecutivos con menos de N minutos entre ellos (patron del caso documentado de enero 2026)",
-            "DespachosRapidosMinutosUmbral", 10.0);
+            "Genera alerta si el mismo RUC/cliente (o la misma placa) registra 2 o mas despachos consecutivos con menos de N minutos entre ellos. Es DINAMICA en la llave (RUC si no cambian el cliente; placa si reutilizan el vehiculo) y ACUMULABLE: en vez de una alerta por racha, se acumulan en UNA por caso que escala por cantidad (2-3 Medio, 4-5 Alto, 6+ Critico) y re-emerge arriba. Ambito Ambos (operativa + auditoria).",
+            "DespachosRapidosMinutosUmbral", 10.0, AmbitoAlerta.Ambos);
         AddIfMissing(TipoDetector.PaymentFraud,
             "Credito sin garante",
             "Genera alerta si un credito (CRED_CABE) se otorga sin garante (COD_GARA vacio); senial de autorizacion indebida de credito.",
@@ -298,7 +298,8 @@ public static class SeedData
         // La columna Ambito no existía antes; las filas anteriores a la migración pudieron quedar
         // sin un valor de enum válido (0). Se normalizan a Auditoría antes de marcar las Operativa.
         var ambitoInvalido = await context.ReglasDeteccion
-            .Where(r => r.Ambito != AmbitoAlerta.Operativa && r.Ambito != AmbitoAlerta.Auditoria)
+            .Where(r => r.Ambito != AmbitoAlerta.Operativa && r.Ambito != AmbitoAlerta.Auditoria
+                     && r.Ambito != AmbitoAlerta.Ambos)
             .ToListAsync();
         foreach (var r in ambitoInvalido) r.Ambito = AmbitoAlerta.Auditoria;
 
@@ -312,6 +313,14 @@ public static class SeedData
             .Where(r => clavesOperativas.Contains(r.ParametroNombre) && r.Ambito != AmbitoAlerta.Operativa)
             .ToListAsync();
         foreach (var r in aOperativa) r.Ambito = AmbitoAlerta.Operativa;
+
+        // Despachos rápidos: ámbito AMBOS (operativa + auditoría) en bases ya sembradas, solo si sigue en el
+        // default anterior (Auditoría), para no pisar un cambio manual. La recalibración (acumulable, mínimo
+        // 2, por RUC/placa) es de código; aquí solo se asegura el carril.
+        var despachosRapidos = await context.ReglasDeteccion
+            .FirstOrDefaultAsync(r => r.ParametroNombre == "DespachosRapidosMinutosUmbral");
+        if (despachosRapidos is not null && despachosRapidos.Ambito == AmbitoAlerta.Auditoria)
+            despachosRapidos.Ambito = AmbitoAlerta.Ambos;
 
         // Recalibrar la tasa de anulaciones del 5% al 3% (la tesis indica que lo normal es <2%),
         // solo si la regla sigue en el valor por defecto anterior (no piso ajustes manuales).
@@ -515,9 +524,9 @@ public static class SeedData
             ReglaDeteccion.Create(
                 TipoDetector.PaymentFraud,
                 "Despachos rapidos sucesivos",
-                "Genera alerta si el mismo cliente registra 3 o mas despachos consecutivos con menos de N minutos entre ellos (patron del caso documentado de enero 2026)",
+                "Genera alerta si el mismo RUC/cliente (o la misma placa) registra 2 o mas despachos consecutivos con menos de N minutos entre ellos. Dinamica (RUC o placa) y acumulable: se acumulan en UNA alerta por caso que escala por cantidad (2-3 Medio, 4-5 Alto, 6+ Critico) y re-emerge arriba. Ambito Ambos.",
                 "DespachosRapidosMinutosUmbral",
-                10.0),
+                10.0, AmbitoAlerta.Ambos),
 
             // Compliance Violation
             ReglaDeteccion.Create(

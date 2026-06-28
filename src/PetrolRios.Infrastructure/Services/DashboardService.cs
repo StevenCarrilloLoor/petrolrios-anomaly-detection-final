@@ -30,7 +30,8 @@ public sealed class DashboardService : IDashboardService
     /// </summary>
     private IQueryable<Alerta> AlertasAuditoria(int? estacionId = null)
     {
-        var query = _dbContext.Set<Alerta>().Where(a => a.Ambito == AmbitoAlerta.Auditoria);
+        var query = _dbContext.Set<Alerta>().Where(a =>
+            a.Ambito == AmbitoAlerta.Auditoria || a.Ambito == AmbitoAlerta.Ambos);
         if (estacionId is > 0) query = query.Where(a => a.EstacionId == estacionId.Value);
         return query;
     }
