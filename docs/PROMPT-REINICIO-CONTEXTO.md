@@ -62,6 +62,17 @@ Eres mi compañero de ingeniería en mi **proyecto de tesis** PetrolRíos. Traba
   Haz `git add` **por ruta, solo de tus archivos**. **NUNCA** toques mis cambios sin commitear.
 - **Limpia** los `.bat`/`.log` temporales que crees.
 - Detalle conocido: los screenshots por CDP a veces dan timeout → **reintenta** (sale al 2º intento).
+- **Probar el agente = INSERTAR EN FIREBIRD con datos REALES (nunca en Postgres).** La forma fiable de
+  verificar el agente end-to-end es **insertar transacciones directo en la Firebird de la estación**
+  (`type x.sql | docker exec -i petrolrios-firebird /usr/local/firebird/bin/isql -user SYSDBA -password
+  masterkey /firebird/data/CONTAC.FDB`, con `FEC_DCTO/FIN_DESP = CURRENT_TIMESTAMP` para que la marca de
+  agua las tome) y confirmar que (a) el agente las **extrae** (consola "Extraídas N"), (b) llegan al central
+  (Datos recibidos / alertas), (c) la consulta en vivo las muestra. **ANTES de insertar, LEER el Firebird
+  real** (mismo `isql`, p. ej. helper `_fbq.bat`) para saber qué hay y cómo viene, y **usar datos reales del
+  catálogo**: clientes `ZZ0000xxx` (tienen `NOM_CLIE`) en vez de códigos sintéticos `CLI777` (no están en
+  CLIE → no resuelven nombre); despachadores `VEND` 001–011 con nombre (004=JORGE MENDOZA, 010=CARLA
+  VALAREZO…). **Verificar SIEMPRE columnas/tipos en `docs/contac-schema.sql` antes del INSERT** (regla de
+  oro). Inserciones demo en `ejecutables/2-BASE-DE-DATOS-Y-DEMO/`; usar PK sintéticas `99xxxxx` para no chocar.
 
 ## 4. El sistema (qué es)
 
@@ -95,6 +106,22 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
   (`POST /api/v1/auth/login` y guarda el token en `localStorage`).
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
+
+**NUEVA RONDA ERP/UX-2 (27-jun-2026, pedido de Steven con la entrevista de auditoría como base) — EN CURSO por
+etapas A–F. Etapas A+B HECHAS + QA en vivo (commit `3050c94`, CAMBIOS §96):** A) `ConsultasPage` con **deep-link
+autobuscable** (`?est&codigo&tipo&desde&hasta` → busca sola), **fecha visible** en tema oscuro
+(`[color-scheme:dark]`), **Imprimir** lo filtrado (encabezado solo-impresión con los filtros) y **celdas
+relacionables** (cliente/RUC/placa/despachador → consulta relacionada en ventana nueva). B) `DetalleAlertaPage`:
+los chips de evidencia de ENTIDAD (placa/RUC/cliente/despachador) abren la **consulta RELACIONADA en vivo en
+ventana nueva** (`abrirConsultaRelacionada` → `/consultas?est=&codigo=`), ya **NO** `/alertas?buscar`; el nº de
+factura sigue enlazando la **factura completa**. **Verificado:** eslint 0 + `tsc -b && vite build` OK
+(`_verify_frontend.bat`); **QA Chrome en vivo:** alerta **#80** → **13** enlaces de factura, **0** a
+`/alertas?buscar`, **7** RUC relacionables; deep-link `?est=EST-001&codigo=<RUC>` → 6 docs reales; ambos
+`input[type=date]` con `color-scheme: dark`. **Pendiente de la ronda: C** factura con más datos + presentación
+profesional, **D** auditoría del agente (reactivo/escalable/dinámico) + consultar una **tabla X
+auto-estructurada**, **E** **rediseño del dashboard**, **F** reporte liquidación→facturas. Permisos de
+Windows/Chrome concedidos; sistema corriendo vía `iniciar-todo-el-sistema.bat`. Regla de seguridad firme:
+login por API (no tecleo contraseñas).
 
 **CIERRE DE PENDIENTES (27-jun-2026, §94, commits `25334b6`/`ac371aa`/`f239a3a`, gate verde 334 tests + QA en
 vivo):** (a) **`Fuente` extendida a las 4 reglas de factura restantes** (FueraHorario, FechaFueraDeRango,
@@ -463,4 +490,4 @@ cabecera de factura, **DESP** = detalle del despacho (una factura agrupa varios 
 
 Hazlo todo seguido, en etapas, verificando (código + Chrome + pruebas) y commiteando cada una con mi
 identidad, sin tocar mis cambios sin guardar. **No espero menos que la perfección.**
-pero primero lee todos los scrips, .bats, archivos y cualquier cosa que este en mi proyecto de todas las carpetas para que armes un contexto completo y sepas que hacer cada cosa nates de que continues
+NOTA IMPORTANTE: pero primero lee todos los scrips, .bats, archivos, ETC, TODO DE TODO no te saltes nada y no continuas hasta que termines de analisar todo al completo cosa que este en mi proyecto de todas las carpetas para que armes un contexto completo y sepas que hacer cada cosa nates de que continues Y asi tener un contexto envidiable

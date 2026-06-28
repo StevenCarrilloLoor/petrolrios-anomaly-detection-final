@@ -2848,3 +2848,39 @@ botones "ver relacionado".
 Commit: `3050c94` (código, etapas A+B). Pendiente de la ronda: **C** (factura con más datos + presentación),
 **D** (auditoría del agente + consultar una tabla X auto-estructurada), **E** (rediseño del dashboard), **F**
 (reporte liquidación→facturas).
+
+---
+
+## 97. Etapa C — Factura enriquecida (más datos + presentación ERP), probada con simulación REAL en Firebird
+
+**Motivación.** La auditora pidió más información y mejor presentación en la factura (img 7 de Steven). Steven
+recalcó además el MÉTODO de prueba: **insertar en Firebird con datos REALES** y **leer el Firebird antes** para
+saber qué llega y cómo.
+
+**Agente (`FirebirdExtractor.ConsultarDocumentosAsync`).** La consulta on-demand ahora hace `LEFT JOIN CLIE`
+(nombre/correo/teléfono del cliente por `COD_CLIE`, la PK de CLIE → match exacto) y `LEFT JOIN VEND` (nombre del
+despachador por `COD_VEND`), y trae más campos de DCTO: chofer, consecutivo, autorización (SRI), guía,
+observaciones, dirección y subtotal. Los LEFT JOIN no descartan filas. **Fix de rendimiento (importante):** una
+primera versión filtraba también por `c.NOM_CLIE CONTAINING @codigo` en el WHERE → forzaba el join a CLIE por
+CADA fila del scan de 39 k+ DCTO (CONTAINING no usa índice) y la consulta **superaba el timeout de 30 s**; se
+quitó del WHERE (el nombre se MUESTRA, no se busca). Búsqueda por nombre = mejora futura (pre-lookup en CLIE).
+
+**Frontend.** `DocumentoFirebird` + normalización ampliados; **`FacturaPage` rediseñada tipo factura ERP**
+(cabecera con estación/tipo/nº/fecha; bloque Cliente con nombre + contacto; bloque Documento con
+despachador/chofer/placa/forma de pago/turno/consecutivo/autorización/guía/despacho; tabla de líneas DESP;
+totales destacados; observaciones; pie), con **tipo de documento y forma de pago legibles** (FV→"Factura de
+venta", 001→"Contado (efectivo)") y print-friendly (`print:bg-white`). Consultas muestra el nombre del cliente
+bajo su código.
+
+**Verificación.** Gate oficial **verde** (build Release 0/0, **334 tests**, migración sin cambios, eslint +
+`tsc -b && vite build`). **Simulación medianamente real en Firebird** (`docker exec isql`): factura nueva
+`001-001-009900070` a un **cliente REAL** del catálogo (`ZZ0000176` = LOOR CEVALLOS MARIO ANDRES) con despachador
+real (`010` = CARLA VALAREZO) + línea DESP, `FEC_DCTO = ahora`. QA en vivo: (a) la factura muestra nombre de
+cliente, nombre de despachador, línea de surtido, autorización/guía/observaciones y forma de pago "Contado
+(efectivo) (001)"; (b) **el agente la EXTRAJO por marca de agua** y llegó al central (Datos recibidos
+#3393/#3394, Procesada) → pipeline **Firebird → agente → central** confirmado. Aprendizaje registrado en
+`docs/PROMPT-REINICIO-CONTEXTO.md` §3: probar el agente = insertar en Firebird con datos reales del catálogo
+(`CLI777` sintético no resuelve nombre; `ZZ0000xxx` sí), leyendo el Firebird antes y verificando el schema.
+
+Commit: `6e8da8d` (código). Pendiente de la ronda: **D** (agente reactivo/escalable + tabla X
+auto-estructurada), **E** (rediseño del dashboard), **F** (reporte liquidación→facturas).
