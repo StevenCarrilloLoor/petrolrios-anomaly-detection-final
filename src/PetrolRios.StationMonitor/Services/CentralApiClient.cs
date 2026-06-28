@@ -58,7 +58,11 @@ public sealed class CentralApiClient
             var problemas = grupos
                 .SelectMany(g => g.Problemas)
                 .Where(p => p.EstacionId == identidad.EstacionId)
-                .Where(p => p.Ambito.Equals("Operativa", StringComparison.OrdinalIgnoreCase))
+                // Operativa (problema de estación) Y Ambos (importa a la estación Y al central, p. ej.
+                // despachos rápidos): ambos le competen a la estación. Antes filtraba Operativa estricto y
+                // se comía los Ambos → el Monitor mostraba 0 aunque el central tuviera cientos.
+                .Where(p => p.Ambito.Equals("Operativa", StringComparison.OrdinalIgnoreCase)
+                         || p.Ambito.Equals("Ambos", StringComparison.OrdinalIgnoreCase))
                 .Where(p => p.Estado is "Nueva" or "EnRevision")
                 .DistinctBy(p => p.Id)
                 .OrderByDescending(p => p.FechaDeteccion)

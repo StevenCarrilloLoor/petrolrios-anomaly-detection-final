@@ -16,9 +16,13 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
         var anomalies = new List<DetectedAnomaly>();
         var carril = Carril(regla);
 
-        var preciosPorProducto = context.Detalles
+        // El precio "autorizado" es el mínimo del producto EN ESE DÍA (no del lote/mes entero). El precio del
+        // combustible cambia legítimamente entre días; comparar contra el mínimo histórico marcaba TODAS las
+        // ventas al precio nuevo como "fuera de lista" (miles de falsos positivos sobre un mes de datos reales).
+        // Por (producto, día), solo se marca cobrar por encima del precio del día = sobreprecio real intra-jornada.
+        var preciosPorProductoDia = context.Detalles
             .Where(d => d.ValorUnitario > 0)
-            .GroupBy(d => d.CodigoProducto.Trim())
+            .GroupBy(d => new { Prod = d.CodigoProducto.Trim(), Dia = d.FechaDespacho.Date })
             .ToDictionary(g => g.Key, g => g.Min(d => d.ValorUnitario));
 
         foreach (var detalle in context.Detalles)
@@ -26,7 +30,9 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
             if (detalle.ValorUnitario <= 0) continue;
 
             var producto = detalle.CodigoProducto.Trim();
-            if (!preciosPorProducto.TryGetValue(producto, out var precioBase)) continue;
+            if (!preciosPorProductoDia.TryGetValue(
+                    new { Prod = producto, Dia = detalle.FechaDespacho.Date }, out var precioBase))
+                continue;
 
             if (detalle.ValorUnitario > precioBase * 1.01)
             {
