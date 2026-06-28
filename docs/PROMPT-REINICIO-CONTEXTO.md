@@ -130,10 +130,17 @@ detector/nivel, firmas de regla, datos basura, acumulación, reglas mudas). Hall
   daba 0 pese a **274 casos**). Centralizado en `DetectionRuleBase` por `CodigoCliente` + cercanía temporal. CENTRAL.
 - **No-bugs confirmados:** CashFraud mudo = liquidaciones con `Diferencia=0` (SanPio cuadra caja); placa genérica
   ZZZ999949 no se usa en SanPio; acumulación/escalado de despachos rápidos impecable (1→38 eventos, Medio→Crítico).
-- **PENDIENTE inmediato (orden de Steven):** (31) **nombres de despachador `DD…`→nombre** — la investigación no
-  halló puente automático en las tablas contables (los `DD…` no mapean a VEND 001–071 ni a EMPL 45–78); necesita
-  dato/decisión de SanPio (ver `VEND`/`EMPL` en vivo o catálogo). (32) **rediseño GRANDE del Monitor de estación**
-  (el filtro Ambos ya está; falta la UI, que va "muy por detrás del sistema central").
+- **(31) Nombres de despachador HECHO (`b1cf5cd`, §105.1):** `EmpleadoDirectorio` resuelve por código EXACTO y,
+  si falla, por NÚCLEO NUMÉRICO — la factura trae `DCTO.COD_VEND="DD0000010"` pero el catálogo VEND guarda "010"
+  (o "10"); `DD0000010`→`10`, `010`→`10` los empareja. +1 test (`DD0000010`→CARLA VALAREZO). _Operativo:_ el
+  agente de SanPio debe sincronizar su VEND (panel → "Sincronizar ahora"); EST-015 aún no tiene catálogo cargado.
+  Si VEND no trae esos despachadores con ese código, verlo en Explorar tabla → VEND.
+- **(32) Rediseño GRANDE del Monitor HECHO (`3ee7d24`, §105.2):** el `PanelHtml` ignoraba el `MetadataJson` que
+  el central ya le manda. Ahora (solo-UI, mismos endpoints): distribución por severidad, conteos por tipo,
+  filtros por nivel + buscador + orden, EVIDENCIA parseada en cada tarjeta (placa/RUC/cliente/doc/productos…),
+  badge ×N acumulados, marca "nuevo", detalle expandible. Filtro Ambos ya estaba (§104.2) → ahora SÍ muestra
+  problemas. _Operativo:_ reconstruir/relanzar el Monitor (puerto 5190, proceso aparte) para verlo en vivo.
+- **Gate verde 347** (build 0/0, +1 `EmpleadoDirectorioTests`, EF OK, frontend OK).
 
 ---
 

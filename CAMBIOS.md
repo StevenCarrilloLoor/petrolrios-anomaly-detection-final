@@ -3112,3 +3112,35 @@ datos basura (scores 0–100, sin campos vacíos, sin mojibake en las descripcio
 
 **Verificación.** Gate `_gate.bat` VERDE (build 0/0, **346 pruebas**, EF sin cambios de modelo, frontend OK) +
 QA en vivo por SQL a la BD de producción. Commits: `06b8c89`, `4aa24d3`.
+
+---
+
+## 105. Nombres de despachador (DD…→nombre) + rediseño grande del Monitor de estación
+
+Tras la caza de bugs, las dos tareas que Steven pidió a continuación.
+
+**105.1 · Nombres de despachador por núcleo numérico (`b1cf5cd`).** En la Contaplus real de SanPio el
+despachador llega en la factura como `DCTO.COD_VEND="DD0000010"` (los 5 principales: DD0000009/10/11/13/14,
+~10 k facturas) pero el catálogo `empleados` (que el agente sincroniza desde `VEND` cada 6 h) guarda el código
+como `"010"` (o `"10"`) — y SanPio (EST-015) además aún no tiene su catálogo cargado (solo están las demo
+EST-001/EST-010 con códigos 001–011). El match exacto fallaba y la alerta mostraba el código crudo.
+`EmpleadoDirectorio` ahora cruza por código **EXACTO** y, si falla, por **NÚCLEO NUMÉRICO** (dígitos sin ceros
+a la izquierda: `DD0000010`→`10`, `010`→`10`, `11`→`11`), trayendo el catálogo completo de la estación (es
+pequeño). +1 prueba (`DD0000010`→CARLA VALAREZO). **Pendiente operativo:** que el agente de SanPio sincronice
+su `VEND` (panel → "Sincronizar ahora"); si `VEND` no trae esos despachadores con ese código, se confirma en
+**Explorar tabla → VEND**. El cruce ya queda listo para cuando el catálogo llegue.
+
+**105.2 · Rediseño grande del Monitor de estación (`3ee7d24`).** El panel local (un solo `PanelHtml.cs`)
+**ignoraba** el `MetadataJson` que el central ya le envía en cada problema. Ahora, a la altura del sistema
+central y **solo-UI** (mismos endpoints `/api/estado|actualizar|config|probar` y mismo contrato): barra de
+**distribución por severidad** (apilada + leyenda), **conteos por tipo** de detector, **filtros por nivel**
+(pills + métricas clicables), **buscador** (placa/RUC/cliente/factura/metadata) y **orden** (severidad /
+reciente / acumulados); tarjetas **enriquecidas con la EVIDENCIA** parseada del metadata (placa, RUC, cliente,
+documento, productos, galones, monto, diferencia), **badge de reincidencia** (×N acumulados) para los
+despachos rápidos, marca de "nuevo", y **detalle expandible** con todo el metadata + referencia/ámbito/estado.
+Pip de urgentes en la pestaña. Recordatorio: el filtro **Ambos** del Monitor ya se había arreglado en §104.2,
+así que ahora **sí muestra** los problemas (despachos rápidos son Ambos). **Para verlo en vivo:** reconstruir/
+relanzar el Monitor (proceso aparte, puerto 5190), igual que con el agente.
+
+**Verificación.** Gate `_gate.bat` VERDE (build Release 0/0, **347 pruebas** — +1 `EmpleadoDirectorioTests` —,
+EF sin cambios de modelo, eslint + `tsc -b && vite build` OK; el Monitor compila). Commits: `b1cf5cd`, `3ee7d24`.
