@@ -3308,3 +3308,48 @@ UTF-8, para que Excel respete los acentos), junto al **"Imprimir / PDF"** existe
 
 **Verificación.** Gate VERDE (build 0/0, **379 pruebas**, EF sin cambios de modelo, eslint + `tsc -b && vite build` OK).
 Commit: `1f90736`.
+
+---
+
+## 111. Auditoría de las 25 reglas (evidencia para el auditor) + descarga Excel/PDF en la factura
+
+**Motivación.** Steven pidió **auditar cada una** de las reglas predeterminadas verificando que lleven **toda la
+información que un auditor necesita** (documento/factura, despachador, placa, RUC, cliente, monto, nombre de
+combustible) — más los botones de **descarga Excel/PDF** que faltaban en la factura.
+
+**Auditoría (las 25, por grupo).** La gran mayoría YA estaba completa:
+
+- **12 reglas de documento único** (heredan RUC / n.º de documento enlazable / placa / cliente / turno / forma de
+  pago / monto vía `Fuente` + su metadata propio): `CreditoSinCliente`, `DiferenciaEfectivo`, `FueraHorario`,
+  `PlacaGenerica`, `VentaSinIdentificacion`, `VentaSinPlaca`, `CamposObligatorios`, `DescuentoExcesivo`,
+  `FechaFueraDeRango`, `TotalInconsistente`, `ReversionTardia`, `AltoVolumenSinPlaca`. ✔ COMPLETAS.
+- **6 reglas agregadas** (sin documento único por diseño, pero con empleado + agregados + ejemplos):
+  `PlacaReutilizada` (placa/clientes/rucs/vendedores/n.º facturas), `FaltantesRecurrentes`, `EfectivoCorporativo`,
+  `TasaAnulaciones`, `DespachosRapidos` (§102, enriquecida), `MultipleCombustible` (§110.3, enriquecida). ✔ OK.
+- **3 reglas de crédito/tarjeta** (identifican la cabecera de crédito o el par de tarjetas + socio + monto + banco;
+  CRED/TURN_TARJ no traen factura): `CreditoSinAutorizacion`, `CreditoSinGarante`, `TransaccionesDuplicadas`. ✔ Adecuadas.
+- **3 reglas FLOJAS → enriquecidas** en esta ronda (ver abajo).
+
+**Enriquecimientos.**
+
+**111.1 · AnulacionRecurrente.** Antes solo decía "N anulaciones en M días" (sin saber QUÉ se anuló ni para jalarlo).
+`ANUL` no trae vendedor, pero **sí identifica los comprobantes anulados**: ahora la alerta lista los **comprobantes**
+(`establecimiento-puntoEmisión-secuencial`, con rango si Inicio≠Fin), el **rango de fechas**, los **tipos de
+comprobante** y las **autorizaciones** → el auditor jala las facturas anuladas en Consultas. La descripción incluye
+una muestra de los comprobantes.
+
+**111.2 · PrecioFueraLista.** La alerta mostraba el producto como **código** ("producto 2/3"). Ahora muestra el
+**nombre del combustible** (Diésel, Extra/Ecopaís) en la descripción y en `metadata["Combustible"]`, usando el
+diccionario `Domain.Enums.Combustibles`; conserva el código y el enlace al despacho (`DESP-…`).
+
+**111.3 · DespachoNoFacturado** (deshabilitada por defecto). El nombre del producto venía vacío → ahora cae al
+diccionario por código; además se fija **`Fuente` = despacho** para heredar cliente/manguera/fecha como evidencia.
+
+**111.4 · Factura: descarga Excel y PDF.** La `FacturaPage` solo tenía "Imprimir". Ahora:
+- Botón **"Excel"**: descarga la factura COMPLETA como **CSV** (BOM UTF-8) — cabecera, cliente, documento,
+  **líneas de surtido con el nombre del combustible** e importes; los montos van como número para que Excel calcule.
+- El botón de impresión ahora dice **"Imprimir / PDF"** (Guardar como PDF desde el diálogo del navegador).
+
+**Verificación.** Gate VERDE: build 0/0, **381 pruebas** (Domain 48 / StationMonitor 2 / **Detectors 205** [+2:
+PrecioFueraLista incluye "Diésel"; AnulacionRecurrente incluye los comprobantes anulados] / Api 126), EF sin cambios
+de modelo, eslint + `tsc -b && vite build` OK. Commit: `3555a50`.

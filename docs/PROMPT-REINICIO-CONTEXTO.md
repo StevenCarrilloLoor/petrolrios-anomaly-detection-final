@@ -113,6 +113,29 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**AUDITORÍA DE LAS 25 REGLAS + DESCARGA EXCEL/PDF EN LA FACTURA (28-jun-2026, CAMBIOS §111, `3555a50`, gate verde 381).**
+Steven pidió **auditar cada regla predeterminada** verificando que lleve toda la información que un auditor necesita
+(documento/factura, despachador, placa, RUC, cliente, monto, nombre de combustible) + los botones de **descarga
+Excel/PDF** que faltaban en la factura.
+- **Veredicto de la auditoría (las 25):** la gran mayoría ya estaba **completa**. (a) **12 reglas de documento único**
+  heredan RUC/n.º doc enlazable/placa/cliente/turno/forma de pago/monto vía `Fuente` + su metadata (CreditoSinCliente,
+  DiferenciaEfectivo, FueraHorario, PlacaGenerica, VentaSinIdentificacion, VentaSinPlaca, CamposObligatorios,
+  DescuentoExcesivo, FechaFueraDeRango, TotalInconsistente, ReversionTardia, AltoVolumenSinPlaca). (b) **6 agregadas**
+  con empleado + agregados + ejemplos (PlacaReutilizada, FaltantesRecurrentes, EfectivoCorporativo, TasaAnulaciones,
+  DespachosRapidos §102, MultipleCombustible §110.3). (c) **3 de crédito/tarjeta** adecuadas (CreditoSinAutorizacion,
+  CreditoSinGarante, TransaccionesDuplicadas: identifican cabecera/par + socio + monto + banco; CRED/TURN_TARJ no traen
+  factura). (d) **3 flojas → enriquecidas.**
+- **111.1 AnulacionRecurrente:** antes solo "N anulaciones en M días". `ANUL` no trae vendedor pero **sí** los comprobantes:
+  ahora lista **comprobantes anulados** (`est-pto-secuencial`, rango si Inicio≠Fin) + rango de fechas + tipos + autorizaciones
+  → el auditor jala las facturas anuladas. **111.2 PrecioFueraLista:** muestra el **nombre del combustible** (Diésel,
+  Extra/Ecopaís) en la descripción y `metadata["Combustible"]`, no solo el código. **111.3 DespachoNoFacturado** (off por
+  defecto): nombre por diccionario + `Fuente`=despacho.
+- **111.4 Factura (`FacturaPage`):** botón **"Excel"** = CSV completo (BOM UTF-8: cabecera, cliente, documento, líneas de
+  surtido con nombre de combustible, importes como número) + el de impresión ahora dice **"Imprimir / PDF"**.
+- **Verificación:** gate VERDE — build 0/0, **381 pruebas** (Domain 48 / Monitor 2 / **Detectors 205** [+2] / Api 126),
+  EF sin cambios, eslint + `tsc -b && vite build` OK. _Es CENTRAL/detector: vivo al reconstruir la API; la factura (frontend)
+  vive al recargar el Vite dev / rebuild del frontend._
+
 **SISTEMA DE PRECIOS ROBUSTO — POR ETAPAS (28-jun-2026, CAMBIOS §107). E1 hecha; gate verde 353.**
 Steven pidió un sistema de precios totalmente automático/reactivo/robusto (spec de 12 puntos: schedule adaptativo,
 cascada de fuentes, validación con bandas, log de auditoría, Súper pendiente, salud/historial, dashboard con
