@@ -2920,3 +2920,30 @@ claro, sin correr SQL (anti-inyección OK).
 
 Commit: `ab17578` (código). Pendiente de la ronda: **E** (rediseño grande del dashboard), **F** (reporte
 liquidación→facturas).
+
+---
+
+## 99. Etapa E — Rediseño del dashboard como centro de mando ACCIONABLE
+
+**Motivación.** Steven: el dashboard estaba "muy simplón y poco útil" → pidió "mejora de 99999%" investigando
+referencias. Investigué buenas prácticas de dashboards de fraude/SOC (DataCamp, PayPal, FanRuan, ArmorPoint…):
+deben ser **accionables** ("test del 'so what?'"; drill-down de cualquier dato a la investigación "a un clic"),
+con un **feed de triage** ("qué revisar primero y por qué" en segundos), **semántica de color** (verde/ámbar/
+rojo), filtro por **periodo** y KPIs con **contexto/delta**.
+
+**Qué se hizo (frontend, SIN tocar backend — reusa los 7 endpoints existentes + la lista de alertas):**
+- **Feed "Atención inmediata":** las alertas más recientes (nivel + descripción + estación/empleado + score +
+  hace-cuánto + estado), cada una **clicable → su detalle**. Es el triage que faltaba.
+- **KPIs con drill-down:** cada tarjeta abre la bandeja **ya filtrada** (`Críticas`→`?nivel=Critico`,
+  `Nuevas`→`?estado=Nueva`, `En línea`→`/conexiones`…). Para que funcione, `AlertasPage` ahora lee los filtros
+  `?nivel/?estado/?tipo/?estacionId` de la URL.
+- **Tendencia con periodo (7/14/30/90 días) + delta** (variación de la 2.ª mitad vs la 1.ª; pastilla roja/verde).
+- **Gráficos con drill-down:** clic en un segmento (tipo) / barra (nivel, estación) → bandeja filtrada.
+- **Métricas con semántica de color** (tasa de alertas válidas: verde ≥90%, ámbar ≥70%, rojo <70%) + filas de
+  **empleados clicables** (→ sus alertas). Mantiene filtro por estación, Imprimir/PDF y refresco en vivo.
+
+**Verificación.** Frontend **eslint + `tsc -b && vite build` verdes**. **QA en vivo en Chrome:** el dashboard
+renderiza sin errores; el feed muestra 7 alertas reales clicables, 5 KPIs son enlaces de drill-down, el selector
+de periodo y el delta aparecen.
+
+Commit: `62eb3bf` (código). Pendiente de la ronda: **F** (reporte liquidación→facturas).
