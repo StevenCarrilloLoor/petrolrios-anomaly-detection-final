@@ -29,7 +29,9 @@ public sealed class AgentSettings
     public string FirebirdDatabase { get; set; } = @"C:\Programas\ContaGober1\Datosc\CONTAB.FDB";
     public string FirebirdUser { get; set; } = "SYSDBA";
     public string FirebirdPassword { get; set; } = "masterkey";
-    public string FirebirdCharset { get; set; } = "NONE";
+    // UTF8 por defecto: las bases ContaGober reales guardan nombres en UTF-8 (con NONE, "MUÑOZ" se leía como
+    // "MUÃ?OZ"). Es configurable por estación; si una base es Latin-1 se puede poner ISO8859_1/WIN1252.
+    public string FirebirdCharset { get; set; } = "UTF8";
     public int FirebirdDialect { get; set; } = 3;
 
     /// <summary>WireCrypt: "Disabled" para Firebird 2.5 (Legacy_Auth), "Enabled" para FB 3+.</summary>

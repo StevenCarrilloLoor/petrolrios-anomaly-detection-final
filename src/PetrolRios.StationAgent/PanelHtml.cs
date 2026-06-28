@@ -579,7 +579,7 @@ async function cargarConfig(){
     document.getElementById('f-fbport').value = c.firebirdPort || 3050;
     document.getElementById('f-fbdatabase').value = c.firebirdDatabase || 'C:\\Programas\\ContaGober1\\Datosc\\CONTAB.FDB';
     document.getElementById('f-fbuser').value = c.firebirdUser || '';
-    document.getElementById('f-fbcharset').value = c.firebirdCharset || 'NONE';
+    document.getElementById('f-fbcharset').value = c.firebirdCharset || 'UTF8';
     document.getElementById('f-fbdialect').value = c.firebirdDialect || 3;
     document.getElementById('f-fbwirecrypt').value = c.firebirdWireCrypt || 'Disabled';
     document.getElementById('f-intervalo').value = c.intervaloSegundos || 1;

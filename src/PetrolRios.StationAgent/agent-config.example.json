@@ -17,7 +17,7 @@
   "FirebirdDatabase": "C:\\Programas\\ContaGober1\\Datosc\\CONTAB.FDB",
   "FirebirdUser": "SYSDBA",
   "FirebirdPassword": "",
-  "FirebirdCharset": "NONE",
+  "FirebirdCharset": "UTF8",
   "FirebirdDialect": 3,
   "FirebirdWireCrypt": "Disabled",
 
