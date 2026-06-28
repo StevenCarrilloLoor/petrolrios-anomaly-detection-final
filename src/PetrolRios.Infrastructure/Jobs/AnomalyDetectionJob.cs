@@ -123,9 +123,13 @@ public sealed class AnomalyDetectionJob
             // Cada regla declara su cadencia en ProgramacionJson (vacío = "cada ciclo", el default).
             // La Pasada A corre las reglas "cada ciclo" sobre el lote incremental no procesado. Las
             // reglas programadas (intervalo/calendario) NO corren en A: cuando les toca, corren en la
-            // Pasada B sobre su VENTANA de datos (FechaOriginal en (UltimaEjecucion, ahora]), sin marcar
-            // Procesada, y luego avanzamos su próxima ejecución. Como la ventana no se solapa entre
-            // corridas, cada transacción la ve la regla una sola vez → sin alertas duplicadas.
+            // Pasada B sobre su VENTANA de datos (lo LLEGADO en (UltimaEjecucion, ahora] por CreatedAt),
+            // sin marcar Procesada, y luego avanzamos su próxima ejecución. Como la ventana no se solapa
+            // entre corridas, cada transacción la ve la regla una sola vez → sin alertas duplicadas.
+            // La ventana usa CreatedAt (cuándo LLEGÓ el dato), no FechaOriginal (la fecha de negocio):
+            // así una regla programada también procesa datos históricos cargados en bloque (re-sync de un
+            // mes) o que llegan tarde por store-and-forward, cuya FechaOriginal está en el pasado y caería
+            // fuera de una ventana anclada a la fecha de negocio.
             var ahora = DateTime.UtcNow;
             var activaOriginalBi = reglas.ToDictionary(r => r.Id, r => r.Activa);
             var biCadaCiclo = new HashSet<int>();
@@ -208,10 +212,14 @@ public sealed class AnomalyDetectionJob
                     var dias = CalculadoraProgramacion.DiasVentanaSugerida(corrida.Prog);
                     var ultima = corrida.BuiltIn?.UltimaEjecucion ?? corrida.Custom?.UltimaEjecucion;
                     var desdeVentana = ultima ?? ahora.AddDays(-dias);
+                    // Ventana por CreatedAt = "lo que LLEGÓ desde mi última corrida" (no por FechaOriginal,
+                    // la fecha de negocio): así la regla programada también ve datos históricos cargados en
+                    // bloque o llegados tarde, cuya FechaOriginal está en el pasado. La regla agrupa por su
+                    // propia fecha de negocio internamente, así el "por jornada" se mantiene correcto.
                     var ventana = await _dbContext.TransaccionesStaging
                         .AsNoTracking()
                         .Where(s => s.EstacionId == estacion.Id
-                                 && s.FechaOriginal > desdeVentana && s.FechaOriginal <= ahora)
+                                 && s.CreatedAt > desdeVentana && s.CreatedAt <= ahora)
                         .ToListAsync(ct);
                     if (ventana.Count == 0) continue;
 
@@ -231,7 +239,7 @@ public sealed class AnomalyDetectionJob
                         estacion, watermark, ventana, reglas, persB, relacionesTabla, alertasPrevias);
                     totalAlertas += await ProcesarContextoAsync(
                         contextoB, estacion, ejecucion, nivelMinCorreo, operativasDeEstacion, ct);
-                    // La ventana NO se marca Procesada (es re-lectura por fecha; el avance de
+                    // La ventana NO se marca Procesada (es re-lectura por llegada/CreatedAt; el avance de
                     // UltimaEjecucion evita el solape entre corridas → sin alertas duplicadas).
                 }
 

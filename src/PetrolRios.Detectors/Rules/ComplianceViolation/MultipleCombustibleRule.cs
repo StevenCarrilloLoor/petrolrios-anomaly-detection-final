@@ -7,6 +7,10 @@ namespace PetrolRios.Detectors.Rules.ComplianceViolation;
 /// <summary>Vehículo (placa) con más de un tipo de combustible en el mismo día (diésel y extra).</summary>
 public sealed class MultipleCombustibleRule(RiskScoringEngine scoring) : DetectionRuleBase(scoring)
 {
+    /// <summary>Placa genérica "consumidor final" (ARCERNNR): no es un vehículo real, agrupa miles de
+    /// ventas de contado de todo tipo de combustible. "Múltiples combustibles" no significa nada para ella.</summary>
+    private const string PlacaGenerica = "ZZZ999949";
+
     public override TipoDetector Detector => TipoDetector.ComplianceViolation;
     public override string Parametro => "MultipleCombustibleHabilitado";
     public override double UmbralPorDefecto => 1.0;
@@ -16,53 +20,50 @@ public sealed class MultipleCombustibleRule(RiskScoringEngine scoring) : Detecti
         var anomalies = new List<DetectedAnomaly>();
         var carril = Carril(regla);
 
-        var ventasPorPlacaDia = context.Facturas
-            .Where(f => !string.IsNullOrWhiteSpace(f.Placa))
-            .GroupBy(f => new
-            {
-                Placa = f.Placa.Trim().ToUpperInvariant(),
-                Dia = f.FechaDocumento.Date
-            });
+        // El producto vive en el DETALLE (DESP) y la placa en la FACTURA (DCTO): se cruzan por el vínculo
+        // factura↔despacho reconstruido en la base (CodigoCliente + cercanía temporal). La unión anterior
+        // por CodigoManguera era incorrecta y la regla no disparaba nunca (ver DetectionRuleBase).
+        var despachosPorCliente = IndexarDespachosPorCliente(context.Detalles);
 
-        foreach (var grupo in ventasPorPlacaDia)
+        // (placa, día) → conjunto de productos despachados a esa placa ese día.
+        var productosPorPlacaDia = new Dictionary<(string Placa, DateTime Dia), HashSet<string>>();
+
+        foreach (var f in context.Facturas)
         {
-            var facturasDelGrupo = grupo.ToList();
-            var productosDelDia = context.Detalles
-                .Where(d => facturasDelGrupo.Any(f => f.CodigoManguera.Trim() == d.CodigoManguera.Trim()))
-                .Select(d => d.CodigoProducto.Trim().ToUpperInvariant())
-                .Distinct()
-                .ToList();
+            if (string.IsNullOrWhiteSpace(f.Placa)) continue;
+            var placa = f.Placa.Trim().ToUpperInvariant();
+            if (placa.Equals(PlacaGenerica, StringComparison.OrdinalIgnoreCase)) continue;
 
-            // Si no hay detalles suficientes, intentar con las mangueras de las facturas
-            if (productosDelDia.Count < 2 && facturasDelGrupo.Count > 1)
-            {
-                var mangueras = facturasDelGrupo
-                    .Select(f => f.CodigoManguera.Trim())
-                    .Distinct()
-                    .ToList();
-                if (mangueras.Count >= 2)
-                    productosDelDia = mangueras;
-            }
+            var despacho = DespachoDeFactura(f, despachosPorCliente);
+            if (despacho is null || string.IsNullOrWhiteSpace(despacho.CodigoProducto)) continue;
 
-            if (productosDelDia.Count < 2) continue;
+            var clave = (placa, f.FechaDocumento.Date);
+            if (!productosPorPlacaDia.TryGetValue(clave, out var set))
+                productosPorPlacaDia[clave] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            set.Add(despacho.CodigoProducto.Trim().ToUpperInvariant());
+        }
 
+        foreach (var ((placa, dia), productos) in productosPorPlacaDia)
+        {
+            if (productos.Count < 2) continue;
+
+            var listaProductos = productos.OrderBy(p => p).ToList();
             var (score, nivel) = Scoring.Calculate(riesgoBase: 55);
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.ComplianceViolation,
                 Ambito = carril,
-                Descripcion = $"Vehículo {grupo.Key.Placa} con múltiples combustibles " +
-                              $"({string.Join(", ", productosDelDia)}) el {grupo.Key.Dia:yyyy-MM-dd}",
+                Descripcion = $"Vehículo {placa} con múltiples combustibles " +
+                              $"({string.Join(", ", listaProductos)}) el {dia:yyyy-MM-dd}",
                 Score = score,
                 NivelRiesgo = nivel,
                 EstacionId = context.EstacionId,
-                TransaccionReferencia = $"MULTI-{grupo.Key.Placa}-{grupo.Key.Dia:yyyyMMdd}",
+                TransaccionReferencia = $"MULTI-{placa}-{dia:yyyyMMdd}",
                 Metadata = new Dictionary<string, object>
                 {
-                    ["Placa"] = grupo.Key.Placa,
-                    ["Fecha"] = grupo.Key.Dia,
-                    ["Productos"] = productosDelDia,
-                    ["CantidadTransacciones"] = facturasDelGrupo.Count
+                    ["Placa"] = placa,
+                    ["Fecha"] = dia,
+                    ["Productos"] = listaProductos
                 }
             });
         }

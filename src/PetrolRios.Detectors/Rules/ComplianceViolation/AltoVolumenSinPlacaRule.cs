@@ -21,11 +21,14 @@ public sealed class AltoVolumenSinPlacaRule(RiskScoringEngine scoring) : Detecti
         var galonesMaximo = Umbral(regla);
         var carril = Carril(regla);
 
+        // Los galones del despacho de cada factura se ubican por el vínculo factura↔despacho de la base
+        // (CodigoCliente + cercanía temporal), no por CodigoManguera (que nunca casaba → regla muda).
+        var despachosPorCliente = IndexarDespachosPorCliente(context.Detalles);
+
         foreach (var factura in context.Facturas.Where(f => string.IsNullOrWhiteSpace(f.Placa)))
         {
-            var galones = context.Detalles
-                .Where(d => d.CodigoManguera.Trim() == factura.CodigoManguera.Trim())
-                .Sum(d => d.Cantidad);
+            var despacho = DespachoDeFactura(factura, despachosPorCliente);
+            var galones = despacho?.Cantidad ?? 0;
             if (galones <= galonesMaximo) continue;
 
             var (score, nivel) = Scoring.Calculate(riesgoBase: 60, montoInvolucrado: galones);
