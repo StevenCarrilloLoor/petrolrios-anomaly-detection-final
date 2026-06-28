@@ -55,6 +55,12 @@ Eres mi compañero de ingeniería en mi **proyecto de tesis** PetrolRíos. Traba
 - **Genera migraciones EF solo con build fresco** (nunca `--no-build` sobre binarios bloqueados/viejos:
   salen **vacías** y rompen el arranque por desajuste modelo↔esquema). El nombre del archivo de
   migración lleva timestamp nuevo: úsalo exacto al hacer `git add`.
+- **Para reiniciar TODO corre SIEMPRE primero `ejecutables/1-INICIAR-Y-DETENER/detener-todo-el-sistema.bat` y
+  LUEGO `iniciar-todo-el-sistema.bat`.** (Aprendido a la mala: `iniciar-todo` NO mata el agente/API/monitor
+  previos, así que llamarlo varias veces APILA instancias; con varios agentes EST-001 vivos, una consulta en
+  vivo la "toma" una instancia de la cola y, si está colgada, expira aunque haya otra sana → Consultas/Factura
+  dan "la estación no respondió a tiempo". `detener-todo` hace el `taskkill` de las 3 + baja Docker, dejando UNA
+  sola instancia limpia.)
 - **Reinicia todo el sistema** con `ejecutables/1-INICIAR-Y-DETENER/iniciar-todo-el-sistema.bat` (Docker, PostgreSQL,
   Firebird, API, agente, monitor, frontend). Para solo el API: `ejecutables/1-INICIAR-Y-DETENER/reiniciar-solo-la-api.bat`.
 - **Commits con mi identidad:**
@@ -107,21 +113,39 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
-**NUEVA RONDA ERP/UX-2 (27-jun-2026, pedido de Steven con la entrevista de auditoría como base) — EN CURSO por
-etapas A–F. Etapas A+B HECHAS + QA en vivo (commit `3050c94`, CAMBIOS §96):** A) `ConsultasPage` con **deep-link
-autobuscable** (`?est&codigo&tipo&desde&hasta` → busca sola), **fecha visible** en tema oscuro
-(`[color-scheme:dark]`), **Imprimir** lo filtrado (encabezado solo-impresión con los filtros) y **celdas
-relacionables** (cliente/RUC/placa/despachador → consulta relacionada en ventana nueva). B) `DetalleAlertaPage`:
-los chips de evidencia de ENTIDAD (placa/RUC/cliente/despachador) abren la **consulta RELACIONADA en vivo en
-ventana nueva** (`abrirConsultaRelacionada` → `/consultas?est=&codigo=`), ya **NO** `/alertas?buscar`; el nº de
-factura sigue enlazando la **factura completa**. **Verificado:** eslint 0 + `tsc -b && vite build` OK
-(`_verify_frontend.bat`); **QA Chrome en vivo:** alerta **#80** → **13** enlaces de factura, **0** a
-`/alertas?buscar`, **7** RUC relacionables; deep-link `?est=EST-001&codigo=<RUC>` → 6 docs reales; ambos
-`input[type=date]` con `color-scheme: dark`. **Pendiente de la ronda: C** factura con más datos + presentación
-profesional, **D** auditoría del agente (reactivo/escalable/dinámico) + consultar una **tabla X
-auto-estructurada**, **E** **rediseño del dashboard**, **F** reporte liquidación→facturas. Permisos de
-Windows/Chrome concedidos; sistema corriendo vía `iniciar-todo-el-sistema.bat`. Regla de seguridad firme:
-login por API (no tecleo contraseñas).
+**NUEVA RONDA ERP/UX-2 (27-jun-2026, pedido de Steven con la entrevista de auditoría + 8 screenshots como base)
+— ✅ A–F COMPLETA (gate verde 334 pruebas + QA en vivo en Chrome con datos REALES del backup en cada etapa).**
+Base: la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`).
+- **A+B (commit `3050c94`, CAMBIOS §96):** A) `ConsultasPage` con **deep-link autobuscable**
+  (`?est&codigo&tipo&desde&hasta` → busca sola), **fecha visible** en tema oscuro (`[color-scheme:dark]`),
+  **Imprimir** lo filtrado y **celdas relacionables** (cliente/RUC/placa/despachador → consulta relacionada en
+  ventana nueva). B) `DetalleAlertaPage`: los chips de evidencia de ENTIDAD abren la **consulta RELACIONADA en
+  vivo en ventana nueva** (ya **NO** `/alertas?buscar`); el nº de factura sigue abriendo la **factura completa**.
+  QA: alerta #80 → 13 enlaces de factura, 0 a `/alertas?buscar`, 7 RUC relacionables; deep-link por RUC → 6 docs.
+- **C (commit `6e8da8d`, CAMBIOS §97):** **factura enriquecida tipo ERP** — nombre de cliente (CLIE) +
+  despachador (VEND) + chofer/autorización SRI/guía/observaciones/subtotal, tipo de doc y forma de pago legibles.
+  **Probada con SIMULACIÓN REAL en Firebird:** se insertó la factura `001-001-009900070` a cliente real
+  `ZZ0000176` + despachador `010` → el AGENTE la extrajo por marca de agua (Datos recibidos #3393/#3394) y la
+  factura la mostró enriquecida. Fix de rendimiento: se quitó `NOM_CLIE` del WHERE (forzaba join por fila → timeout).
+- **D (commit `ab17578`, CAMBIOS §98):** **auditoría del agente** confirmada (reactivo: heartbeat 1 s config en
+  vivo + store-and-forward; escalable: watermark por estación + fuentes configurables + aislamiento; dinámico:
+  auto-extrae + auto-relaciona + reporta esquema) + **consultar CUALQUIER tabla auto-estructurada**: agente
+  `ConsultarTablaGenericaAsync` (`SELECT FIRST n *` con **lista blanca anti-inyección**) + página "Explorar
+  tabla" (`/consultas/tabla`) con columnas dinámicas. QA: VEND→6 columnas+11 filas; tabla inexistente rechazada.
+- **E (commit `62eb3bf`, CAMBIOS §99):** **dashboard rediseñado como centro de mando ACCIONABLE** (investigué
+  referencias de dashboards de fraude/SOC) — feed "Atención inmediata" (alertas recientes clicables = triage),
+  KPIs con **drill-down** (→ bandeja filtrada), tendencia con **periodo 7/14/30/90 + delta**, **drill-down en
+  gráficos**, filas de empleados clicables, métricas con **semántica de color**; `AlertasPage` lee filtros
+  `?nivel/?estado/?tipo/?estacionId` de la URL. QA: feed con 7 alertas, 5 KPIs-enlace, sin errores.
+- **F (commit `c426d58`, CAMBIOS §100):** **cuadre de liquidaciones** (pedido directo de la auditora) — para
+  las liquidaciones de un periodo, **qué facturas componen cada una** (`LIQU.NUM_TURN ↔ DCTO.NUM_TURN`,
+  `TIP_DCTO='FV'`, total real `TSI_DCTO+IVA_DCTO` porque `TNI_DCTO` viene en 0 en el backup). Agente
+  `ConsultarLiquidacionesAsync` + Worker enruta `LIQUIDACIONES`; página `/consultas/liquidaciones` agrupa las
+  facturas bajo cada liquidación (faltante/sobrante + total) + imprimir + enlace desde Consultas. QA en vivo con
+  backup REAL: EST-001 → 4 liquidaciones con sus facturas y totales reales (1000 celdas con valores, ya no $0.00).
+
+Permisos de Windows/Chrome concedidos; sistema corriendo vía `iniciar-todo-el-sistema.bat` (siempre `detener-todo`
+antes). Regla de seguridad firme: login por API (no tecleo contraseñas). **La ronda A–F está cerrada.**
 
 **CIERRE DE PENDIENTES (27-jun-2026, §94, commits `25334b6`/`ac371aa`/`f239a3a`, gate verde 334 tests + QA en
 vivo):** (a) **`Fuente` extendida a las 4 reglas de factura restantes** (FueraHorario, FechaFueraDeRango,

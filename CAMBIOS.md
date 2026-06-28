@@ -2947,3 +2947,38 @@ renderiza sin errores; el feed muestra 7 alertas reales clicables, 5 KPIs son en
 de periodo y el delta aparecen.
 
 Commit: `62eb3bf` (código). Pendiente de la ronda: **F** (reporte liquidación→facturas).
+
+---
+
+## 100. Etapa F — Cuadre de liquidaciones: qué facturas componen cada liquidación (pedido de la auditora)
+
+**Motivación.** En la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`) la auditora pidió, para las
+liquidaciones de un periodo, **ver qué facturas componen cada una** (cruce turno↔facturas) para cuadrar el
+efectivo entregado por el cliente contra lo facturado. El sistema ya **detectaba** "factura fuera de
+liquidación" (§88), pero faltaba una **vista de cuadre a demanda** que el auditor pudiera consultar.
+
+**Qué se hizo (agente + central + frontend, datos EN VIVO de Firebird, SIN ML):**
+- **Agente (`FirebirdExtractor.ConsultarLiquidacionesAsync`):** SELECT de **solo lectura** que cruza
+  `LIQU l LEFT JOIN DCTO d ON d.NUM_TURN = l.NUM_TURN AND d.TIP_DCTO = 'FV'`, filtrable por rango de
+  `l.FEC_LIQU` (desde/hasta) y acotado por `FIRST {limite}`. Devuelve, por cada liquidación, sus datos
+  (Nº, turno, fecha, cliente, saldo final, faltante, sobrante, diferencia) y la fila de cada factura de su
+  turno (Nº doc, fecha, cliente, RUC, placa, despachador, forma de pago y **total = `TSI_DCTO + IVA_DCTO`**).
+  *El total se calcula como base+IVA porque en el backup real `TNI_DCTO` viene en 0 — lo confirmó el QA en
+  vivo: con `TNI_DCTO` las 1000 celdas salían $0.00; con `TSI_DCTO+IVA_DCTO` salen reales.*
+- **Worker (`EjecutarConsultasAsync`):** enruta el discriminador `LIQUIDACIONES` de la cola de consultas
+  on-demand a `ConsultarLiquidacionesAsync` (junto a `DESP`→despachos, `DCTO`/vacío→documentos, resto→tabla
+  genérica auto-estructurada de la Etapa D).
+- **Frontend (`/consultas/liquidaciones`, `LiquidacionesPage.tsx` + `consultas.service.ts`):** elige
+  estación + rango de fechas → consulta en vivo → **agrupa las facturas bajo cada liquidación** (por
+  `NumeroLiquidacion-NumeroTurno`, `useMemo`), mostrando el faltante/sobrante de cada una, la tabla de sus
+  facturas y el total facturado; **encabezado de impresión** y enlace desde Consultas (ícono balanza).
+
+**Verificación.** Gate oficial **VERDE** (build Release 0/0, **334 pruebas** [40+2+193+99], EF sin cambios
+pendientes, eslint + `tsc -b && vite build` OK). **QA en vivo en Chrome con datos REALES del backup:**
+estación EST-001 → **4 liquidaciones** reales renderizadas (p. ej. Liquidación 153 · turno 154), cada una con
+sus facturas agrupadas (1000 filas de factura), **sin error**; tras el fix del total, las **1000 celdas
+muestran valores reales** ($5.00, $14.00, $2.02, $15.00…) en vez de $0.00. El agente ejecutó el SQL nuevo en
+vivo (se reinició **solo** el agente con el SQL corregido, manteniendo UNA instancia, según la regla
+detener-todo→iniciar-todo).
+
+Commit: `c426d58` (código). **→ Con la Etapa F, la ronda ERP/UX-2 (A–F) queda COMPLETA.**
