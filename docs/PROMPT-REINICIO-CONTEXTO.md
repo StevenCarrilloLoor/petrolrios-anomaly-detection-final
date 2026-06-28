@@ -113,6 +113,25 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**CONSULTAS: PDF AUTOGENERADO + BÚSQUEDA MULTI-TAG + FACTURAS ENLAZABLES EN LA ALERTA (28-jun-2026, CAMBIOS §112, `ffb5785`, gate verde 383).**
+Tres pedidos de la prueba en vivo (con capturas):
+- **112.1 PDF autogenerado en Consultas** (no `window.print`). Steven mostró el PDF del módulo de Reportes como estándar.
+  Nuevo `POST /api/v1/consultas/pdf` (cualquier rol Central) que renderiza con **QuestPDF**
+  (`IReporteService.GenerarPdfConsultaDocumentos`) las columnas/filas que muestra el frontend, con el mismo formato del
+  reporte de alertas. Botón **PDF** en `ConsultasPage` (junto a **Excel**/CSV y a **Imprimir**, que se separa). CENTRAL.
+- **112.2 Búsqueda multi-tag escalable.** Varios criterios combinados con **AND** (placa Y despachador a la vez), con
+  **+ Añadir criterio** y una **×** por criterio. `SolicitudConsulta`/`ConsultaPendiente` ganan `Codigos[]` (compat con
+  `Codigo`); el agente (`FirebirdExtractor.ConsultarDocumentosAsync`) arma el WHERE dinámico (un bloque OR
+  RUC/placa/cliente/n.º doc/despachador por tag, ANDados, parametrizado `@codigo0..N`, `CAST` anti-truncado). La URL usa
+  `?codigo=` repetido (deep-linkable). **ES CAMBIO DE AGENTE:** vive para EST-001 al relanzar; SanPio necesita actualizar
+  su agente.
+- **112.3 Evidencia: TODAS las facturas enlazables + sin duplicado.** En el detalle de alerta, `Documentos`
+  (MultipleCombustible/DespachosRapidos) y `NumerosFactura` (PlacaReutilizada) hacen que **cada** documento sea un enlace
+  "factura" (antes solo el `NumeroDocumento` suelto); y se oculta el suelto cuando ya está en la lista (quita la
+  duplicación). Genérico por clave → no choca con el creador de reglas. FRONTEND.
+- **Verificación:** gate VERDE — build 0/0, **383 pruebas** (Domain 48 / Monitor 2 / Detectors 205 / **Api 128** [+2 PDF]),
+  EF sin cambios, eslint + `tsc -b && vite build` OK.
+
 **AUDITORÍA DE LAS 25 REGLAS + DESCARGA EXCEL/PDF EN LA FACTURA (28-jun-2026, CAMBIOS §111, `3555a50`, gate verde 381).**
 Steven pidió **auditar cada regla predeterminada** verificando que lleve toda la información que un auditor necesita
 (documento/factura, despachador, placa, RUC, cliente, monto, nombre de combustible) + los botones de **descarga

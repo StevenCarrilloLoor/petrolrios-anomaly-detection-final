@@ -3353,3 +3353,40 @@ diccionario por código; además se fija **`Fuente` = despacho** para heredar cl
 **Verificación.** Gate VERDE: build 0/0, **381 pruebas** (Domain 48 / StationMonitor 2 / **Detectors 205** [+2:
 PrecioFueraLista incluye "Diésel"; AnulacionRecurrente incluye los comprobantes anulados] / Api 126), EF sin cambios
 de modelo, eslint + `tsc -b && vite build` OK. Commit: `3555a50`.
+
+---
+
+## 112. Consultas: PDF autogenerado + búsqueda multi-tag + cada documento de la alerta enlaza a su factura
+
+**Motivación.** Tres pedidos de la prueba en vivo de Steven (con capturas): (1) "imprimir no es lo mismo que un
+PDF autogenerado" — mostró el PDF real del módulo de Reportes como el estándar y pidió que Consultas genere ese
+mismo PDF, no `window.print`; (2) poder **buscar por varios criterios a la vez** (placa Y despachador), con un botón
+**+** para añadir tags y una **×** para quitarlos, escalable; (3) en la evidencia de la alerta, **cada** documento
+debía abrir su factura (solo el primero lo hacía) y había una duplicación incómoda (la lista `Documentos` + el
+`NumeroDocumento` suelto).
+
+**112.1 · PDF autogenerado en Consultas (QuestPDF).** Nuevo endpoint `POST /api/v1/consultas/pdf` (cualquier rol del
+central, Auditor incluido) que recibe las columnas y filas que el frontend está mostrando y las renderiza con
+**QuestPDF** (`IReporteService.GenerarPdfConsultaDocumentos`), con el mismo formato del reporte de alertas (cabecera
+"PetrolRíos S.A.", estación + búsqueda, tabla con encabezado oscuro y filas alternas, paginado). El frontend
+(`consultas.service.descargarPdf`) descarga el blob. En `ConsultasPage` el botón **"PDF"** queda junto a **"Excel"**
+(CSV) y a **"Imprimir"** (que vuelve a ser solo imprimir, separado del PDF). Es CENTRAL (vivo al reconstruir la API).
+
+**112.2 · Búsqueda multi-tag (escalable).** La búsqueda pasa de un solo código a **varios criterios combinados con
+AND** (p. ej. placa Y despachador a la vez). En `ConsultasPage`, cada criterio es un input con su **×**, más un
+botón **"+ Añadir criterio"**; los tags se guardan en la URL como `?codigo=` repetido (deep-linkable). Cadena
+backend: `SolicitudConsulta`/`ConsultaPendiente` ganan `Codigos[]` (compat con `Codigo`), la cola los pasa, y el
+agente (`FirebirdExtractor.ConsultarDocumentosAsync`) arma el **WHERE dinámico**: un bloque OR
+(RUC/placa/cliente/n.º doc/despachador) **por cada tag**, ANDados, todo **parametrizado** (`@codigo0…@codigoN`, con
+`CAST(... AS VARCHAR(60))` anti-truncado, SOLO LECTURA). **Es CAMBIO DE AGENTE:** vive para EST-001 al relanzarlo;
+para SanPio hay que actualizar su agente.
+
+**112.3 · Evidencia: TODAS las facturas enlazables + sin duplicado.** En el detalle de alerta, la lista `Documentos`
+(MultipleCombustible/DespachosRapidos) y `NumerosFactura` (PlacaReutilizada) ahora hacen que **cada** documento sea
+un enlace **"factura"** (antes solo el `NumeroDocumento` suelto del Fuente lo era — de ahí "solo veo una factura de
+dos"). Además se **oculta** el `NumeroDocumento` suelto cuando ya está dentro de la lista (quita la duplicación
+incómoda). Es genérico (depende de la clave, no de la regla) → no choca con el creador de reglas. Es FRONTEND.
+
+**Verificación.** Gate VERDE: build 0/0, **383 pruebas** (Domain 48 / StationMonitor 2 / Detectors 205 / **Api 128**
+[+2: el PDF de consulta produce un `%PDF-` válido con columnas/filas y tolera el caso sin filas]), EF sin cambios de
+modelo, eslint + `tsc -b && vite build` OK. Commit: `ffb5785`.
