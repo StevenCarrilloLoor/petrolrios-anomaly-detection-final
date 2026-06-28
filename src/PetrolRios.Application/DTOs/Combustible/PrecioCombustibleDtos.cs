@@ -1,21 +1,28 @@
 namespace PetrolRios.Application.DTOs.Combustible;
 
-/// <summary>Precio vigente de un combustible regulado (para el dashboard y la API).</summary>
+/// <summary>Precio vigente de un combustible, con el valor del SISTEMA (efectivo) y el último observado
+/// por la API/scraper, para verlos lado a lado en el dashboard.</summary>
 public sealed record PrecioCombustibleResponse(
     string Producto,
     string Nombre,
-    decimal PrecioGalon,
+    bool EsRegulado,
+    decimal PrecioGalon,          // precio del SISTEMA (efectivo: el que sirve y usan los detectores)
+    decimal? PrecioApi,           // último precio observado por el scraper (null si aún no hay)
+    string? FuenteApi,
+    DateTime? ApiActualizadoEn,
     decimal Subsidio,
+    bool PrecioPendiente,
     DateTime VigenteDesde,
     DateTime? VigenteHasta,
     string Fuente);
 
-/// <summary>Respuesta de precios vigentes con metadatos (moneda, momento de consulta, nota de bandas).</summary>
+/// <summary>Respuesta de precios vigentes con metadatos (moneda, momento, nota de bandas, fuentes degradadas).</summary>
 public sealed record PreciosCombustibleResponse(
     IReadOnlyList<PrecioCombustibleResponse> Precios,
     string Moneda,
     DateTime ConsultadoEn,
-    string Nota);
+    string Nota,
+    IReadOnlyList<string> FuentesDegradadas);
 
 /// <summary>Cuerpo para actualizar (admin) el precio de un combustible cuando cambia la banda mensual.</summary>
 public sealed record ActualizarPrecioCombustibleRequest(
@@ -26,7 +33,7 @@ public sealed record ActualizarPrecioCombustibleRequest(
     DateTime? VigenteHasta,
     string? Fuente);
 
-/// <summary>Precio entregado por una fuente externa (conector). Producto en texto: Extra/Ecopais/Diesel.</summary>
+/// <summary>Precio entregado por una fuente externa (conector). Producto en texto: Extra/Ecopais/Diesel/Super.</summary>
 public sealed record PrecioCombustibleExterno(
     string Producto,
     decimal PrecioGalon,

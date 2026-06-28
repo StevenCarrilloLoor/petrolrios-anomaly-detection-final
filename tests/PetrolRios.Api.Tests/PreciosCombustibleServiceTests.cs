@@ -74,9 +74,33 @@ public sealed class PreciosCombustibleServiceTests : IDisposable
     public async Task Actualizar_ProductoInvalido_Lanza()
     {
         var act = () => _sut.ActualizarAsync(new ActualizarPrecioCombustibleRequest(
-            "Super", 5.60m, 0m, DateTime.UtcNow, null, null));
+            "Querosene", 3.00m, 0m, DateTime.UtcNow, null, null));
 
         await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task Actualizar_PrecioFueraDeRango_Lanza()
+    {
+        // $99/gal en Extra está fuera del rango plausible ($1.50–$6.00) → rechazo.
+        var act = () => _sut.ActualizarAsync(new ActualizarPrecioCombustibleRequest(
+            "Extra", 99.00m, 0m, DateTime.UtcNow, null, null));
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task Actualizar_EscribeBitacoraDeAuditoria()
+    {
+        await _sut.ActualizarAsync(new ActualizarPrecioCombustibleRequest(
+            "Diesel", 3.40m, 1.60m, new DateTime(2026, 7, 12), new DateTime(2026, 8, 11), null));
+
+        var log = await _db.PreciosCombustibleLog.SingleAsync();
+        log.Producto.Should().Be(TipoCombustible.Diesel);
+        log.Fuente.Should().Be("admin_manual");
+        log.Resultado.Should().Be("actualizado");
+        log.PrecioAnterior.Should().Be(3.25m);
+        log.PrecioNuevo.Should().Be(3.40m);
     }
 
     [Fact]

@@ -600,8 +600,22 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("FuenteApi")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<decimal?>("PrecioApi")
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<DateTime?>("PrecioApiActualizadoEn")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<decimal>("PrecioGalon")
                         .HasColumnType("numeric(8,4)");
+
+                    b.Property<bool>("PrecioPendiente")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("Producto")
                         .HasColumnType("integer");
@@ -624,6 +638,75 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("precios_combustible", (string)null);
+                });
+
+            modelBuilder.Entity("PetrolRios.Domain.Entities.PrecioCombustibleLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AdminId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Disparo")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("EtagRecibido")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Fuente")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("FuenteDegradada")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("JitterSegundos")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("PrecioAnterior")
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<decimal?>("PrecioNuevo")
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<bool>("PrecioPendiente")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Producto")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RawHtmlHash")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("Resultado")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("VariacionPorcentual")
+                        .HasColumnType("numeric(8,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Producto", "CreatedAt");
+
+                    b.ToTable("precios_combustible_log", (string)null);
                 });
 
             modelBuilder.Entity("PetrolRios.Domain.Entities.RefreshToken", b =>

@@ -51,13 +51,16 @@ public static class SeedData
         if (await context.PreciosCombustible.AnyAsync()) return;
 
         const string fuente = "EP Petroecuador — sistema de bandas (vigente jun 2026)";
+        const string fuenteSuper = "ARCH — referencial (libre mercado, jun 2026)";
         var desde = new DateTime(2026, 6, 12);
         var hasta = new DateTime(2026, 7, 11);
 
         await context.PreciosCombustible.AddRangeAsync(
             PrecioCombustible.Create(TipoCombustible.Extra, 3.31m, 1.021m, desde, hasta, fuente),
             PrecioCombustible.Create(TipoCombustible.Ecopais, 3.31m, 1.650m, desde, hasta, fuente),
-            PrecioCombustible.Create(TipoCombustible.Diesel, 3.25m, 1.602m, desde, hasta, fuente));
+            PrecioCombustible.Create(TipoCombustible.Diesel, 3.25m, 1.602m, desde, hasta, fuente),
+            // Súper: libre mercado, precio referencial (no entra al detector). ~$5,70 en jun 2026.
+            PrecioCombustible.Create(TipoCombustible.Super, 5.70m, 0m, desde, hasta, fuenteSuper));
 
         await context.SaveChangesAsync();
     }

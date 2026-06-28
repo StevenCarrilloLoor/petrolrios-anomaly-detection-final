@@ -21,6 +21,7 @@ public class PetrolRiosDbContext : DbContext
         Set<FuenteDatosEstacionEstado>();
     public DbSet<LogAuditoria> LogsAuditoria => Set<LogAuditoria>();
     public DbSet<PrecioCombustible> PreciosCombustible => Set<PrecioCombustible>();
+    public DbSet<PrecioCombustibleLog> PreciosCombustibleLog => Set<PrecioCombustibleLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<ReglaDeteccion> ReglasDeteccion => Set<ReglaDeteccion>();
     public DbSet<ReglaPersonalizada> ReglasPersonalizadas => Set<ReglaPersonalizada>();

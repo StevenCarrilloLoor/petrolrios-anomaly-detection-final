@@ -11,6 +11,7 @@ const COLOR: Record<string, string> = {
   Extra: "#22c55e",
   Ecopais: "#3b82f6",
   Diesel: "#f59e0b",
+  Super: "#a855f7",
 };
 
 function fmtFecha(iso: string | null): string {
@@ -24,17 +25,48 @@ function Tile({ p }: { p: PrecioCombustible }) {
   const color = COLOR[p.producto] ?? "#64748b";
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
-      <div className="flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-        <span className="text-sm font-medium text-neutral-200">{p.nombre}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
+          <span className="text-sm font-medium text-neutral-200">{p.nombre}</span>
+        </div>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            p.esRegulado ? "bg-emerald-500/10 text-emerald-300" : "bg-violet-500/10 text-violet-300"
+          }`}
+          title={p.esRegulado ? "Precio regulado (único nacional)" : "Libre mercado (referencial)"}
+        >
+          {p.esRegulado ? "Regulado" : "Referencial"}
+        </span>
       </div>
+
+      {/* Precio del SISTEMA (efectivo) */}
       <div className="mt-2 flex items-baseline gap-1">
         <span className="text-2xl font-semibold text-white">${p.precioGalon.toFixed(2)}</span>
-        <span className="text-xs text-neutral-500">/ galón</span>
+        <span className="text-xs text-neutral-500">/ galón · sistema</span>
+        {p.precioPendiente && (
+          <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+            pendiente
+          </span>
+        )}
       </div>
+
+      {/* Precio observado por la API (comparación) */}
+      <div className="mt-1 text-xs text-neutral-400">
+        API:{" "}
+        {p.precioApi != null ? (
+          <span className="text-neutral-200">
+            ${p.precioApi.toFixed(2)}
+            {p.fuenteApi ? ` · ${p.fuenteApi}` : ""}
+          </span>
+        ) : (
+          <span className="text-neutral-600">sin dato aún</span>
+        )}
+      </div>
+
       {p.subsidio > 0 && (
         <div className="mt-1 text-xs text-neutral-400">
-          Subsidio estatal: <span className="text-neutral-200">${p.subsidio.toFixed(2)}</span> / gal
+          Subsidio: <span className="text-neutral-200">${p.subsidio.toFixed(2)}</span> / gal
         </div>
       )}
     </div>
@@ -60,10 +92,11 @@ export function PreciosCombustibleCard() {
       <CardHeader title="Precios de combustible (Ecuador)" subtitle={vigencia} />
       <CardContent>
         {isLoading ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
-            <Skeleton className="h-24" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
           </div>
         ) : isError || precios.length === 0 ? (
           <div className="flex items-center gap-2 text-sm text-neutral-400">
@@ -72,14 +105,19 @@ export function PreciosCombustibleCard() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {precios.map((p) => (
                 <Tile key={p.producto} p={p} />
               ))}
             </div>
+            {(data?.fuentesDegradadas?.length ?? 0) > 0 && (
+              <p className="mt-3 text-xs text-amber-400">
+                Fuentes temporalmente no disponibles: {data?.fuentesDegradadas.join(", ")}
+              </p>
+            )}
             <p className="mt-3 text-xs leading-relaxed text-neutral-500">{data?.nota}</p>
             {precios[0]?.fuente && (
-              <p className="mt-1 text-xs text-neutral-600">Fuente: {precios[0].fuente}</p>
+              <p className="mt-1 text-xs text-neutral-600">Fuente del sistema: {precios[0].fuente}</p>
             )}
           </>
         )}
