@@ -271,6 +271,14 @@ export function AlertasPage() {
                     <td className="max-w-md px-4 py-3">
                       <p className="font-medium">
                         {TIPO_DETECTOR_LABELS[alerta.tipoDetector]}
+                        {alerta.eventosAcumulados > 1 && (
+                          <span
+                            className="ml-2 inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 align-middle text-xs font-semibold text-amber-600"
+                            title={`Caso acumulado: ${alerta.eventosAcumulados} eventos del mismo caso. El nivel escala por cantidad y la alerta re-emerge arriba cuando crece.`}
+                          >
+                            ×{alerta.eventosAcumulados} acumulados
+                          </span>
+                        )}
                       </p>
                       <p
                         className="mt-0.5 truncate text-xs text-muted-foreground"

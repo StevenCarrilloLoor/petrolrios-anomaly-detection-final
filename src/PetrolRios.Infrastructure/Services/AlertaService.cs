@@ -365,6 +365,8 @@ public sealed class AlertaService : IAlertaService
             Descripcion = a.Descripcion,
             Score = a.Score,
             FechaDeteccion = a.FechaDeteccion,
+            EventosAcumulados = a.EventosAcumulados,
+            FechaActualizacion = a.FechaActualizacion,
             EmpleadoCodigo = a.EmpleadoCodigo,
             EmpleadoNombre = empleados.Nombre(a.EstacionId, a.EmpleadoCodigo),
             TransaccionReferencia = a.TransaccionReferencia,

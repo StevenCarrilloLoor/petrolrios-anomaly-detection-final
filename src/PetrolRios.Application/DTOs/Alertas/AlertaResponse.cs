@@ -11,6 +11,12 @@ public sealed record AlertaResponse
     public string Descripcion { get; init; } = string.Empty;
     public double Score { get; init; }
     public DateTime FechaDeteccion { get; init; }
+
+    /// <summary>Cuántos eventos del mismo caso se han acumulado (alertas escalables, p. ej. despachos rápidos). 1 = sin acumular.</summary>
+    public int EventosAcumulados { get; init; } = 1;
+    /// <summary>Última vez que la alerta se creó o creció (acumuló). La bandeja ordena por esta fecha (las que crecen suben).</summary>
+    public DateTime FechaActualizacion { get; init; }
+
     public string? EmpleadoCodigo { get; init; }
     /// <summary>Nombre del empleado resuelto desde el catálogo (null si no hay match: se muestra solo el código).</summary>
     public string? EmpleadoNombre { get; init; }

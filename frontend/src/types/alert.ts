@@ -14,7 +14,7 @@ export type EstadoAlerta =
   | "FalsoPositivo"
   | "Cerrada";
 
-export type AmbitoAlerta = "Operativa" | "Auditoria";
+export type AmbitoAlerta = "Operativa" | "Auditoria" | "Ambos";
 
 export interface AlertaResponse {
   notificationId?: string;
@@ -26,6 +26,10 @@ export interface AlertaResponse {
   descripcion: string;
   score: number;
   fechaDeteccion: string;
+  /** Cuántos eventos del mismo caso se han acumulado (alertas escalables, p. ej. despachos rápidos). 1 = sin acumular. */
+  eventosAcumulados: number;
+  /** Última vez que la alerta se creó o creció (acumuló). La bandeja ordena por esta fecha. */
+  fechaActualizacion: string;
   empleadoCodigo: string | null;
   empleadoNombre: string | null;
   transaccionReferencia: string | null;
