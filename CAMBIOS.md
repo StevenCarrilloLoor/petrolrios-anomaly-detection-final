@@ -3010,3 +3010,34 @@ cada estación toma el build nuevo (es cambio en el agente; el de SanPio lo rein
 
 Commit: `737043e` (código). Pendiente de la ronda G: **G2** (recalibrar despachos rápidos), **G3** (nombre de
 despachador + encoding Ñ).
+
+---
+
+## 102. Etapa G2 — Despachos rápidos ACUMULABLES/ESCALABLES + ámbito Ambos (idea de Steven)
+
+**Motivación.** En producción la regla "Despachos rápidos" generó **6.080 alertas** (una por racha, agrupando por
+cliente), inservibles. Steven propuso (refinado con datos reales): en vez de una alerta nueva por cada racha,
+**acumular** las del mismo caso en UNA alerta que **crece y escala** (Medio→Alto→Crítico) y **re-emerge arriba**;
+mínimo **2** (2 ya es raro); y de forma **dinámica** en la llave (si no cambian el RUC/cliente y despachan a otras
+placas → acumula por RUC; si reutilizan la misma placa → por placa). Aviso de qué identificador se mantiene.
+
+**Qué se hizo:**
+- **Infra de alertas acumulables/escalables** (`Alerta`): `EventosAcumulados`, `FechaActualizacion` (la bandeja
+  ordena por esta → las que crecen suben), `Acumular()` (suma, re-escala, re-emerge como Nueva) y
+  `EscalarPorConteo()` (2–3 Medio, 4–5 Alto, 6+ Crítico). Migración `AlertaAcumulable` (filas existentes:
+  conteo 1, `FechaActualizacion=FechaDeteccion`).
+- **Upsert en el job** (`AnomalyDetectionJob`): si la anomalía es acumulable y ya hay una alerta ABIERTA del
+  mismo caso (misma referencia), acumula y escala en vez de crear otra.
+- **Regla `DespachosRapidosRule`** reescrita: dinámica por **RUC** y por **placa** (lo no cubierto por RUC),
+  mínimo 2, excluye placa genérica/vacía, `EsAcumulable`, referencia `RAPIDOS-{RUC|PLA}-{valor}-{día}`, ámbito
+  por defecto **Ambos**, descripción que avisa qué identificador se mantiene constante.
+- **Ruteo Ambos completado**: `AlertaRepository` y `DashboardService` incluyen `Ambos` (antes filtraban
+  `== Auditoria` estricto → un Ambos no salía); el seed deja de pisar `Ambos` en la normalización y **fuerza** el
+  carril de la regla a Ambos en bases ya sembradas (sin pisar cambios manuales).
+
+**Verificación.** Gate **VERDE** (build Release 0/0, **346 pruebas** [Domain 48, Detectors 197, Api 99; +12
+nuevas], migración OK, frontend OK). **Cambio CENTRAL** (no de agente): vivo al reconstruir la API (que aplica la
+migración). Para verlo con datos reales: limpiar alertas + re-sincronizar el mes de SanPio (bat de limpieza en G4).
+
+Commit: `d86643f`. Pendiente de G2: mostrar el conteo acumulado en el frontend (la bandeja ya re-ordena).
+Pendiente de la ronda G: **G3** (nombre despachador + encoding Ñ).

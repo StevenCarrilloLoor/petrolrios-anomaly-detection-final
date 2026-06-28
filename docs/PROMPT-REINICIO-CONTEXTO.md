@@ -128,7 +128,16 @@ reconstruye con `iniciar-todo` (los cambios de detectores/DTO quedan vivos al in
   `ConsultarDocumentos` con `CASE`. Arregla $0.00, scoring plano y reglas con umbral $. Gate verde **337** (+3
   `FacturaDtoTests`). Central/detector vivo al reconstruir API; la pantalla de factura/consulta requiere que el
   agente tome el build (es cambio de agente → reiniciar el de SanPio).
-- **Pendiente G2** (despachos rápidos: placa + agregación + Ambos), **G3** (nombre despachador + encoding Ñ).
+- **G2 HECHA (`d86643f`, CAMBIOS §102):** despachos rápidos **ACUMULABLES/ESCALABLES + ámbito Ambos** (idea de
+  Steven). En vez de 6.080 alertas sueltas, **UNA por caso** (referencia `RAPIDOS-{RUC|PLA}-{valor}-{día}`) que
+  escala por cantidad (2-3 Medio, 4-5 Alto, 6+ Crítico) y **re-emerge arriba**; **dinámica** por RUC (si no
+  cambian el cliente) y por placa (si la reutilizan), **mínimo 2**. `Alerta` gana `EventosAcumulados`/
+  `FechaActualizacion`/`Acumular()`/`EscalarPorConteo()` + migración `AlertaAcumulable`; **upsert** en el job
+  (si hay alerta abierta del caso → acumula/escala). **Ruteo Ambos completado**: `AlertaRepository` y
+  `DashboardService` incluyen Ambos; el seed no pisa Ambos en la normalización y fuerza el carril. Gate verde
+  **346**. Es CENTRAL (vivo al reconstruir la API, que aplica la migración). Pendiente: mostrar el conteo en el frontend.
+- **Pendiente G3** (nombre despachador `DD…` + encoding Ñ), **G4** (verificación final + docs + **bat para
+  borrar las alertas (PostgreSQL) y re-probar el mes con SanPio** — lo pidió Steven).
 
 ---
 
