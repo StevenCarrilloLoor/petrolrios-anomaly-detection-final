@@ -1,0 +1,29 @@
+{
+  "//": "Configuracion INICIAL de PRODUCCION que el publicador deja en cada agente (config/agent-config.json). Trae los valores correctos de Firebird para una instalacion real de PetrolRios/ContaGober: ruta C:\\Programas\\ContaGober1\\Datosc\\CONTAB.FDB, puerto 3050 y Charset=UTF8 (para que las tildes y la N salgan bien). El operador solo completa codigo de estacion, servidor central y credenciales desde el panel (http://localhost:5180, pestana Configuracion) y pulsa Guardar; el agente sobrescribe este archivo. Mientras 'Configurado' sea false, el agente no inicia los ciclos.",
+
+  "CodigoEstacion": "",
+  "NombreEstacion": "",
+  "ZonaEstacion": "",
+
+  "ServerUrl": "",
+  "Email": "",
+  "Password": "",
+
+  "ServerTimeoutSegundos": 30,
+
+  "FirebirdHost": "localhost",
+  "FirebirdPort": 3050,
+  "FirebirdDatabase": "C:\\Programas\\ContaGober1\\Datosc\\CONTAB.FDB",
+  "FirebirdUser": "SYSDBA",
+  "FirebirdPassword": "",
+  "FirebirdCharset": "UTF8",
+  "FirebirdDialect": 3,
+  "FirebirdWireCrypt": "Disabled",
+
+  "IntervaloSegundos": 30,
+  "InicioAutomatico": true,
+  "LocalStorePath": "pending",
+  "PanelPuerto": 5180,
+
+  "Configurado": false
+}

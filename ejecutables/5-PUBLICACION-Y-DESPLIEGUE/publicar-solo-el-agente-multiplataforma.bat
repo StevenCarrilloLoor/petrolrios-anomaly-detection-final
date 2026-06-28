@@ -49,6 +49,19 @@ copy /Y "ejecutables\5-PUBLICACION-Y-DESPLIEGUE\agente-LEEME-macos.txt" "dist\ag
 copy /Y "ejecutables\5-PUBLICACION-Y-DESPLIEGUE\instalar-agente-como-servicio-macos.sh" "dist\agente-macos-arm\instalar_agente_servicio_macos.sh" > nul
 
 echo.
+echo Dejando la configuracion INICIAL de produccion en cada agente
+echo  (Firebird ContaGober + puerto 3050 + Charset UTF8 para tildes/N)...
+rem  El agente carga config\agent-config.json ANTES que appsettings.json (que es la
+rem  config del DEMO con Charset=NONE y ruta de Docker). Asi un agente recien publicado
+rem  arranca con los valores correctos de Firebird; el operador solo completa estacion,
+rem  servidor central y credenciales desde el panel. Sin esto, el agente nuevo tomaba
+rem  los defaults del demo (NONE + ruta vieja) -> tildes/N rotas y ruta equivocada.
+for %%D in (agente-windows agente-linux agente-macos-intel agente-macos-arm) do (
+  if not exist "dist\%%D\config" mkdir "dist\%%D\config"
+  copy /Y "ejecutables\5-PUBLICACION-Y-DESPLIEGUE\agent-config-produccion.json" "dist\%%D\config\agent-config.json" > nul
+)
+
+echo.
 echo ============================================================
 echo  LISTO. Carpetas listas para copiar a cada estacion:
 echo    dist\agente-windows       (Windows 64-bit)
