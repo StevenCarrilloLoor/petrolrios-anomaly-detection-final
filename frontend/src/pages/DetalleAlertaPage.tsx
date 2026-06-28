@@ -22,7 +22,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Search,
   FileText,
 } from "lucide-react";
 
@@ -105,8 +104,10 @@ const METADATA_LABELS: Record<string, string> = {
   Vendedores: "Despachadores",
 };
 
-// Claves de la evidencia cuyo valor es buscable (placa, RUC, n° de factura, cliente): se muestran como
-// enlace que abre la bandeja de alertas filtrada por ese valor ("ver todas las alertas de esta placa").
+// Claves de la evidencia cuyo valor identifica una entidad (placa, RUC, cliente, despachador): se
+// muestran como enlace que abre, EN VENTANA NUEVA, la consulta EN VIVO de todo lo relacionado con ese
+// valor en la estación (comportamiento "ERP" que pidió la auditora: ver las facturas/despachos de ese
+// cliente/placa/despachador sin perder la pantalla actual, para comparar lado a lado).
 const CLAVES_BUSCABLES = new Set([
   "Placa",
   "NumeroDocumento",
@@ -116,11 +117,24 @@ const CLAVES_BUSCABLES = new Set([
   "Ruc",
   "Rucs",
   "RucCliente",
+  "Vendedores",
 ]);
 
-// Claves cuyo valor es un NÚMERO DE FACTURA: además del buscador, ofrecen "Ver factura" → abre la factura
-// COMPLETA en vivo (FacturaPage) en una ventana nueva, para compararla lado a lado (lo pidió la auditora).
+// Claves cuyo valor es un NÚMERO DE FACTURA: ofrecen "Ver factura" → abre la factura COMPLETA en vivo
+// (FacturaPage) en una ventana nueva, para compararla lado a lado (lo pidió la auditora).
 const CLAVES_FACTURA = new Set(["NumeroDocumento", "NumerosFactura"]);
+
+/**
+ * Abre la consulta EN VIVO (Consultas) filtrada por un valor (RUC, placa, cliente o despachador) en la
+ * estación de la alerta, en una VENTANA NUEVA. Es el comportamiento ERP que pidió la auditora: clic en
+ * el dato → ver todo lo relacionado (sus facturas/despachos), comparando lado a lado.
+ */
+function abrirConsultaRelacionada(estacionCodigo: string, valor: string) {
+  const v = valor.trim();
+  if (!v || !estacionCodigo) return;
+  const qs = new URLSearchParams({ est: estacionCodigo, codigo: v });
+  window.open(`/consultas?${qs.toString()}`, "_blank", "noopener,width=1100,height=860");
+}
 
 export function DetalleAlertaPage() {
   const { id } = useParams<{ id: string }>();
@@ -337,8 +351,10 @@ export function DetalleAlertaPage() {
                     clave={clave}
                     valor={valor}
                     estacionCodigo={alerta.estacionCodigo}
-                    onBuscar={(q) =>
-                      navigate(`/alertas?buscar=${encodeURIComponent(q)}`)
+                    onRelacionar={(v) =>
+                      alerta.estacionCodigo
+                        ? abrirConsultaRelacionada(alerta.estacionCodigo, v)
+                        : navigate(`/alertas?buscar=${encodeURIComponent(v)}`)
                     }
                   />
                 </div>
@@ -575,20 +591,21 @@ function CopyButton({ value }: { value: string }) {
 }
 
 /**
- * Renderiza un valor de la evidencia. Si la clave es "buscable" (placa, RUC, n° de factura, cliente),
- * el valor se muestra como enlace que abre la bandeja filtrada por ese valor + botón copiar. Los
- * valores de lista (varios n° de factura, clientes, despachadores) se muestran como pastillas.
+ * Renderiza un valor de la evidencia. Si la clave identifica una entidad (placa, RUC, cliente,
+ * despachador), el valor se muestra como enlace que abre, EN VENTANA NUEVA, la consulta EN VIVO de todo
+ * lo relacionado con ese valor + botón copiar. Si es un n° de factura, ofrece "Ver factura". Los valores
+ * de lista (varios n° de factura, clientes, despachadores) se muestran como pastillas.
  */
 function ValorEvidencia({
   clave,
   valor,
   estacionCodigo,
-  onBuscar,
+  onRelacionar,
 }: {
   clave: string;
   valor: unknown;
   estacionCodigo: string;
-  onBuscar: (q: string) => void;
+  onRelacionar: (valor: string) => void;
 }) {
   const buscable = CLAVES_BUSCABLES.has(clave);
   const esFactura = CLAVES_FACTURA.has(clave);
@@ -606,7 +623,7 @@ function ValorEvidencia({
             buscable={buscable}
             esFactura={esFactura}
             estacionCodigo={estacionCodigo}
-            onBuscar={onBuscar}
+            onRelacionar={onRelacionar}
           />
         ))}
       </span>
@@ -622,7 +639,7 @@ function ValorEvidencia({
           buscable={buscable}
           esFactura={esFactura}
           estacionCodigo={estacionCodigo}
-          onBuscar={onBuscar}
+          onRelacionar={onRelacionar}
         />
       </span>
     );
@@ -635,33 +652,36 @@ function ValorEvidencia({
 }
 
 /**
- * Pastilla de un valor: enlace de búsqueda (si aplica) + "Ver factura" (si es un n° de factura y tenemos
- * el código de estación) + botón copiar. "Ver factura" abre la factura COMPLETA en vivo en una ventana nueva.
+ * Pastilla de un valor. Si es un n° de factura, ofrece "Ver factura" (abre la factura COMPLETA en vivo
+ * en una ventana nueva). Si identifica una entidad (placa/RUC/cliente/despachador), el valor es un
+ * enlace que abre la consulta EN VIVO de todo lo relacionado en una ventana nueva. Siempre con copiar.
  */
 function ChipValor({
   value,
   buscable,
   esFactura,
   estacionCodigo,
-  onBuscar,
+  onRelacionar,
 }: {
   value: string;
   buscable: boolean;
   esFactura: boolean;
   estacionCodigo: string;
-  onBuscar: (q: string) => void;
+  onRelacionar: (valor: string) => void;
 }) {
   const verFactura = esFactura && estacionCodigo.length > 0;
+  // El nº de factura usa su propio enlace "Ver factura"; el resto de entidades abren la consulta relacionada.
+  const relacionable = buscable && !esFactura;
   return (
     <span className="inline-flex items-center gap-1 rounded bg-background px-1.5 py-0.5 font-mono text-xs ring-1 ring-border">
-      {buscable ? (
+      {relacionable ? (
         <button
           type="button"
-          onClick={() => onBuscar(value)}
-          title={`Ver todas las alertas con "${value}"`}
+          onClick={() => onRelacionar(value)}
+          title={`Ver todo lo relacionado con "${value}" en una ventana nueva`}
           className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
         >
-          <Search size={11} className="shrink-0 opacity-70" />
+          <ExternalLink size={11} className="shrink-0 opacity-70" />
           {value}
         </button>
       ) : (
