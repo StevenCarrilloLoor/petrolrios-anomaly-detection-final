@@ -35,6 +35,19 @@ export interface DocumentoFirebird {
   Descuento?: number;
   TotalNeto?: number;
   NumeroDespacho?: string; // NDO_DCTO: el despacho (DESP) que originó la factura
+  // Enriquecido (etapa C): nombre/contacto del cliente (CLIE), nombre del despachador (VEND) y más DCTO.
+  ClienteNombre?: string;
+  ClienteRazon?: string;
+  ClienteCorreo?: string;
+  ClienteTelefono?: string;
+  Direccion?: string;
+  Chofer?: string;
+  VendedorNombre?: string;
+  Consecutivo?: number;
+  Autorizacion?: string;
+  Guia?: string;
+  Observaciones?: string;
+  Subtotal?: number;
   [k: string]: unknown;
 }
 
@@ -44,6 +57,8 @@ export interface DocumentoFirebird {
 const CAMPOS_DOC = [
   "SecuenciaDocumento", "TipoDocumento", "NumeroDocumento", "Fecha", "Cliente", "Ruc", "Vendedor",
   "Placa", "FormaPago", "NumeroTurno", "TotalSinIva", "Iva", "Descuento", "TotalNeto", "NumeroDespacho",
+  "ClienteNombre", "ClienteRazon", "ClienteCorreo", "ClienteTelefono", "Direccion", "Chofer",
+  "VendedorNombre", "Consecutivo", "Autorizacion", "Guia", "Observaciones", "Subtotal",
 ] as const;
 
 function normalizarDoc(raw: Record<string, unknown>): DocumentoFirebird {

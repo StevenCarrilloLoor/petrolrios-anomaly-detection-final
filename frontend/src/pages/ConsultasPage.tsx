@@ -345,7 +345,12 @@ export function ConsultasPage() {
                       <td className="whitespace-nowrap px-3 py-2">{fecha(d.Fecha)}</td>
                       <td className="px-3 py-2">{texto(d.TipoDocumento)}</td>
                       <td className="px-3 py-2">
-                        <CeldaRelacionada estacion={estacion} valor={d.Cliente} />
+                        <div className="flex flex-col">
+                          <CeldaRelacionada estacion={estacion} valor={d.Cliente} />
+                          {texto(d.ClienteNombre) !== "—" && (
+                            <span className="text-xs text-muted-foreground">{texto(d.ClienteNombre)}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2 font-mono">
                         <CeldaRelacionada estacion={estacion} valor={d.Ruc} />

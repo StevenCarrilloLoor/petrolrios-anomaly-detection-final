@@ -6,7 +6,7 @@ import {
   type DespachoFirebird,
 } from "@/services/consultas.service";
 import { Spinner } from "@/components/ui/Spinner";
-import { FileText, Printer, AlertTriangle, Fuel } from "lucide-react";
+import { FileText, Printer, AlertTriangle, Fuel, X } from "lucide-react";
 
 function money(v: unknown): string {
   const n = typeof v === "number" ? v : Number(v);
@@ -26,11 +26,59 @@ function fecha(v: unknown): string {
   return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-EC");
 }
 
-function Campo({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+// Tipo de documento (TIP_DCTO) y forma de pago (COD_PAGO) legibles. La auditora pidió ver los nombres,
+// no los códigos crudos ("¿qué es el facturado 5? no sé"). Catálogo de las capturas reales del POS.
+const TIPO_DOC: Record<string, string> = {
+  FV: "Factura de venta",
+  DV: "Devolución / nota de crédito",
+  EB: "Egreso de bodega",
+};
+function tipoDoc(code: unknown): string {
+  const c = texto(code);
+  if (c === "—") return "Documento";
+  return TIPO_DOC[c.toUpperCase()] ?? c;
+}
+const FORMA_PAGO: Record<string, string> = {
+  "001": "Contado (efectivo)",
+  "002": "Tarjeta de crédito",
+  "003": "Tarjeta de débito",
+  "004": "Cheque",
+  "020": "Pago Ya",
+  "021": "Otros pagos",
+  CRE: "Crédito",
+  CON: "Contado islas",
+  EFE: "Efectivo",
+  EF: "Efectivo",
+};
+function formaPago(code: unknown): string {
+  const c = texto(code);
+  if (c === "—") return "—";
+  const label = FORMA_PAGO[c.toUpperCase()];
+  return label ? `${label} (${c})` : c;
+}
+
+/** Fila etiqueta→valor dentro de un bloque (cliente / documento). */
+function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
-    <div className="rounded-lg border border-border bg-background px-3 py-2">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={`text-sm font-medium text-foreground ${mono ? "font-mono" : ""}`}>{value}</p>
+    <div className="flex items-start justify-between gap-3 border-b border-border/40 py-1 last:border-0 print:border-black/10">
+      <dt className="shrink-0 text-xs text-muted-foreground print:text-gray-600">{k}</dt>
+      <dd className={`text-right text-sm font-medium text-foreground print:text-black ${mono ? "font-mono" : ""}`}>{v}</dd>
+    </div>
+  );
+}
+
+/** Fila de un total (derecha). El total final va resaltado. */
+function Total({ k, v, fuerte }: { k: string; v: string; fuerte?: boolean }) {
+  return (
+    <div
+      className={
+        fuerte
+          ? "mt-1 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 text-base font-bold text-primary print:bg-gray-100 print:text-black"
+          : "flex items-center justify-between px-3 py-0.5 text-sm"
+      }
+    >
+      <span className={fuerte ? "" : "text-muted-foreground print:text-gray-600"}>{k}</span>
+      <span className="font-mono font-medium">{v}</span>
     </div>
   );
 }
@@ -90,18 +138,38 @@ export function FacturaPage() {
     };
   }, [doc, est]);
 
+  const nombreCliente = doc
+    ? texto(doc.ClienteNombre) !== "—"
+      ? texto(doc.ClienteNombre)
+      : texto(doc.ClienteRazon)
+    : "—";
+  const despachador = doc
+    ? texto(doc.VendedorNombre) !== "—"
+      ? `${texto(doc.VendedorNombre)} (${texto(doc.Vendedor)})`
+      : texto(doc.Vendedor)
+    : "—";
+
   return (
-    <div className="mx-auto max-w-3xl p-6">
+    <div className="mx-auto max-w-4xl p-4 sm:p-6 print:max-w-none print:p-0 print:text-black">
+      {/* Barra de acciones (no se imprime) */}
       <div className="mb-4 flex items-center justify-between print:hidden">
         <h1 className="flex items-center gap-2 text-xl font-bold text-foreground">
           <FileText size={22} /> Factura {texto(num)}
         </h1>
-        <button
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
-        >
-          <Printer size={15} /> Imprimir
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            <Printer size={15} /> Imprimir
+          </button>
+          <button
+            onClick={() => window.close()}
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+          >
+            <X size={15} /> Cerrar
+          </button>
+        </div>
       </div>
 
       {cargando && (
@@ -119,38 +187,67 @@ export function FacturaPage() {
       )}
 
       {doc && !cargando && (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="mb-3 text-sm font-semibold text-foreground">Datos del documento</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <Campo label="N.º de documento" value={texto(doc.NumeroDocumento)} mono />
-              <Campo label="Tipo" value={texto(doc.TipoDocumento)} />
-              <Campo label="Fecha" value={fecha(doc.Fecha)} />
-              <Campo label="Cliente" value={texto(doc.Cliente)} mono />
-              <Campo label="RUC / cédula" value={texto(doc.Ruc)} mono />
-              <Campo label="Placa" value={texto(doc.Placa)} mono />
-              <Campo label="Despachador" value={texto(doc.Vendedor)} mono />
-              <Campo label="Forma de pago" value={texto(doc.FormaPago)} />
-              <Campo label="Turno" value={texto(doc.NumeroTurno)} />
-              <Campo label="Despacho (origen)" value={texto(doc.NumeroDespacho)} mono />
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm print:rounded-none print:border print:border-black/20 print:bg-white print:shadow-none">
+          {/* Encabezado de la factura */}
+          <div className="flex flex-col gap-4 border-b border-border bg-muted/30 p-5 sm:flex-row sm:items-start sm:justify-between print:bg-white">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground print:text-gray-600">
+                PetrolRíos S.A. · Estación {texto(est)}
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-foreground print:text-black">{tipoDoc(doc.TipoDocumento)}</h2>
+              <p className="text-xs text-muted-foreground print:text-gray-600">
+                Comprobante en vivo de la estación (solo lectura)
+              </p>
+            </div>
+            <div className="sm:text-right">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground print:text-gray-600">N.º de documento</p>
+              <p className="font-mono text-xl font-bold text-foreground print:text-black">{texto(doc.NumeroDocumento)}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground print:text-gray-700">{fecha(doc.Fecha)}</p>
+              <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary print:bg-gray-100 print:text-black">
+                {texto(doc.TipoDocumento)}
+              </span>
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="mb-3 text-sm font-semibold text-foreground">Importes</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Campo label="Base (sin IVA)" value={money(doc.TotalSinIva)} />
-              <Campo label="IVA" value={money(doc.Iva)} />
-              <Campo label="Descuento" value={money(doc.Descuento)} />
-              <Campo label="Total" value={money(doc.TotalNeto)} />
-            </div>
+          {/* Cliente + Documento */}
+          <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-600">
+                Cliente
+              </h3>
+              <p className="text-base font-semibold text-foreground print:text-black">{nombreCliente}</p>
+              <dl className="mt-2">
+                <Row k="Código" v={texto(doc.Cliente)} mono />
+                <Row k="RUC / cédula" v={texto(doc.Ruc)} mono />
+                <Row k="Dirección" v={texto(doc.Direccion)} />
+                <Row k="Teléfono" v={texto(doc.ClienteTelefono)} mono />
+                <Row k="Correo" v={texto(doc.ClienteCorreo)} />
+              </dl>
+            </section>
+
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-600">
+                Detalles del documento
+              </h3>
+              <dl>
+                <Row k="Despachador" v={despachador} />
+                <Row k="Chofer" v={texto(doc.Chofer)} mono />
+                <Row k="Placa" v={texto(doc.Placa)} mono />
+                <Row k="Forma de pago" v={formaPago(doc.FormaPago)} />
+                <Row k="Turno" v={texto(doc.NumeroTurno)} mono />
+                <Row k="Consecutivo" v={texto(doc.Consecutivo)} mono />
+                <Row k="Autorización (SRI)" v={texto(doc.Autorizacion)} mono />
+                <Row k="Guía" v={texto(doc.Guia)} mono />
+                <Row k="Despacho (origen)" v={texto(doc.NumeroDespacho)} mono />
+              </dl>
+            </section>
           </div>
 
           {/* Líneas de surtido (DESP), cruzadas por el «Despacho (origen)» = NDO_DCTO → NUM_DESP. */}
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Fuel size={15} /> Líneas de surtido
-            </p>
+          <div className="border-t border-border px-5 py-4 print:border-black/20">
+            <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-600">
+              <Fuel size={14} /> Líneas de surtido
+            </h3>
             {cargandoLineas ? (
               <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
                 <Spinner size="sm" /> Consultando el surtido en la estación…
@@ -159,7 +256,7 @@ export function FacturaPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground print:border-black/30 print:text-gray-600">
                       <th className="py-1.5 pr-3 font-medium">Producto</th>
                       <th className="py-1.5 pr-3 font-medium">Manguera</th>
                       <th className="py-1.5 pr-3 text-right font-medium">Galones</th>
@@ -169,12 +266,12 @@ export function FacturaPage() {
                   </thead>
                   <tbody>
                     {lineas.map((l, i) => (
-                      <tr key={`${l.NumeroDespacho}-${i}`} className="border-b border-border/50 last:border-0">
-                        <td className="py-1.5 pr-3 text-foreground">{texto(l.Producto)}</td>
-                        <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground">{texto(l.Manguera)}</td>
-                        <td className="py-1.5 pr-3 text-right font-mono text-foreground">{galones(l.Galones)}</td>
-                        <td className="py-1.5 pr-3 text-right font-mono text-foreground">{money(l.PrecioUnitario)}</td>
-                        <td className="py-1.5 text-right font-mono font-medium text-foreground">{money(l.Total)}</td>
+                      <tr key={`${l.NumeroDespacho}-${i}`} className="border-b border-border/50 last:border-0 print:border-black/10">
+                        <td className="py-1.5 pr-3 text-foreground print:text-black">{texto(l.Producto)}</td>
+                        <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground print:text-gray-600">{texto(l.Manguera)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-foreground print:text-black">{galones(l.Galones)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-foreground print:text-black">{money(l.PrecioUnitario)}</td>
+                        <td className="py-1.5 text-right font-mono font-medium text-foreground print:text-black">{money(l.Total)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -189,10 +286,31 @@ export function FacturaPage() {
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            Datos traídos en vivo de la base de la estación {texto(est)} (solo lectura): cabecera (DCTO),
-            importes y líneas de surtido (DESP, cruzadas por «Despacho (origen)» = NDO_DCTO → NUM_DESP).
-          </p>
+          {/* Importes */}
+          <div className="border-t border-border p-5 print:border-black/20">
+            <div className="ml-auto w-full max-w-xs">
+              <Total k="Subtotal" v={money(doc.Subtotal)} />
+              <Total k="Base (sin IVA)" v={money(doc.TotalSinIva)} />
+              <Total k="Descuento" v={money(doc.Descuento)} />
+              <Total k="IVA" v={money(doc.Iva)} />
+              <Total k="TOTAL" v={money(doc.TotalNeto)} fuerte />
+            </div>
+          </div>
+
+          {/* Observaciones (si las hay) */}
+          {texto(doc.Observaciones) !== "—" && (
+            <div className="border-t border-border px-5 py-3 text-sm print:border-black/20">
+              <span className="font-semibold text-foreground print:text-black">Observaciones: </span>
+              <span className="text-muted-foreground print:text-gray-700">{texto(doc.Observaciones)}</span>
+            </div>
+          )}
+
+          {/* Pie */}
+          <div className="border-t border-border bg-muted/20 px-5 py-3 text-[11px] text-muted-foreground print:border-black/20 print:bg-white print:text-gray-600">
+            Datos traídos EN VIVO de la base de la estación {texto(est)} (Firebird, solo lectura): cabecera (DCTO)
+            + cliente (CLIE) + despachador (VEND) + líneas de surtido (DESP, cruzadas por «Despacho (origen)» =
+            NDO_DCTO → NUM_DESP).
+          </div>
         </div>
       )}
     </div>

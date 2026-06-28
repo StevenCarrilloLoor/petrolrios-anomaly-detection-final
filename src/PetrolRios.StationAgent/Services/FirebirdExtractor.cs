@@ -82,24 +82,40 @@ public sealed class FirebirdExtractor
         // El CAST(col AS VARCHAR(60)) en el filtro por código es CLAVE: en "col CONTAINING @codigo" Firebird
         // describe el parámetro con el ancho de la columna; si la columna es estrecha (p. ej. PLA_DCTO CHAR(8))
         // y el código buscado es más largo (un RUC de 13), lanza "string right truncation". El CAST ancho lo evita.
+        // Enriquecido (round ERP/UX-2, etapa C): además de la cabecera DCTO, trae el NOMBRE del cliente y
+        // su contacto desde CLIE (LEFT JOIN por COD_CLIE, que es la PK de CLIE → match exacto) y el NOMBRE
+        // del despachador desde VEND (LEFT JOIN por COD_VEND; Firebird compara CHAR con relleno de espacios,
+        // así que un código corto del demo o uno largo de San Pío resuelven si existen, y si no, queda en
+        // blanco sin romper). Campos extra de DCTO útiles para auditoría: chofer, consecutivo, autorización
+        // (SRI), guía, observaciones, dirección y subtotal. El nombre del cliente se MUESTRA (no se filtra
+        // por él en el WHERE: poner c.NOM_CLIE en el WHERE forzaría el join a CLIE por CADA fila del scan
+        // —CONTAINING no usa índice— y volvería lenta la consulta sobre toda la tabla). Búsqueda por nombre
+        // = mejora futura (pre-lookup en CLIE). Todo SOLO LECTURA. Los LEFT JOIN nunca descartan filas de DCTO.
         var sql = $"""
             SELECT FIRST {top}
-              SEC_DCTO AS "SecuenciaDocumento", TIP_DCTO AS "TipoDocumento", NUM_DCTO AS "NumeroDocumento",
-              FEC_DCTO AS "Fecha", COD_CLIE AS "Cliente", RUC_DCTO AS "Ruc", COD_VEND AS "Vendedor",
-              PLA_DCTO AS "Placa", COD_PAGO AS "FormaPago", NUM_TURN AS "NumeroTurno",
-              TSI_DCTO AS "TotalSinIva", IVA_DCTO AS "Iva", DSC_DCTO AS "Descuento", TNI_DCTO AS "TotalNeto",
-              NDO_DCTO AS "NumeroDespacho"
-            FROM DCTO
-            WHERE (@tipo IS NULL OR TIP_DCTO = @tipo)
-              AND (@desde IS NULL OR FEC_DCTO >= @desde)
-              AND (@hasta IS NULL OR FEC_DCTO <= @hasta)
+              d.SEC_DCTO AS "SecuenciaDocumento", d.TIP_DCTO AS "TipoDocumento", d.NUM_DCTO AS "NumeroDocumento",
+              d.FEC_DCTO AS "Fecha",
+              d.COD_CLIE AS "Cliente", c.NOM_CLIE AS "ClienteNombre", c.RAZ_CLIE AS "ClienteRazon",
+              c.COR_CLIE AS "ClienteCorreo", c.TE1_CLIE AS "ClienteTelefono",
+              d.RUC_DCTO AS "Ruc", d.DIR_DCTO AS "Direccion", d.PLA_DCTO AS "Placa", d.COD_CHOF AS "Chofer",
+              d.COD_VEND AS "Vendedor", v.NOM_VEND AS "VendedorNombre",
+              d.COD_PAGO AS "FormaPago", d.NUM_TURN AS "NumeroTurno", d.NUM_CONS AS "Consecutivo",
+              d.AUT_DCTO AS "Autorizacion", d.GUI_DCTO AS "Guia", d.OBS_DCTO AS "Observaciones",
+              d.SUB_DCTO AS "Subtotal", d.TSI_DCTO AS "TotalSinIva", d.IVA_DCTO AS "Iva",
+              d.DSC_DCTO AS "Descuento", d.TNI_DCTO AS "TotalNeto", d.NDO_DCTO AS "NumeroDespacho"
+            FROM DCTO d
+            LEFT JOIN CLIE c ON c.COD_CLIE = d.COD_CLIE
+            LEFT JOIN VEND v ON v.COD_VEND = d.COD_VEND
+            WHERE (@tipo IS NULL OR d.TIP_DCTO = @tipo)
+              AND (@desde IS NULL OR d.FEC_DCTO >= @desde)
+              AND (@hasta IS NULL OR d.FEC_DCTO <= @hasta)
               AND (@codigo IS NULL
-                   OR CAST(RUC_DCTO AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(PLA_DCTO AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(COD_CLIE AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(NUM_DCTO AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(COD_VEND AS VARCHAR(60)) CONTAINING @codigo)
-            ORDER BY FEC_DCTO DESC
+                   OR CAST(d.RUC_DCTO AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(d.PLA_DCTO AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(d.COD_CLIE AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(d.NUM_DCTO AS VARCHAR(60)) CONTAINING @codigo
+                   OR CAST(d.COD_VEND AS VARCHAR(60)) CONTAINING @codigo)
+            ORDER BY d.FEC_DCTO DESC
             """;
         var prm = new
         {
