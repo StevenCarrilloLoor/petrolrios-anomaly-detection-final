@@ -49,5 +49,5 @@ public sealed class PreciosCombustibleController : ControllerBase
     [Authorize(Roles = "Administrador", Policy = "Central")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<PreciosCombustibleResponse>> Refrescar(CancellationToken ct) =>
-        Ok(await _precios.RefrescarDesdeFuenteAsync(ct));
+        Ok(await _precios.RefrescarDesdeFuenteAsync("manual", ct));
 }

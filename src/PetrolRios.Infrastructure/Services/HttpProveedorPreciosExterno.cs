@@ -12,11 +12,30 @@ public sealed class PreciosCombustibleOptions
 {
     public const string Section = "PreciosCombustible";
 
-    /// <summary>URL de una fuente externa que devuelva un JSON array de precios (ver
-    /// <see cref="PrecioCombustibleExterno"/>). Vacío por defecto: no hay API pública oficial de Ecuador,
-    /// así que el sistema sirve los valores oficiales guardados y este conector queda listo para cuando
-    /// se disponga de una fuente (propia o de terceros).</summary>
+    /// <summary>URL de una fuente externa que devuelva un JSON array de precios (alternativa simple; ver
+    /// <see cref="HttpProveedorPreciosExterno"/>). Por defecto se usa la CASCADA de fuentes públicas.</summary>
     public string? FuenteUrl { get; set; }
+
+    /// <summary>Cascada de fuentes a scrapear, en orden de preferencia. Vacío = se usan las de por defecto.</summary>
+    public List<FuentePrecioConfig> Fuentes { get; set; } = [];
+
+    /// <summary>Fuentes por defecto, de menor a mayor protección anti-bot (gobierno/gremio primero). Solo
+    /// gasolinaecuador.com está verificada como HTML estático parseable; las demás son mejor-esfuerzo y la
+    /// cascada cae a la siguiente si no responden o no traen precios. Configurables en appsettings.</summary>
+    public static readonly IReadOnlyList<(string Nombre, string Url)> FuentesPorDefecto = new[]
+    {
+        ("arch", "https://www.arch.gob.ec/"),
+        ("camddepe", "https://camddepe.com.ec/"),
+        ("gasolinaecuador", "https://gasolinaecuador.com/"),
+        ("primicias", "https://www.primicias.ec/economia/"),
+    };
+}
+
+/// <summary>Una fuente configurable de la cascada (nombre corto + URL a scrapear).</summary>
+public sealed class FuentePrecioConfig
+{
+    public string Nombre { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
 }
 
 /// <summary>

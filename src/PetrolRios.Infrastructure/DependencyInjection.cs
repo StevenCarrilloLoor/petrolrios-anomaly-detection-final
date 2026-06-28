@@ -62,14 +62,19 @@ public static class DependencyInjection
         services.AddScoped<IEmailNotificacionService, EmailNotificacionService>();
 
         // Precios oficiales de combustibles regulados de Ecuador (Extra/Ecopaís/Diésel). El servicio sirve
-        // los valores guardados (sembrados); el conector externo (HTTP a una URL configurable, deshabilitado
-        // por defecto) permite "interrogar" una fuente real cuando exista, con respaldo a lo guardado.
+        // los valores guardados (sembrados); el proveedor por CASCADA de fuentes públicas (arch → camddepe →
+        // gasolinaecuador → primicias) los refresca de forma robusta y respetuosa (headers de navegador +
+        // ETag/304 + backoff ante 403/429), con respaldo a lo guardado si todas fallan.
         services.Configure<PreciosCombustibleOptions>(
             configuration.GetSection(PreciosCombustibleOptions.Section));
-        services.AddSingleton<IProveedorPreciosExterno>(sp => new HttpProveedorPreciosExterno(
-            new System.Net.Http.HttpClient(),
+        services.AddSingleton<IProveedorPreciosExterno>(sp => new Services.Precios.CascadaPreciosProvider(
+            new System.Net.Http.HttpClient(new System.Net.Http.HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.All,
+                AllowAutoRedirect = true
+            }),
             sp.GetRequiredService<IOptions<PreciosCombustibleOptions>>(),
-            sp.GetRequiredService<ILogger<HttpProveedorPreciosExterno>>()));
+            sp.GetRequiredService<ILogger<Services.Precios.CascadaPreciosProvider>>()));
         services.AddScoped<IPreciosCombustibleService, PreciosCombustibleService>();
         services.AddSingleton<QrLoginService>(); // estado en memoria del login por QR
         services.AddSingleton<PasswordResetService>(); // tokens de recuperacion en memoria

@@ -83,39 +83,66 @@ public sealed class PreciosCombustibleService : IPreciosCombustibleService
         return await ObtenerVigentesAsync(ct);
     }
 
-    public async Task<PreciosCombustibleResponse> RefrescarDesdeFuenteAsync(CancellationToken ct = default)
+    public async Task<PreciosCombustibleResponse> RefrescarDesdeFuenteAsync(
+        string disparo = "manual", CancellationToken ct = default)
     {
-        if (_externo.Habilitado)
+        if (!_externo.Habilitado) return await ObtenerVigentesAsync(ct);
+
+        IReadOnlyList<PrecioCombustibleExterno>? externos = null;
+        try { externos = await _externo.ObtenerAsync(ct); }
+        catch (Exception ex) { _logger.LogWarning(ex, "La cascada de precios falló."); }
+
+        var fuente = _externo.UltimaFuente ?? "fuente";
+        var degradadas = _externo.FuentesDegradadas.Count > 0
+            ? string.Join(",", _externo.FuentesDegradadas) : null;
+
+        if (externos is { Count: > 0 })
         {
-            try
+            foreach (var e in externos)
             {
-                var externos = await _externo.ObtenerAsync(ct);
-                if (externos is { Count: > 0 })
+                if (!Enum.TryParse<TipoCombustible>(e.Producto, ignoreCase: true, out var producto)
+                    || !Enum.IsDefined(producto))
+                    continue;
+
+                var fila = await _db.PreciosCombustible.FirstOrDefaultAsync(p => p.Producto == producto, ct);
+                var anterior = fila?.PrecioGalon;
+                var enRango = RangoValido(producto, e.PrecioGalon);
+                var plausible = VariacionPlausible(producto, anterior, e.PrecioGalon);
+                var promover = enRango && plausible;     // solo se asciende al SISTEMA un valor válido
+                var variacion = anterior is null or 0
+                    ? (decimal?)null
+                    : Math.Round((e.PrecioGalon - anterior.Value) / anterior.Value * 100m, 2);
+                var resultado = !enRango || !plausible ? "invalido"
+                    : anterior == e.PrecioGalon ? "sin_cambio" : "actualizado";
+
+                if (fila is null)
                 {
-                    foreach (var e in externos)
-                    {
-                        if (!Enum.TryParse<TipoCombustible>(e.Producto, ignoreCase: true, out var producto)
-                            || !Enum.IsDefined(producto))
-                            continue;
-                        var fila = await _db.PreciosCombustible.FirstOrDefaultAsync(p => p.Producto == producto, ct);
-                        if (fila is null)
-                            await _db.PreciosCombustible.AddAsync(PrecioCombustible.Create(
-                                producto, e.PrecioGalon, e.Subsidio, e.VigenteDesde, e.VigenteHasta,
-                                "Fuente externa configurada"), ct);
-                        else
-                            fila.Actualizar(e.PrecioGalon, e.Subsidio, e.VigenteDesde, e.VigenteHasta,
-                                "Fuente externa configurada");
-                    }
-                    await _db.SaveChangesAsync(ct);
-                    _logger.LogInformation("Precios de combustible refrescados desde la fuente externa.");
+                    fila = PrecioCombustible.Create(producto, e.PrecioGalon, 0m, e.VigenteDesde, e.VigenteHasta, fuente);
+                    fila.RegistrarApi(e.PrecioGalon, fuente, DateTime.UtcNow, promover);
+                    await _db.PreciosCombustible.AddAsync(fila, ct);
                 }
+                else
+                {
+                    fila.RegistrarApi(e.PrecioGalon, fuente, DateTime.UtcNow, promover);
+                }
+
+                await _db.PreciosCombustibleLog.AddAsync(PrecioCombustibleLog.Create(
+                    producto, fuente, disparo, resultado,
+                    precioAnterior: anterior, precioNuevo: e.PrecioGalon, variacionPorcentual: variacion,
+                    fuenteDegradada: degradadas), ct);
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "No se pudo refrescar precios desde la fuente externa; se mantienen los valores guardados.");
-            }
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Precios refrescados desde '{Fuente}' ({Disparo}).", fuente, disparo);
         }
+        else
+        {
+            // Todas las fuentes fallaron: se conservan los precios del sistema; se registra el intento.
+            await _db.PreciosCombustibleLog.AddAsync(PrecioCombustibleLog.Create(
+                TipoCombustible.Extra, "fallback", disparo, "error", fuenteDegradada: degradadas), ct);
+            await _db.SaveChangesAsync(ct);
+            _logger.LogWarning("Ninguna fuente devolvió precios ({Disparo}); se conservan los del sistema.", disparo);
+        }
+
         return await ObtenerVigentesAsync(ct);
     }
 
@@ -125,8 +152,8 @@ public sealed class PreciosCombustibleService : IPreciosCombustibleService
             .OrderBy(f => (int)f.Producto)
             .Select(ToItem)
             .ToList();
-        // FuentesDegradadas se llenará cuando entre el scraper (E2); por ahora, vacío.
-        return new PreciosCombustibleResponse(precios, "USD", DateTime.UtcNow, Nota, []);
+        return new PreciosCombustibleResponse(
+            precios, "USD", DateTime.UtcNow, Nota, _externo.FuentesDegradadas);
     }
 
     private static PrecioCombustibleResponse ToItem(PrecioCombustible f) =>
