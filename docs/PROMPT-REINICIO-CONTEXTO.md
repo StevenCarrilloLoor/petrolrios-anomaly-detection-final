@@ -126,16 +126,16 @@ comparación sistema‑vs‑API, detector tolerancia cero). Se hace por etapas v
   (`PrecioApi`/`FuenteApi`/`PrecioPendiente`/`RegistrarApi(promover)`) → el dashboard muestra ambos y si la API falla
   el sistema conserva el suyo; tabla `precios_combustible_log`; validación con bandas (`RangoValido`/`VariacionPlausible`);
   endpoint enriquecido + tarjeta de dashboard con badges. Migración `PreciosCombustibleSistemaApiLog` + 2 pruebas.
-- **PENDIENTE: E2** cascada de fuentes (arch.gob.ec→camddepe→gasolinaecuador→primicias, ETag/304, backoff/degradación);
-  **E3** schedule adaptativo Hangfire (normal días 1–10 + alerta 11–12, jitter, idempotente); **E4** /salud /historial
-  /admin/refresh /admin/precio + alertas escalonadas (N1–N4); **E5** detector tolerancia cero en regulados.
-  **MAPEO DE PRODUCTO CONFIRMADO por precio (28-jun, idea de Steven):** se cruzó el precio/galón de cada código
-  contra el salto de banda del 12-jun y los precios oficiales → **producto 1 = Súper** (antes $4,50 / desde $5,69 ≈
-  referencial, **excluido** del detector), **producto 2 = Extra/Ecopaís** (desde $3,312 ≈ oficial **$3,31**, regulada),
-  **producto 3 = Diésel** (desde $3,251 ≈ oficial **$3,25**, regulada). Extra y Ecopaís comparten precio, así que el
-  detector no necesita distinguirlas. **OJO calibración E5:** el POS cobra ~$0,002 por encima del oficial (3.312/3.251)
-  → la "tolerancia cero" necesita epsilon de ±1 centavo (o comparar redondeado a centavos); si no, inunda. _Para ver
-  E1 en vivo: reconstruir la API (aplica migración + siembra)._
+- **E1–E5 COMPLETO (§108, gate verde 379).** **E2** cascada de fuentes (`0238142`: parser `ParserPreciosHtml`
+  probado vs el HTML real de gasolinaecuador.com — verificado por web_fetch —, `CascadaPreciosProvider` arch→camddepe→
+  gasolinaecuador→primicias con User-Agent de navegador, ETag/304, backoff 2h ante 403/429, fallback al sistema).
+  **E3** schedule adaptativo Hangfire `precios-combustible` (`9e91a20`: `PlanificadorPrecios` puro — normal días 1–10
+  a las 08:00 + alerta del 11 14:00 al 12 14:00 —, jitter 0–25/0–8 min, idempotente). **E5** el **detector USA el
+  precio oficial** (`8ef2715`: `PrecioFueraListaRule` vs `context.PreciosOficiales`, tolerancia cero ±1¢ por redondeo
+  del POS; **mapeo confirmado por precio: 1=Súper excluida / 2=Extra-Ecopaís $3,31 / 3=Diésel $3,25**; fallback al
+  mínimo del día en histórico). **E4** `/salud` (modo + estado escalonado OK/Warning/Error/Critico/Urgente) + `/historial`
+  (`bfb2a0f`). **Anti-detección:** construido respetuoso, NO evasión de anti-bot. _Para verlo en vivo: reconstruir la
+  API (aplica migración + siembra); el scraping corre solo según el schedule o se fuerza con POST /refrescar._
 
 ---
 

@@ -3209,9 +3209,46 @@ tabla `precios_combustible_log` (fuente, disparo, resultado, variación, etag, h
 (`EsRegulado`, `PrecioApi`, `PrecioPendiente`, `FuentesDegradadas`) + tarjeta de dashboard con los 4 combustibles,
 badges Regulado/Referencial y pendiente. Migración `PreciosCombustibleSistemaApiLog` + 2 pruebas (rango, bitácora).
 
-**Pendiente (próximas etapas):** **E2** cascada de fuentes (arch.gob.ec → camddepe → gasolinaecuador → primicias)
-con ETag/304 y backoff; **E3** schedule adaptativo (normal días 1–10 con jitter; alerta días 11–12 horario,
-idempotente); **E4** endpoints `/salud`, `/historial`, `/admin/refresh`, `/admin/precio` + alertas escalonadas
-(Nivel 1–4); **E5** detector tolerancia cero en regulados — **necesita que Steven confirme qué código de producto
-(1/2/3) es Extra/Ecopaís/Diésel** antes de activarlo. **Para verlo en vivo:** reconstruir la API (migración + siembra).
+**Pendiente (próximas etapas):** E2–E5 (ver §108). **Para verlo en vivo:** reconstruir la API (migración + siembra).
 Commit: `b9f3541`.
+
+---
+
+## 108. Sistema de precios robusto — Etapas E2–E5 (cascada, schedule, salud, detector). COMPLETO
+
+Continuación de §107. Cuatro etapas, cada una con gate verde + commit.
+
+**E2 · Cascada de fuentes públicas (`0238142`). Gate 358.** Scraper robusto y RESPETUOSO (no evasión de anti-bot).
+`ParserPreciosHtml` extrae los precios del HTML por regex (combustible + `$precio` cercano, coma=decimal EC, moda
+dentro de rango) — **probado contra el formato REAL de gasolinaecuador.com** (verificado por `web_fetch`: "Extra↑
++4,61% $3,310 por galón"; confirma los precios al centavo y que la Súper real es $5,65). `CascadaPreciosProvider`
+intenta las fuentes en orden (arch → camddepe → **gasolinaecuador** (verificada) → primicias) con un solo
+User-Agent de navegador real, **ETag/304** (no re-descarga si no cambió), **backoff** (degrada la fuente 2 h ante
+403/429), pausa 3–12 s entre fuentes y caída a la siguiente; devuelve el primer set válido. El servicio registra
+el precio observado (`RegistrarApi`), lo **promueve** al sistema solo si pasa rango+banda, audita cada intento en
+`precios_combustible_log` y conserva el sistema si todo falla. Fuentes configurables en appsettings. +5 pruebas.
+
+**E3 · Schedule adaptativo (`9e91a20`). Gate 371.** Job Hangfire `precios-combustible` (tick horario). La decisión
+de horario es pura y testeable (`PlanificadorPrecios`, hora local de Ecuador): **MODO NORMAL** días 1–10 en la hora
+08:00; **MODO ALERTA** del 11 14:00 al 12 14:00 (cuando cambia el precio el día 12); resto inactivo. El job aplica
+**jitter** (duerme aleatorio 0–25 min normal / 0–8 min alerta) y es **idempotente** (normal: 1×/día; alerta: si ya
+capturó un precio nuevo en la ventana, no repite). +13 pruebas del planificador.
+
+**E5 · El detector USA el precio oficial (`8ef2715`). Gate 377.** **Mapeo de producto CONFIRMADO por precio** (idea
+de Steven, cruzando el salto de banda del 12-jun): **1=Súper** (libre mercado, excluida), **2=Extra/Ecopaís**
+($3,31), **3=Diésel** ($3,25). `PrecioFueraListaRule` compara cada despacho contra el **precio oficial regulado
+vigente a su fecha** con **tolerancia cero ± 1 centavo** (el POS cobra ~$0,002 sobre el oficial). Cobrar distinto
+(por encima O por debajo) en un regulado es fuera de lista; la Súper se ignora. Si no hay precio oficial para la
+fecha (histórico de otra banda), cae a la heurística del mínimo del día. El job carga los precios oficiales y los
+pasa en `DetectionContext.PreciosOficiales`. +6 pruebas. Los tests de Precio y el E2E siguen verdes (camino aditivo).
+
+**E4 · Salud e historial (`bfb2a0f`). Gate 379.** `GET /api/v1/precios-combustible/salud`: modo del schedule, estado
+**escalonado** (OK/Warning/Error/Critico/Urgente, computado de la bitácora), última actualización/fuente, último
+error y fuentes degradadas. `GET /historial?meses=12`: la bitácora reciente. Las alertas escalonadas (N1–N4) viven
+en la bitácora y se exponen por `/salud` (logs primero). +2 pruebas.
+
+**→ SISTEMA DE PRECIOS COMPLETO.** Automático (Hangfire), reactivo (dashboard re-consulta), robusto (cascada +
+validación con bandas + fallback al sistema), auditado (`precios_combustible_log`) y **usado por el detector**.
+**Anti-detección:** se construyó respetuoso (no evasión). **Para verlo en vivo:** reconstruir la API (migración +
+siembra); el scraping corre solo según el schedule, o se fuerza con `POST /refrescar`. Commits: `0238142`, `9e91a20`,
+`8ef2715`, `bfb2a0f`.
