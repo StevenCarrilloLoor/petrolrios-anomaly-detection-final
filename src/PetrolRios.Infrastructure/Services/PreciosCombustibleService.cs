@@ -146,6 +146,55 @@ public sealed class PreciosCombustibleService : IPreciosCombustibleService
         return await ObtenerVigentesAsync(ct);
     }
 
+    public async Task<SaludPreciosResponse> ObtenerSaludAsync(CancellationToken ct = default)
+    {
+        var modo = Precios.PlanificadorPrecios
+            .Modo(Precios.PlanificadorPrecios.AhoraEcuador(DateTime.UtcNow)).ToString();
+        var degradadas = _externo.FuentesDegradadas;
+
+        var ultimoOk = await _db.PreciosCombustibleLog.AsNoTracking()
+            .Where(l => l.Resultado == "actualizado")
+            .OrderByDescending(l => l.CreatedAt).FirstOrDefaultAsync(ct);
+        var ultimoErr = await _db.PreciosCombustibleLog.AsNoTracking()
+            .Where(l => l.Resultado == "error")
+            .OrderByDescending(l => l.CreatedAt).FirstOrDefaultAsync(ct);
+
+        var errorReciente = ultimoErr is not null && ultimoErr.CreatedAt >= DateTime.UtcNow.AddHours(-2);
+        var sinActualizar = ultimoOk is null ? (TimeSpan?)null : DateTime.UtcNow - ultimoOk.CreatedAt;
+
+        var estado = "OK";
+        string? detalle = null;
+        if (errorReciente && modo == nameof(Precios.ModoScrapePrecios.Alerta))
+        { estado = "Critico"; detalle = "Falló el scraping durante la ventana de cambio de precio."; }
+        else if (errorReciente)
+        { estado = "Error"; detalle = "El último intento de scraping falló; se reintentará."; }
+        else if (sinActualizar is { TotalDays: > 40 })
+        { estado = "Urgente"; detalle = "Sin actualización de precio en más de 40 días; conviene revisar."; }
+        else if (degradadas.Count > 0)
+        { estado = "Warning"; detalle = $"Fuente(s) degradada(s): {string.Join(", ", degradadas)}."; }
+
+        return new SaludPreciosResponse(
+            modo, estado, detalle,
+            ultimoOk?.CreatedAt,
+            ultimoOk?.Fuente ?? _externo.UltimaFuente,
+            ultimoErr is not null ? $"{ultimoErr.CreatedAt:yyyy-MM-dd HH:mm} UTC ({ultimoErr.Fuente})" : null,
+            degradadas);
+    }
+
+    public async Task<IReadOnlyList<HistorialPrecioItem>> ObtenerHistorialAsync(
+        int meses = 12, CancellationToken ct = default)
+    {
+        var desde = DateTime.UtcNow.AddMonths(-Math.Clamp(meses, 1, 60));
+        var filas = await _db.PreciosCombustibleLog.AsNoTracking()
+            .Where(l => l.CreatedAt >= desde)
+            .OrderByDescending(l => l.CreatedAt)
+            .Take(500)
+            .ToListAsync(ct);
+        return filas.Select(l => new HistorialPrecioItem(
+            l.CreatedAt, l.Producto.ToString(), l.PrecioAnterior, l.PrecioNuevo,
+            l.VariacionPorcentual, l.Fuente, l.Disparo, l.Resultado)).ToList();
+    }
+
     private PreciosCombustibleResponse Construir(IReadOnlyList<PrecioCombustible> filas)
     {
         var precios = filas

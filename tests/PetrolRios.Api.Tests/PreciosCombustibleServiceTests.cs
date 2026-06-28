@@ -112,6 +112,29 @@ public sealed class PreciosCombustibleServiceTests : IDisposable
         r.Precios.Select(p => p.Producto).Should().Contain(["Extra", "Diesel"]);
     }
 
+    [Fact]
+    public async Task Historial_DevuelveLaBitacoraTrasUnaActualizacion()
+    {
+        await _sut.ActualizarAsync(new ActualizarPrecioCombustibleRequest(
+            "Diesel", 3.40m, 1.60m, new DateTime(2026, 7, 12), new DateTime(2026, 8, 11), null));
+
+        var hist = await _sut.ObtenerHistorialAsync(12);
+
+        hist.Should().ContainSingle();
+        hist[0].Producto.Should().Be("Diesel");
+        hist[0].Resultado.Should().Be("actualizado");
+    }
+
+    [Fact]
+    public async Task Salud_SinErroresNiDegradadas_EsOk()
+    {
+        var salud = await _sut.ObtenerSaludAsync();
+
+        salud.Estado.Should().Be("OK");
+        salud.FuentesDegradadas.Should().BeEmpty();
+        salud.ModoSchedule.Should().BeOneOf("Normal", "Alerta", "Inactivo");
+    }
+
     public void Dispose()
     {
         _db.Dispose();

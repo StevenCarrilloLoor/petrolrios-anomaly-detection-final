@@ -40,3 +40,24 @@ public sealed record PrecioCombustibleExterno(
     decimal Subsidio,
     DateTime VigenteDesde,
     DateTime? VigenteHasta);
+
+/// <summary>Salud del subsistema de precios: modo del schedule, estado, última actualización y fuentes caídas.</summary>
+public sealed record SaludPreciosResponse(
+    string ModoSchedule,                       // Normal | Alerta | Inactivo
+    string Estado,                             // OK | Warning | Error | Critico | Urgente
+    string? Detalle,
+    DateTime? UltimaActualizacion,
+    string? UltimaFuente,
+    string? UltimoError,
+    IReadOnlyList<string> FuentesDegradadas);
+
+/// <summary>Una entrada de la bitácora de precios (para el historial).</summary>
+public sealed record HistorialPrecioItem(
+    DateTime Fecha,
+    string Producto,
+    decimal? PrecioAnterior,
+    decimal? PrecioNuevo,
+    decimal? VariacionPorcentual,
+    string Fuente,
+    string Disparo,
+    string Resultado);

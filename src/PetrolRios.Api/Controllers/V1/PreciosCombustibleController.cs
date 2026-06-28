@@ -44,10 +44,23 @@ public sealed class PreciosCombustibleController : ControllerBase
         }
     }
 
-    /// <summary>Refresca los precios desde la fuente externa configurada (si hay). Solo administradores.</summary>
+    /// <summary>Refresca los precios desde la cascada de fuentes (fuerza la corrida). Solo administradores.</summary>
     [HttpPost("refrescar")]
     [Authorize(Roles = "Administrador", Policy = "Central")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<PreciosCombustibleResponse>> Refrescar(CancellationToken ct) =>
         Ok(await _precios.RefrescarDesdeFuenteAsync("manual", ct));
+
+    /// <summary>Salud del subsistema de precios: modo del schedule, estado, última actualización, fuentes caídas.</summary>
+    [HttpGet("salud")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<SaludPreciosResponse>> Salud(CancellationToken ct) =>
+        Ok(await _precios.ObtenerSaludAsync(ct));
+
+    /// <summary>Historial (bitácora) de los últimos N meses, lo más reciente primero.</summary>
+    [HttpGet("historial")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<HistorialPrecioItem>>> Historial(
+        [FromQuery] int meses = 12, CancellationToken ct = default) =>
+        Ok(await _precios.ObtenerHistorialAsync(meses, ct));
 }

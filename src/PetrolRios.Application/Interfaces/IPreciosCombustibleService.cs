@@ -24,6 +24,12 @@ public interface IPreciosCombustibleService
     /// (manual | modo_normal_08h | modo_alerta_horario) para la auditoría.
     /// </summary>
     Task<PreciosCombustibleResponse> RefrescarDesdeFuenteAsync(string disparo = "manual", CancellationToken ct = default);
+
+    /// <summary>Salud del subsistema: modo del schedule, estado, última actualización, fuentes degradadas.</summary>
+    Task<SaludPreciosResponse> ObtenerSaludAsync(CancellationToken ct = default);
+
+    /// <summary>Historial (bitácora) de los últimos N meses, lo más reciente primero.</summary>
+    Task<IReadOnlyList<HistorialPrecioItem>> ObtenerHistorialAsync(int meses = 12, CancellationToken ct = default);
 }
 
 /// <summary>
