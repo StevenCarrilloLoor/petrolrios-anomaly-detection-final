@@ -306,6 +306,25 @@ public class InvoiceAnomalyDetectorTests
     }
 
     [Fact]
+    public async Task DetectAsync_AnulacionesRecurrentes_IncluyeComprobantesAnuladosEnEvidencia()
+    {
+        // El auditor necesita SABER qué comprobantes se anularon (no solo "N anulaciones") para jalarlos.
+        var anulaciones = new List<AnulacionDto>
+        {
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow),
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow.AddDays(-1)),
+            TestHelpers.CreateAnulacion(fecha: DateTime.UtcNow.AddDays(-2))
+        };
+        var context = TestHelpers.CreateContext(anulaciones: anulaciones);
+
+        var result = await _sut.DetectAsync(context, CancellationToken.None);
+
+        var alerta = result.Should().ContainSingle(a => a.Descripcion.Contains("Anulaciones recurrentes")).Which;
+        alerta.Metadata.Should().ContainKey("Comprobantes");
+        alerta.Descripcion.Should().Contain("001-001-0000001"); // establecimiento-puntoEmisión-secuencial anulado
+    }
+
+    [Fact]
     public async Task DetectAsync_AnulacionesMismoDia_NoGeneraKiting()
     {
         var anulaciones = new List<AnulacionDto>

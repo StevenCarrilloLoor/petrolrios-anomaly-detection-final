@@ -42,24 +42,30 @@ public sealed class DespachoNoFacturadoRule(RiskScoringEngine scoring) : Detecti
             if (!sinFacturar) continue;
             if (despacho.Cantidad <= 0) continue;
 
+            // Nombre real del combustible: si DESP no trae nombre, se resuelve por código (1/2/3).
+            var nombreProd = despacho.NombreProducto.Trim();
+            if (nombreProd.Length == 0) nombreProd = Combustibles.NombrePorCodigo(despacho.CodigoProducto);
+
             var (score, nivel) = Scoring.Calculate(riesgoBase: 35, montoInvolucrado: despacho.VolumenTotal);
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.InvoiceAnomaly,
                 Ambito = carril,
                 Descripcion = $"Despacho {despacho.NumeroDespacho} NO facturado: " +
-                              $"{despacho.Cantidad:F2} gal de {despacho.NombreProducto.Trim()} " +
+                              $"{despacho.Cantidad:F2} gal de {nombreProd} " +
                               $"por ${despacho.VolumenTotal:F2}. Revisar (combustible servido sin cobrar).",
                 Score = score,
                 NivelRiesgo = nivel,
                 EstacionId = context.EstacionId,
                 TransaccionReferencia = $"DESP-NOFACT-{despacho.NumeroDespacho}",
+                Fuente = despacho,   // hereda cliente/manguera/fecha del despacho como evidencia
                 Metadata = new Dictionary<string, object>
                 {
                     ["NumeroDespacho"] = despacho.NumeroDespacho,
                     ["Galones"] = despacho.Cantidad,
                     ["Monto"] = despacho.VolumenTotal,
-                    ["Producto"] = despacho.NombreProducto.Trim(),
+                    ["Combustible"] = nombreProd,
+                    ["Producto"] = despacho.CodigoProducto.Trim(),
                     ["IndicadorFacturado"] = marca.Length == 0 ? "(vacío)" : marca
                 }
             });

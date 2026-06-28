@@ -66,6 +66,17 @@ public sealed class PrecioFueraListaOficialTests
     }
 
     [Fact]
+    public void Marca_IncluyeNombreDelCombustible_NoSoloElCodigo()
+    {
+        // El auditor debe leer "Diésel", no "producto 3". Nombre en la descripción y en el metadata.
+        var r = _sut.Evaluar(Contexto(Det("3", 3.40)), regla: null).ToList();
+        r.Should().ContainSingle();
+        r[0].Descripcion.Should().Contain("Diésel");
+        r[0].Metadata.Should().ContainKey("Combustible");
+        r[0].Metadata["Combustible"].Should().Be("Diésel");
+    }
+
+    [Fact]
     public void Super_AunqueElPrecioVarie_NoMarca()
     {
         // Súper es libre mercado: $6,50 ≠ $5,65 referencial, pero NO se marca (excluida).

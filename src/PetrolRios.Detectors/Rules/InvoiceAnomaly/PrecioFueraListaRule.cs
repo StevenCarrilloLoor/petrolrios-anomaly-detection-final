@@ -35,6 +35,7 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
             if (detalle.ValorUnitario <= 0) continue;
 
             var producto = detalle.CodigoProducto.Trim();
+            var nombre = Combustibles.NombrePorCodigo(producto);   // 1→Súper, 2→Extra/Ecopaís, 3→Diésel
             var fecha = detalle.FechaDespacho.Date;
 
             // 1) Precio OFICIAL regulado vigente a la fecha → tolerancia CERO (± epsilon).
@@ -57,7 +58,7 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
                     {
                         TipoDetector = TipoDetector.InvoiceAnomaly,
                         Ambito = carril,
-                        Descripcion = $"Precio fuera de lista (regulado): producto {producto} cobrado a " +
+                        Descripcion = $"Precio fuera de lista (regulado): {nombre} (producto {producto}) cobrado a " +
                                       $"${detalle.ValorUnitario:F3} ({signo} del oficial ${precioOficial:F2})",
                         Score = score,
                         NivelRiesgo = nivel,
@@ -66,6 +67,7 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
                         Fuente = detalle,
                         Metadata = new Dictionary<string, object>
                         {
+                            ["Combustible"] = nombre,
                             ["Producto"] = producto,
                             ["PrecioAplicado"] = detalle.ValorUnitario,
                             ["PrecioOficial"] = precioOficial,
@@ -89,7 +91,7 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
                 {
                     TipoDetector = TipoDetector.InvoiceAnomaly,
                     Ambito = carril,
-                    Descripcion = $"Precio fuera de lista: producto {producto} cobrado a " +
+                    Descripcion = $"Precio fuera de lista: {nombre} (producto {producto}) cobrado a " +
                                   $"${detalle.ValorUnitario:F2} (autorizado: ${precioBase:F2})",
                     Score = score,
                     NivelRiesgo = nivel,
@@ -98,6 +100,7 @@ public sealed class PrecioFueraListaRule(RiskScoringEngine scoring) : DetectionR
                     Fuente = detalle,
                     Metadata = new Dictionary<string, object>
                     {
+                        ["Combustible"] = nombre,
                         ["Producto"] = producto,
                         ["PrecioAplicado"] = detalle.ValorUnitario,
                         ["PrecioAutorizado"] = precioBase,

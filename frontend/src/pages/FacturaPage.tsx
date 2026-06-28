@@ -7,7 +7,7 @@ import {
 } from "@/services/consultas.service";
 import { Spinner } from "@/components/ui/Spinner";
 import { nombreCombustible } from "@/lib/combustibles";
-import { FileText, Printer, AlertTriangle, Fuel, X } from "lucide-react";
+import { FileText, Printer, AlertTriangle, Fuel, X, Download } from "lucide-react";
 
 function money(v: unknown): string {
   const n = typeof v === "number" ? v : Number(v);
@@ -25,6 +25,11 @@ function fecha(v: unknown): string {
   if (!v) return "—";
   const d = new Date(String(v));
   return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString("es-EC");
+}
+/** Número crudo con 2 decimales para el CSV (sin "$", para que Excel lo trate como número). */
+function num2(v: unknown): string {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) : "";
 }
 
 // Tipo de documento (TIP_DCTO) y forma de pago (COD_PAGO) legibles. La auditora pidió ver los nombres,
@@ -56,6 +61,73 @@ function formaPago(code: unknown): string {
   if (c === "—") return "—";
   const label = FORMA_PAGO[c.toUpperCase()];
   return label ? `${label} (${c})` : c;
+}
+
+/** Descarga la factura COMPLETA (cabecera + líneas de surtido) como CSV que abre Excel. Cliente-side. */
+function descargarFacturaCsv(doc: DocumentoFirebird, lineas: DespachoFirebird[], est: string, num: string) {
+  const esc = (v: unknown) => {
+    const s = v == null ? "" : String(v);
+    return /[",;\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const fila = (a: unknown, b: unknown = "") => [esc(a), esc(b)].join(",");
+  const nombreCli = texto(doc.ClienteNombre) !== "—" ? texto(doc.ClienteNombre) : texto(doc.ClienteRazon);
+  const desp = texto(doc.VendedorNombre) !== "—"
+    ? `${texto(doc.VendedorNombre)} (${texto(doc.Vendedor)})`
+    : texto(doc.Vendedor);
+
+  const filas: string[] = [
+    fila("PetrolRíos S.A.", `Estación ${est}`),
+    fila(tipoDoc(doc.TipoDocumento), texto(doc.NumeroDocumento)),
+    fila("Fecha", fecha(doc.Fecha)),
+    "",
+    "CLIENTE",
+    fila("Nombre", nombreCli),
+    fila("Código", texto(doc.Cliente)),
+    fila("RUC / cédula", texto(doc.Ruc)),
+    fila("Dirección", texto(doc.Direccion)),
+    fila("Teléfono", texto(doc.ClienteTelefono)),
+    fila("Correo", texto(doc.ClienteCorreo)),
+    "",
+    "DOCUMENTO",
+    fila("Despachador", desp),
+    fila("Chofer", texto(doc.Chofer)),
+    fila("Placa", texto(doc.Placa)),
+    fila("Forma de pago", formaPago(doc.FormaPago)),
+    fila("Turno", texto(doc.NumeroTurno)),
+    fila("Consecutivo", texto(doc.Consecutivo)),
+    fila("Autorización (SRI)", texto(doc.Autorizacion)),
+    fila("Guía", texto(doc.Guia)),
+    fila("Despacho (origen)", texto(doc.NumeroDespacho)),
+    "",
+    "LÍNEAS DE SURTIDO",
+    ["Producto", "Manguera", "Galones", "Precio unit.", "Total"].map(esc).join(","),
+    ...lineas.map((l) =>
+      [
+        nombreCombustible(l.CodigoProducto) || texto(l.Producto),
+        texto(l.Manguera),
+        num2(l.Galones),
+        num2(l.PrecioUnitario),
+        num2(l.Total),
+      ].map(esc).join(","),
+    ),
+    "",
+    "IMPORTES",
+    fila("Subtotal", num2(doc.Subtotal)),
+    fila("Base (sin IVA)", num2(doc.TotalSinIva)),
+    fila("Descuento", num2(doc.Descuento)),
+    fila("IVA", num2(doc.Iva)),
+    fila("TOTAL", num2(doc.TotalNeto)),
+  ];
+  if (texto(doc.Observaciones) !== "—") filas.push("", fila("Observaciones", texto(doc.Observaciones)));
+
+  // BOM para que Excel respete los acentos.
+  const csv = "﻿" + filas.join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `factura-${(num || "documento").replace(/[^\w.-]+/g, "_")}-${est || "estacion"}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Fila etiqueta→valor dentro de un bloque (cliente / documento). */
@@ -159,10 +231,19 @@ export function FacturaPage() {
         </h1>
         <div className="flex gap-2">
           <button
+            onClick={() => doc && descargarFacturaCsv(doc, lineas, est, num)}
+            disabled={!doc}
+            title="Descargar la factura como archivo Excel (CSV)"
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={15} /> Excel
+          </button>
+          <button
             onClick={() => window.print()}
+            title="Imprimir o guardar como PDF (elige «Guardar como PDF» en el diálogo de impresión)"
             className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
           >
-            <Printer size={15} /> Imprimir
+            <Printer size={15} /> Imprimir / PDF
           </button>
           <button
             onClick={() => window.close()}
