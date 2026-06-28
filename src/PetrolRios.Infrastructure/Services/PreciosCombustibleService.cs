@@ -18,6 +18,7 @@ public sealed class PreciosCombustibleService : IPreciosCombustibleService
 {
     private readonly PetrolRiosDbContext _db;
     private readonly IProveedorPreciosExterno _externo;
+    private readonly IParametrosOperacion _parametros;
     private readonly ILogger<PreciosCombustibleService> _logger;
 
     private const string Nota =
@@ -28,11 +29,40 @@ public sealed class PreciosCombustibleService : IPreciosCombustibleService
     public PreciosCombustibleService(
         PetrolRiosDbContext db,
         IProveedorPreciosExterno externo,
+        IParametrosOperacion parametros,
         ILogger<PreciosCombustibleService> logger)
     {
         _db = db;
         _externo = externo;
+        _parametros = parametros;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Precio EFECTIVO según la preferencia configurada: "Sistema" usa siempre el del sistema; "Api" usa el
+    /// scrapeado si es válido; "Auto" (default) usa el del sistema cuando lo fijó manualmente un admin para el
+    /// período vigente (corrección autoritativa), y si no, el de la API si es válido, y si no, el del sistema.
+    /// Devuelve también el origen ("Sistema"/"API") y la fecha del precio del sistema, para mostrarlos y comparar.
+    /// </summary>
+    public static (decimal Precio, string Origen, DateTime FechaSistema) Vigente(PrecioCombustible f, string? preferencia)
+    {
+        var fechaSistema = f.UpdatedAt ?? f.CreatedAt;
+        var apiValido = f.PrecioApi is decimal pa && RangoValido(f.Producto, pa);
+
+        // Corrección manual del admin vigente (no expirada): es autoritativa, gana sobre la API.
+        var adminFijo = f.Fuente == "Admin"
+            && (f.VigenteHasta == null || DateTime.UtcNow.Date <= f.VigenteHasta.Value.Date);
+
+        var usarApi = (preferencia ?? "Auto").Trim().ToLowerInvariant() switch
+        {
+            "sistema" => false,
+            "api" => apiValido,
+            _ => apiValido && !adminFijo,   // Auto
+        };
+
+        return usarApi
+            ? (f.PrecioApi!.Value, "API", fechaSistema)
+            : (f.PrecioGalon, "Sistema", fechaSistema);
     }
 
     public async Task<PreciosCombustibleResponse> ObtenerVigentesAsync(CancellationToken ct = default)
@@ -197,28 +227,35 @@ public sealed class PreciosCombustibleService : IPreciosCombustibleService
 
     private PreciosCombustibleResponse Construir(IReadOnlyList<PrecioCombustible> filas)
     {
+        var preferencia = _parametros.Actual().PreferenciaPreciosCombustible;
         var precios = filas
             .OrderBy(f => (int)f.Producto)
-            .Select(ToItem)
+            .Select(f => ToItem(f, preferencia))
             .ToList();
         return new PreciosCombustibleResponse(
             precios, "USD", DateTime.UtcNow, Nota, _externo.FuentesDegradadas);
     }
 
-    private static PrecioCombustibleResponse ToItem(PrecioCombustible f) =>
-        new(
+    private static PrecioCombustibleResponse ToItem(PrecioCombustible f, string? preferencia)
+    {
+        var (vigente, origen, fechaSistema) = Vigente(f, preferencia);
+        return new(
             Producto: f.Producto.ToString(),
             Nombre: NombreDe(f.Producto),
             EsRegulado: f.Producto.EsRegulado(),
             PrecioGalon: f.PrecioGalon,
+            FechaSistema: fechaSistema,
             PrecioApi: f.PrecioApi,
             FuenteApi: string.IsNullOrWhiteSpace(f.FuenteApi) ? null : f.FuenteApi,
             ApiActualizadoEn: f.PrecioApiActualizadoEn,
+            PrecioVigente: vigente,
+            OrigenVigente: origen,
             Subsidio: f.Subsidio,
             PrecioPendiente: f.PrecioPendiente,
             VigenteDesde: f.VigenteDesde,
             VigenteHasta: f.VigenteHasta,
             Fuente: f.Fuente);
+    }
 
     private static string NombreDe(TipoCombustible t) => t switch
     {

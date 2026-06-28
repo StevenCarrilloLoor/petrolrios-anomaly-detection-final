@@ -23,6 +23,7 @@ function fmtFecha(iso: string | null): string {
 
 function Tile({ p }: { p: PrecioCombustible }) {
   const color = COLOR[p.producto] ?? "#64748b";
+  const apiEsVigente = p.origenVigente === "API";
   return (
     <div className="rounded-xl border border-neutral-800 bg-neutral-900/50 p-4">
       <div className="flex items-center justify-between gap-2">
@@ -40,10 +41,18 @@ function Tile({ p }: { p: PrecioCombustible }) {
         </span>
       </div>
 
-      {/* Precio del SISTEMA (efectivo) */}
+      {/* Precio VIGENTE (el efectivo según la preferencia) */}
       <div className="mt-2 flex items-baseline gap-1">
-        <span className="text-2xl font-semibold text-white">${p.precioGalon.toFixed(2)}</span>
-        <span className="text-xs text-neutral-500">/ galón · sistema</span>
+        <span className="text-2xl font-semibold text-white">${p.precioVigente.toFixed(2)}</span>
+        <span className="text-xs text-neutral-500">/ galón</span>
+        <span
+          className={`ml-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+            apiEsVigente ? "bg-sky-500/15 text-sky-300" : "bg-neutral-500/15 text-neutral-300"
+          }`}
+          title="Fuente del precio efectivo (preferencia configurable en Ajustes)"
+        >
+          {apiEsVigente ? "vía API" : "vía sistema"}
+        </span>
         {p.precioPendiente && (
           <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
             pendiente
@@ -51,22 +60,32 @@ function Tile({ p }: { p: PrecioCombustible }) {
         )}
       </div>
 
-      {/* Precio observado por la API (comparación) */}
-      <div className="mt-1 text-xs text-neutral-400">
-        API:{" "}
-        {p.precioApi != null ? (
-          <span className="text-neutral-200">
-            ${p.precioApi.toFixed(2)}
-            {p.fuenteApi ? ` · ${p.fuenteApi}` : ""}
-          </span>
-        ) : (
-          <span className="text-neutral-600">sin dato aún</span>
-        )}
+      {/* Comparación: precio del sistema y de la API, cada uno con su fecha */}
+      <div className="mt-2 space-y-0.5 text-xs">
+        <div className={apiEsVigente ? "text-neutral-500" : "text-neutral-300"}>
+          Sistema: <span className="font-medium">${p.precioGalon.toFixed(2)}</span>
+          <span className="text-neutral-600"> · {fmtFecha(p.fechaSistema)}</span>
+        </div>
+        <div className={apiEsVigente ? "text-neutral-300" : "text-neutral-500"}>
+          API:{" "}
+          {p.precioApi != null ? (
+            <>
+              <span className="font-medium">${p.precioApi.toFixed(2)}</span>
+              <span className="text-neutral-600">
+                {" "}
+                · {fmtFecha(p.apiActualizadoEn)}
+                {p.fuenteApi ? ` · ${p.fuenteApi}` : ""}
+              </span>
+            </>
+          ) : (
+            <span className="text-neutral-600">sin dato aún</span>
+          )}
+        </div>
       </div>
 
       {p.subsidio > 0 && (
-        <div className="mt-1 text-xs text-neutral-400">
-          Subsidio: <span className="text-neutral-200">${p.subsidio.toFixed(2)}</span> / gal
+        <div className="mt-1 text-xs text-neutral-500">
+          Subsidio: <span className="text-neutral-300">${p.subsidio.toFixed(2)}</span> / gal
         </div>
       )}
     </div>

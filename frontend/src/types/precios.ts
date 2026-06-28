@@ -6,10 +6,13 @@ export interface PrecioCombustible {
   producto: string; // "Extra" | "Ecopais" | "Diesel" | "Super"
   nombre: string;
   esRegulado: boolean;
-  precioGalon: number; // sistema (efectivo)
+  precioGalon: number; // precio del SISTEMA (manual/sembrado)
+  fechaSistema: string; // cuándo se fijó el precio del sistema
   precioApi: number | null; // último observado por scraping
   fuenteApi: string | null;
   apiActualizadoEn: string | null;
+  precioVigente: number; // EL EFECTIVO según la preferencia
+  origenVigente: string; // "Sistema" | "API"
   subsidio: number;
   precioPendiente: boolean;
   vigenteDesde: string;

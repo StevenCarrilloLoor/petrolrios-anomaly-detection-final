@@ -335,11 +335,16 @@ public sealed class AnomalyDetectionJob
             .AsNoTracking()
             .ToDictionaryAsync(p => p.Producto, ct);
 
+        // El detector usa el precio EFECTIVO (sistema vs API según la preferencia configurada), no el del sistema a secas.
+        var preferencia = _parametros.Actual().PreferenciaPreciosCombustible;
         var lista = new List<PrecioOficialContexto>();
         foreach (var (codigo, combustible) in MapaProductoCombustible)
             if (porCombustible.TryGetValue(combustible, out var p))
+            {
+                var (precio, _, _) = Services.PreciosCombustibleService.Vigente(p, preferencia);
                 lista.Add(new PrecioOficialContexto(
-                    codigo, p.PrecioGalon, combustible.EsRegulado(), p.VigenteDesde, p.VigenteHasta));
+                    codigo, precio, combustible.EsRegulado(), p.VigenteDesde, p.VigenteHasta));
+            }
         return lista;
     }
 

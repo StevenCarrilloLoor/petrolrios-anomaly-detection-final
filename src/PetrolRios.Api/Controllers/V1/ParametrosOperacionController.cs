@@ -47,6 +47,10 @@ public sealed class ParametrosOperacionController : ControllerBase
                           "Mejor elige una opción de la lista en Ajustes."
             });
 
+        var preferencia = (config.PreferenciaPreciosCombustible ?? "Auto").Trim();
+        if (!new[] { "Auto", "Api", "Sistema" }.Contains(preferencia, StringComparer.OrdinalIgnoreCase))
+            return BadRequest(new { mensaje = "Preferencia de precio inválida. Use Auto, Api o Sistema." });
+
         // Aplicar el nuevo cron re-registrando el job. Hangfire PARSEA el cron aquí y lanza si es inválido
         // ANTES de tocar el almacenamiento, así que lo registramos primero dentro de try/catch: si el cron
         // está mal, devolvemos 400 sin persistir ni dejar el job en mal estado (el anterior sigue vigente).
@@ -68,7 +72,7 @@ public sealed class ParametrosOperacionController : ControllerBase
 
         // Cron válido y job aplicado: ahora sí persistimos (con el cron ya normalizado/recortado).
         // La tasa de refresco se acota en el store (1 s … 1 h); 0/negativo cae al valor por defecto.
-        _store.Guardar(new OperacionConfig(config.NivelMinimoCorreo, cron, config.RefrescoSegundos));
+        _store.Guardar(new OperacionConfig(config.NivelMinimoCorreo, cron, config.RefrescoSegundos, preferencia));
 
         return Ok(_store.Actual());
     }

@@ -70,22 +70,17 @@ public class PrecioCombustible : BaseEntity
     }
 
     /// <summary>
-    /// Registra el precio observado por el scraper. Siempre guarda el valor crudo (para comparar). Si
-    /// <paramref name="promover"/> es true (precio válido dentro de banda), también lo asciende a precio del
-    /// SISTEMA (efectivo). Limpia <see cref="PrecioPendiente"/> al promover.
+    /// Registra el precio observado por el scraper, SIN pisar el precio del SISTEMA: ambos quedan guardados
+    /// por separado para comparar, y la preferencia configurable decide cuál es el efectivo (ver
+    /// <c>PreciosCombustibleService.Vigente</c>). No toca <c>UpdatedAt</c> (eso es para el precio del sistema),
+    /// así la fecha de cada fuente queda independiente. Si el valor es válido, limpia el flag de pendiente.
     /// </summary>
-    public void RegistrarApi(decimal precioApi, string fuenteApi, DateTime cuando, bool promover)
+    public void RegistrarApi(decimal precioApi, string fuenteApi, DateTime cuando, bool valido)
     {
         PrecioApi = precioApi;
         FuenteApi = (fuenteApi ?? string.Empty).Trim();
         PrecioApiActualizadoEn = DateTime.SpecifyKind(cuando, DateTimeKind.Utc);
-        if (promover)
-        {
-            PrecioGalon = precioApi;
-            Fuente = FuenteApi;
-            PrecioPendiente = false;
-        }
-        UpdatedAt = DateTime.UtcNow;
+        if (valido) PrecioPendiente = false;
     }
 
     /// <summary>Marca/limpia el flag de precio pendiente (Súper que aún no confirma su valor del período).</summary>

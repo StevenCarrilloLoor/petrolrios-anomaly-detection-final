@@ -8,6 +8,8 @@ export interface OperacionConfig {
   nivelMinimoCorreo: string;
   cronExpression: string;
   refrescoSegundos: number;
+  // "Auto" | "Api" | "Sistema": qué fuente manda como precio de combustible efectivo.
+  preferenciaPreciosCombustible: string;
 }
 
 export const operacionService = {

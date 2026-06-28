@@ -1,7 +1,9 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using PetrolRios.Application.DTOs.Combustible;
+using PetrolRios.Application.DTOs.Configuracion;
 using PetrolRios.Application.Interfaces;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
@@ -39,7 +41,10 @@ public sealed class PreciosCombustibleServiceTests : IDisposable
         _db.PreciosCombustible.Add(PrecioCombustible.Create(TipoCombustible.Diesel, 3.25m, 1.602m, desde, hasta, "seed"));
         _db.PreciosCombustible.Add(PrecioCombustible.Create(TipoCombustible.Extra, 3.31m, 1.021m, desde, hasta, "seed"));
         _db.SaveChanges();
-        _sut = new PreciosCombustibleService(_db, new ProveedorDeshabilitado(), NullLogger<PreciosCombustibleService>.Instance);
+        var parametros = new Mock<IParametrosOperacion>();
+        parametros.Setup(p => p.Actual()).Returns(new OperacionConfig("Critico", "*/5 * * * *", 1, "Auto"));
+        _sut = new PreciosCombustibleService(
+            _db, new ProveedorDeshabilitado(), parametros.Object, NullLogger<PreciosCombustibleService>.Instance);
     }
 
     [Fact]

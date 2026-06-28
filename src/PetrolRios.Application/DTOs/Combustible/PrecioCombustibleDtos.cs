@@ -6,10 +6,13 @@ public sealed record PrecioCombustibleResponse(
     string Producto,
     string Nombre,
     bool EsRegulado,
-    decimal PrecioGalon,          // precio del SISTEMA (efectivo: el que sirve y usan los detectores)
+    decimal PrecioGalon,          // precio del SISTEMA (manual/sembrado)
+    DateTime FechaSistema,        // cuándo se fijó el precio del sistema
     decimal? PrecioApi,           // último precio observado por el scraper (null si aún no hay)
     string? FuenteApi,
     DateTime? ApiActualizadoEn,
+    decimal PrecioVigente,        // EL EFECTIVO según la preferencia (el que sirve y usan los detectores)
+    string OrigenVigente,         // "Sistema" | "API"
     decimal Subsidio,
     bool PrecioPendiente,
     DateTime VigenteDesde,

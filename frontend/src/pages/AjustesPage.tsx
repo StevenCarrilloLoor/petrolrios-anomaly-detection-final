@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { conexionBaseService } from "@/services/conexionBase.service";
 import { operacionService, type OperacionConfig } from "@/services/operacion.service";
+import { preciosService } from "@/services/precios.service";
 import type {
   ConexionActiva,
   ProbarConexionRequest,
@@ -384,10 +385,33 @@ function SeccionOperacion() {
     nivelMinimoCorreo: "Critico",
     cronExpression: "*/5 * * * *",
     refrescoSegundos: 1,
+    preferenciaPreciosCombustible: "Auto",
   });
   const [guardado, setGuardado] = useState<{ ok: boolean; texto: string } | null>(null);
   const [cargando, setCargando] = useState(false);
   const [avanzado, setAvanzado] = useState(false);
+  const [refrescoPrecios, setRefrescoPrecios] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [refrescando, setRefrescando] = useState(false);
+
+  const onRefrescarPrecios = async () => {
+    setRefrescando(true);
+    setRefrescoPrecios(null);
+    try {
+      const r = await preciosService.refrescar();
+      const conApi = r.precios.filter((p) => p.precioApi != null).length;
+      setRefrescoPrecios({
+        ok: true,
+        texto:
+          conApi > 0
+            ? `Cascada ejecutada: ${conApi} de ${r.precios.length} combustibles con dato de la API.`
+            : "Cascada ejecutada, pero ninguna fuente devolvió precios (se conservan los del sistema).",
+      });
+    } catch {
+      setRefrescoPrecios({ ok: false, texto: "No se pudo ejecutar el refresco de precios." });
+    } finally {
+      setRefrescando(false);
+    }
+  };
 
   useEffect(() => {
     let activo = true;
@@ -484,6 +508,44 @@ function SeccionOperacion() {
             <p className="mt-1 text-xs text-muted-foreground">
               Cada cuánto TODAS las pantallas vuelven a consultar al servidor. 1 s = casi en vivo; súbelo
               si el equipo va lento.
+            </p>
+          </Campo>
+        </div>
+
+        {/* Precio de combustible: preferencia de fuente + ejecutar el job manualmente */}
+        <div className="grid grid-cols-1 gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
+          <Campo label="Precio de combustible: ¿qué fuente manda?">
+            <select
+              className={inputCls}
+              value={config.preferenciaPreciosCombustible}
+              onChange={(e) => setConfig({ ...config, preferenciaPreciosCombustible: e.target.value })}
+            >
+              <option value="Auto">Automático (la API si es más reciente; tu corrección manual manda)</option>
+              <option value="Api">Siempre la API (precio scrapeado)</option>
+              <option value="Sistema">Siempre el del sistema (manual / sembrado)</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Define cuál es el precio EFECTIVO (el que usan los detectores). Igual se guardan y muestran
+              ambos —sistema y API— para poder comparar y detectar errores.
+            </p>
+          </Campo>
+          <Campo label="Probar la API de precios ahora">
+            <button
+              type="button"
+              onClick={onRefrescarPrecios}
+              disabled={refrescando}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-muted/50 disabled:opacity-60"
+            >
+              {refrescando ? <Loader2 size={15} className="animate-spin" /> : <span>↻</span>}
+              Ejecutar refresco de precios
+            </button>
+            {refrescoPrecios && (
+              <p className={`mt-1 text-xs ${refrescoPrecios.ok ? "text-emerald-500" : "text-red-500"}`}>
+                {refrescoPrecios.texto}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              Fuerza la cascada de fuentes sin esperar al calendario. Útil para verificar que el scraping funciona.
             </p>
           </Campo>
         </div>
