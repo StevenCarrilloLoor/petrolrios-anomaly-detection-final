@@ -153,8 +153,14 @@ public sealed class Worker : BackgroundService
                 if (string.Equals(c.Tabla, "DESP", StringComparison.OrdinalIgnoreCase))
                     filas = await _extractor.ConsultarDespachosAsync(c.Codigo, c.Limite, ct);
                 else if (string.IsNullOrWhiteSpace(c.Tabla) || string.Equals(c.Tabla, "DCTO", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Varios tags ANDados (placa Y despachador…); si no vienen, se usa el código único.
+                    var codigos = c.Codigos is { Count: > 0 }
+                        ? c.Codigos
+                        : (string.IsNullOrWhiteSpace(c.Codigo) ? null : new[] { c.Codigo! });
                     filas = await _extractor.ConsultarDocumentosAsync(
-                        c.TipoDocumento, c.FechaDesde, c.FechaHasta, c.Codigo, c.Limite, ct);
+                        c.TipoDocumento, c.FechaDesde, c.FechaHasta, codigos, c.Limite, ct);
+                }
                 else if (string.Equals(c.Tabla, "LIQUIDACIONES", StringComparison.OrdinalIgnoreCase))
                     filas = await _extractor.ConsultarLiquidacionesAsync(c.FechaDesde, c.FechaHasta, c.Limite, ct);
                 else

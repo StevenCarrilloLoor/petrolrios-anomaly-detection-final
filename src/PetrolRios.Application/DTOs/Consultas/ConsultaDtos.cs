@@ -13,7 +13,9 @@ public sealed record SolicitudConsulta(
     DateTime? FechaHasta,
     string? Codigo,            // coincide con RUC, placa, cliente, despachador o n.º de documento
     int Limite = 200,
-    string Tabla = "DCTO");    // "DCTO" = documentos (defecto); "DESP" = líneas de surtidor por NUM_DESP
+    string Tabla = "DCTO",     // "DCTO" = documentos (defecto); "DESP" = líneas de surtidor por NUM_DESP
+    IReadOnlyList<string>? Codigos = null);  // varios tags ANDados (p. ej. placa Y despachador a la vez);
+                                             // si viene null/vacío se usa Codigo (compatibilidad).
 
 /// <summary>Consulta pendiente que el agente recoge en su heartbeat (sin el código de estación, ya es suyo).</summary>
 public sealed record ConsultaPendiente(
@@ -23,7 +25,8 @@ public sealed record ConsultaPendiente(
     DateTime? FechaHasta,
     string? Codigo,
     int Limite,
-    string Tabla = "DCTO");
+    string Tabla = "DCTO",
+    IReadOnlyList<string>? Codigos = null);
 
 /// <summary>Estado/resultado de una consulta, que la interfaz sondea hasta que esté "Listo" o "Error".</summary>
 public sealed record ConsultaEstado(

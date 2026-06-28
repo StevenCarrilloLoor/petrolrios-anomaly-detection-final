@@ -121,8 +121,27 @@ const CLAVES_BUSCABLES = new Set([
 ]);
 
 // Claves cuyo valor es un NÚMERO DE FACTURA: ofrecen "Ver factura" → abre la factura COMPLETA en vivo
-// (FacturaPage) en una ventana nueva, para compararla lado a lado (lo pidió la auditora).
-const CLAVES_FACTURA = new Set(["NumeroDocumento", "NumerosFactura"]);
+// (FacturaPage) en una ventana nueva, para compararla lado a lado (lo pidió la auditora). Incluye las
+// LISTAS de documentos que emiten las reglas agregadas (Documentos en MultipleCombustible/DespachosRapidos,
+// NumerosFactura en PlacaReutilizada) → así CADA documento de la lista es un enlace a su factura, no solo
+// el primero. Es genérico (depende de la clave, no de la regla) para no chocar con el creador de reglas.
+const CLAVES_FACTURA = new Set(["NumeroDocumento", "NumerosFactura", "Documentos"]);
+
+// Evita la duplicación incómoda: si una lista (Documentos/NumerosFactura) ya incluye el "NumeroDocumento"
+// suelto (que viene del Fuente automático), no se muestra el suelto — la lista ya lo enlaza como factura.
+// Solo se filtra cuando el valor está contenido en la lista; cualquier otra clave se conserva. Genérico.
+function evidenciaSinDuplicados(metadata: Record<string, unknown>): [string, unknown][] {
+  const enLista = new Set(
+    ["Documentos", "NumerosFactura"]
+      .map((k) => metadata[k])
+      .filter((v): v is unknown[] => Array.isArray(v))
+      .flat()
+      .map((v) => String(v).trim()),
+  );
+  return Object.entries(metadata).filter(
+    ([clave, valor]) => clave !== "NumeroDocumento" || !enLista.has(String(valor ?? "").trim()),
+  );
+}
 
 /**
  * Abre la consulta EN VIVO (Consultas) filtrada por un valor (RUC, placa, cliente o despachador) en la
@@ -339,7 +358,7 @@ export function DetalleAlertaPage() {
               Evidencia de la detección
             </h3>
             <div className="grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg bg-muted/50 p-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Object.entries(metadata).map(([clave, valor]) => (
+              {evidenciaSinDuplicados(metadata).map(([clave, valor]) => (
                 <div
                   key={clave}
                   className="flex items-start justify-between gap-3 border-b border-border/50 py-1.5 last:border-0"

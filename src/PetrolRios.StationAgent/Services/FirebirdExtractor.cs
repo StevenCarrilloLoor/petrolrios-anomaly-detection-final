@@ -1,3 +1,4 @@
+using System.Text;
 using Dapper;
 using FirebirdSql.Data.FirebirdClient;
 using Microsoft.Extensions.Logging;
@@ -74,9 +75,38 @@ public sealed class FirebirdExtractor
     /// heartbeat. Nunca modifica la base (la conexión es ReadOnly y solo se hace SELECT).
     /// </summary>
     public async Task<IReadOnlyList<Dictionary<string, object?>>> ConsultarDocumentosAsync(
-        string? tipoDocumento, DateTime? desde, DateTime? hasta, string? codigo, int limite, CancellationToken ct)
+        string? tipoDocumento, DateTime? desde, DateTime? hasta, IReadOnlyList<string>? codigos, int limite, CancellationToken ct)
     {
         var top = Math.Clamp(limite <= 0 ? 200 : limite, 1, 1000);
+
+        // Búsqueda por VARIOS criterios ("tags") combinados con AND: cada tag debe coincidir en ALGUNA de
+        // las columnas buscables (RUC, placa, cliente, n.º de documento o despachador). Así el auditor puede
+        // buscar, p. ej., por placa Y despachador a la vez. Escalable a cualquier cantidad (se acotan a 10
+        // por prudencia). Cada tag va PARAMETRIZADO (@codigo0, @codigo1…) → SOLO LECTURA y sin inyección.
+        var tags = (codigos ?? Array.Empty<string>())
+            .Select(c => c?.Trim() ?? string.Empty)
+            .Where(c => c.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(10)
+            .ToList();
+
+        var prm = new DynamicParameters();
+        prm.Add("tipo", string.IsNullOrWhiteSpace(tipoDocumento) ? null : tipoDocumento.Trim());
+        prm.Add("desde", desde);
+        prm.Add("hasta", hasta);
+
+        var filtroCodigos = new StringBuilder();
+        for (var i = 0; i < tags.Count; i++)
+        {
+            prm.Add($"codigo{i}", tags[i]);
+            // El CAST(col AS VARCHAR(60)) evita "string right truncation" cuando el tag es más largo que una
+            // columna estrecha (p. ej. PLA_DCTO CHAR(8) vs un RUC de 13).
+            filtroCodigos.Append($"\n              AND (CAST(d.RUC_DCTO AS VARCHAR(60)) CONTAINING @codigo{i}");
+            filtroCodigos.Append($"\n                   OR CAST(d.PLA_DCTO AS VARCHAR(60)) CONTAINING @codigo{i}");
+            filtroCodigos.Append($"\n                   OR CAST(d.COD_CLIE AS VARCHAR(60)) CONTAINING @codigo{i}");
+            filtroCodigos.Append($"\n                   OR CAST(d.NUM_DCTO AS VARCHAR(60)) CONTAINING @codigo{i}");
+            filtroCodigos.Append($"\n                   OR CAST(d.COD_VEND AS VARCHAR(60)) CONTAINING @codigo{i})");
+        }
         // Los alias van ENTRE COMILLAS para que Firebird preserve el PascalCase (sin comillas los pasa a
         // MAYÚSCULAS y el frontend, que lee NumeroDocumento/TotalNeto/etc., vería la tabla vacía).
         // El CAST(col AS VARCHAR(60)) en el filtro por código es CLAVE: en "col CONTAINING @codigo" Firebird
@@ -110,22 +140,9 @@ public sealed class FirebirdExtractor
             LEFT JOIN VEND v ON v.COD_VEND = d.COD_VEND
             WHERE (@tipo IS NULL OR d.TIP_DCTO = @tipo)
               AND (@desde IS NULL OR d.FEC_DCTO >= @desde)
-              AND (@hasta IS NULL OR d.FEC_DCTO <= @hasta)
-              AND (@codigo IS NULL
-                   OR CAST(d.RUC_DCTO AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(d.PLA_DCTO AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(d.COD_CLIE AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(d.NUM_DCTO AS VARCHAR(60)) CONTAINING @codigo
-                   OR CAST(d.COD_VEND AS VARCHAR(60)) CONTAINING @codigo)
+              AND (@hasta IS NULL OR d.FEC_DCTO <= @hasta){filtroCodigos}
             ORDER BY d.FEC_DCTO DESC
             """;
-        var prm = new
-        {
-            tipo = string.IsNullOrWhiteSpace(tipoDocumento) ? null : tipoDocumento.Trim(),
-            desde,
-            hasta,
-            codigo = string.IsNullOrWhiteSpace(codigo) ? null : codigo.Trim(),
-        };
 
         using var connection = CreateConnection();
         var filas = await connection.QueryAsync(new CommandDefinition(sql, prm, cancellationToken: ct));

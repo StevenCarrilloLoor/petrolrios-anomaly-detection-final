@@ -148,6 +148,85 @@ public sealed class ReporteService : IReporteService
         return documento.GeneratePdf();
     }
 
+    public byte[] GenerarPdfConsultaDocumentos(
+        string? estacion, string? busqueda,
+        IReadOnlyList<string> columnas, IReadOnlyList<IReadOnlyList<string>> filas)
+    {
+        var cols = columnas ?? Array.Empty<string>();
+        var rows = filas ?? Array.Empty<IReadOnlyList<string>>();
+
+        var documento = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4.Landscape());
+                page.Margin(28);
+                page.DefaultTextStyle(t => t.FontSize(8));
+
+                page.Header().Column(col =>
+                {
+                    col.Item().Row(row =>
+                    {
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text("PetrolRíos S.A.").FontSize(16).Bold();
+                            c.Item().Text("Consulta de documentos — datos en vivo de la estación (solo lectura)")
+                                .FontSize(11);
+                        });
+                        row.ConstantItem(180).AlignRight().Column(c =>
+                        {
+                            c.Item().Text($"Generado: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC").FontSize(8);
+                            c.Item().Text($"Total: {rows.Count} documento(s)").FontSize(8).Bold();
+                        });
+                    });
+                    var sub = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(estacion)) sub.Add($"Estación: {estacion}");
+                    if (!string.IsNullOrWhiteSpace(busqueda)) sub.Add($"Búsqueda: {busqueda}");
+                    col.Item().PaddingTop(4)
+                        .Text(sub.Count > 0 ? string.Join("  ·  ", sub) : "Sin filtros").FontSize(8).Italic();
+                    col.Item().PaddingTop(6).LineHorizontal(0.8f);
+                });
+
+                page.Content().PaddingTop(8).Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        foreach (var _ in cols) columns.RelativeColumn();
+                    });
+
+                    table.Header(header =>
+                    {
+                        foreach (var titulo in cols)
+                            header.Cell().Background("#1e293b").Padding(4)
+                                .Text(titulo).FontColor("#ffffff").FontSize(8).Bold();
+                    });
+
+                    var alterna = false;
+                    foreach (var fila in rows)
+                    {
+                        var fondo = alterna ? "#f1f5f9" : "#ffffff";
+                        alterna = !alterna;
+                        for (var i = 0; i < cols.Count; i++)
+                        {
+                            var val = i < fila.Count ? fila[i] : string.Empty;
+                            table.Cell().Background(fondo).Padding(3).Text(val ?? string.Empty).FontSize(7);
+                        }
+                    }
+                });
+
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.Span("Página ").FontSize(8);
+                    text.CurrentPageNumber().FontSize(8);
+                    text.Span(" de ").FontSize(8);
+                    text.TotalPages().FontSize(8);
+                });
+            });
+        });
+
+        return documento.GeneratePdf();
+    }
+
     public async Task<byte[]> GenerarExcelAsync(
         TipoDetector? tipo, NivelRiesgo? nivel, EstadoAlerta? estado,
         int? estacionId, DateTime? desde, DateTime? hasta,

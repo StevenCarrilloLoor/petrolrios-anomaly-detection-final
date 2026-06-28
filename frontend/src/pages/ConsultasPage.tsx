@@ -17,9 +17,11 @@ import {
   AlertTriangle,
   Printer,
   X,
+  Plus,
   Table2,
   Scale,
   Download,
+  FileText,
 } from "lucide-react";
 
 /** Descarga los documentos consultados como CSV (lo abre Excel). Cliente-side, sin pasar por el servidor. */
@@ -107,7 +109,17 @@ export function ConsultasPage() {
   const [tipo, setTipo] = useState(searchParams.get("tipo") ?? "");
   const [desde, setDesde] = useState(searchParams.get("desde") ?? "");
   const [hasta, setHasta] = useState(searchParams.get("hasta") ?? "");
-  const [codigo, setCodigo] = useState(searchParams.get("codigo") ?? "");
+  // Búsqueda con varios criterios ("tags") combinados con AND: p. ej. placa Y despachador a la vez.
+  // Escalable (cualquier cantidad). Arranca con los del deep-link (?codigo=… repetido) o un campo vacío.
+  const [tags, setTags] = useState<string[]>(() => {
+    const all = searchParams.getAll("codigo").filter((t) => t.trim().length > 0);
+    return all.length > 0 ? all : [""];
+  });
+  const setTagAt = (i: number, v: string) => setTags((ts) => ts.map((t, j) => (j === i ? v : t)));
+  const addTag = () => setTags((ts) => [...ts, ""]);
+  const removeTag = (i: number) =>
+    setTags((ts) => (ts.length <= 1 ? [""] : ts.filter((_, j) => j !== i)));
+  const tagsLimpios = () => tags.map((t) => t.trim()).filter((t) => t.length > 0);
 
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,13 +134,13 @@ export function ConsultasPage() {
   });
 
   const buscar = async (
-    override?: Partial<{ estacion: string; tipo: string; desde: string; hasta: string; codigo: string }>,
+    override?: Partial<{ estacion: string; tipo: string; desde: string; hasta: string; codigos: string[] }>,
   ) => {
     const est = override?.estacion ?? estacion;
     const ti = override?.tipo ?? tipo;
     const de = override?.desde ?? desde;
     const ha = override?.hasta ?? hasta;
-    const co = (override?.codigo ?? codigo).trim();
+    const cods = (override?.codigos ?? tags).map((t) => t.trim()).filter((t) => t.length > 0);
 
     if (!est) {
       setError("Elija una estación.");
@@ -139,11 +151,12 @@ export function ConsultasPage() {
     setDocs(null);
 
     // Mantener la consulta en la URL: así la pantalla es enlazable y se puede abrir en ventana nueva.
+    // Cada criterio va como un parámetro `codigo` repetido (?codigo=A&codigo=B) → escalable y deep-linkable.
     const qs = new URLSearchParams({ est });
     if (ti) qs.set("tipo", ti);
     if (de) qs.set("desde", de);
     if (ha) qs.set("hasta", ha);
-    if (co) qs.set("codigo", co);
+    cods.forEach((c) => qs.append("codigo", c));
     setSearchParams(qs, { replace: true });
 
     try {
@@ -152,7 +165,8 @@ export function ConsultasPage() {
         tipoDocumento: ti || null,
         fechaDesde: de || null,
         fechaHasta: ha ? `${ha}T23:59:59` : null,
-        codigo: co || null,
+        codigo: cods[0] ?? null,                  // compatibilidad (un solo criterio)
+        codigos: cods.length > 0 ? cods : null,   // varios criterios ANDados
         limite: 500,
       };
       setDocs(await consultasService.consultarDocumentos(s));
@@ -178,7 +192,7 @@ export function ConsultasPage() {
         tipo: searchParams.get("tipo") ?? "",
         desde: searchParams.get("desde") ?? "",
         hasta: searchParams.get("hasta") ?? "",
-        codigo: searchParams.get("codigo") ?? "",
+        codigos: searchParams.getAll("codigo"),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +202,7 @@ export function ConsultasPage() {
     setTipo("");
     setDesde("");
     setHasta("");
-    setCodigo("");
+    setTags([""]);
     setDocs(null);
     setError(null);
     setFiltrosAplicados(null);
@@ -204,11 +218,45 @@ export function ConsultasPage() {
         ...(filtrosAplicados.tipoDocumento
           ? [{ etiqueta: "Tipo", valor: TIPO_LABEL[filtrosAplicados.tipoDocumento] ?? filtrosAplicados.tipoDocumento }]
           : []),
-        ...(filtrosAplicados.codigo ? [{ etiqueta: "Búsqueda", valor: filtrosAplicados.codigo }] : []),
+        ...((filtrosAplicados.codigos ?? (filtrosAplicados.codigo ? [filtrosAplicados.codigo] : []))
+          .filter((c): c is string => !!c).length > 0
+          ? [
+              {
+                etiqueta: "Búsqueda",
+                valor: (filtrosAplicados.codigos ?? [filtrosAplicados.codigo])
+                  .filter((c): c is string => !!c)
+                  .join("  +  "),
+              },
+            ]
+          : []),
         ...(filtrosAplicados.fechaDesde ? [{ etiqueta: "Desde", valor: String(filtrosAplicados.fechaDesde).slice(0, 10) }] : []),
         ...(filtrosAplicados.fechaHasta ? [{ etiqueta: "Hasta", valor: String(filtrosAplicados.fechaHasta).slice(0, 10) }] : []),
       ]
     : [];
+
+  // PDF AUTOGENERADO (no "imprimir"): el central lo renderiza con QuestPDF a partir de las filas mostradas.
+  const descargarPdf = () => {
+    if (!docs || docs.length === 0) return;
+    const columnas = [
+      "N.º documento", "Fecha", "Tipo", "Cliente", "RUC/cédula", "Placa", "Despachador", "Turno", "Total",
+    ];
+    const filas = docs.map((d) => [
+      texto(d.NumeroDocumento),
+      fecha(d.Fecha),
+      texto(d.TipoDocumento),
+      texto(d.ClienteNombre) !== "—" ? texto(d.ClienteNombre) : texto(d.Cliente),
+      texto(d.Ruc),
+      texto(d.Placa),
+      texto(d.Vendedor),
+      texto(d.NumeroTurno),
+      money(d.TotalNeto),
+    ]);
+    const busqueda = resumenFiltros
+      .filter((f) => f.etiqueta === "Tipo" || f.etiqueta === "Búsqueda")
+      .map((f) => `${f.etiqueta}: ${f.valor}`)
+      .join("  ·  ");
+    void consultasService.descargarPdf(estacion, busqueda, columnas, filas);
+  };
 
   return (
     <div className="space-y-5 print:bg-white print:text-black">
@@ -247,11 +295,18 @@ export function ConsultasPage() {
               <Download size={16} /> Excel
             </button>
             <button
+              onClick={descargarPdf}
+              className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+              title="Descargar un PDF autogenerado de estos resultados (no es imprimir)"
+            >
+              <FileText size={16} /> PDF
+            </button>
+            <button
               onClick={() => window.print()}
               className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
-              title="Imprimir / guardar como PDF lo que estás viendo con estos filtros"
+              title="Imprimir lo que estás viendo con estos filtros"
             >
-              <Printer size={16} /> Imprimir / PDF
+              <Printer size={16} /> Imprimir
             </button>
           </div>
         )}
@@ -281,16 +336,42 @@ export function ConsultasPage() {
               ))}
             </select>
           </label>
-          <label className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">RUC / placa / cliente / despachador / n.º doc</span>
-            <input
-              className={`${inputClass} w-full`}
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && buscar()}
-              placeholder="p. ej. 1790012345001"
-            />
-          </label>
+          <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+            <span className="text-xs font-medium text-muted-foreground">
+              RUC / placa / cliente / despachador / n.º doc
+            </span>
+            <div className="space-y-1.5">
+              {tags.map((t, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <input
+                    className={`${inputClass} w-full`}
+                    value={t}
+                    onChange={(e) => setTagAt(i, e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && buscar()}
+                    placeholder={i === 0 ? "p. ej. 1790012345001" : "otro criterio (se combina con Y)"}
+                  />
+                  {(tags.length > 1 || t.trim().length > 0) && (
+                    <button
+                      type="button"
+                      onClick={() => removeTag(i)}
+                      title="Quitar este criterio"
+                      className="shrink-0 rounded-md border border-border p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addTag}
+                title="Añadir otro criterio (se combinan con Y: p. ej. placa Y despachador a la vez)"
+                className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Plus size={13} /> Añadir criterio
+              </button>
+            </div>
+          </div>
           <label className="space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Desde</span>
             <input type="date" className={dateInputClass} value={desde} onChange={(e) => setDesde(e.target.value)} />
@@ -307,7 +388,7 @@ export function ConsultasPage() {
             >
               <Search size={16} /> {cargando ? "Consultando…" : "Buscar"}
             </button>
-            {(tipo || desde || hasta || codigo) && (
+            {(tipo || desde || hasta || tagsLimpios().length > 0) && (
               <button
                 onClick={limpiar}
                 className="inline-flex items-center justify-center gap-1 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"

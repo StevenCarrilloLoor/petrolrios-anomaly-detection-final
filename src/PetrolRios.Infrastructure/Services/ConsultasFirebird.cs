@@ -44,7 +44,7 @@ public sealed class ConsultasFirebird : IConsultasFirebird
             if (!string.Equals(e.CodigoEstacion, est, StringComparison.OrdinalIgnoreCase)) continue;
             e.Tomada = true;
             var s = e.Solicitud;
-            pendientes.Add(new ConsultaPendiente(id, s.TipoDocumento, s.FechaDesde, s.FechaHasta, s.Codigo, s.Limite, s.Tabla));
+            pendientes.Add(new ConsultaPendiente(id, s.TipoDocumento, s.FechaDesde, s.FechaHasta, s.Codigo, s.Limite, s.Tabla, s.Codigos));
         }
         return pendientes;
     }

@@ -7,6 +7,7 @@ export interface SolicitudConsulta {
   fechaDesde?: string | null; // ISO (yyyy-mm-dd)
   fechaHasta?: string | null;
   codigo?: string | null; // coincide con RUC, placa, cliente, despachador o n.º de documento
+  codigos?: (string | null)[] | null; // varios criterios ANDados (placa Y despachador…); si null usa `codigo`
   limite?: number;
   tabla?: string; // "DCTO" (defecto) | "DESP" (líneas de surtidor por NUM_DESP)
 }
@@ -168,6 +169,26 @@ export const consultasService = {
   /** Documentos (DCTO) que coinciden con el filtro. */
   async consultarDocumentos(s: SolicitudConsulta, signal?: AbortSignal): Promise<DocumentoFirebird[]> {
     return (await this.sondearFilas(s, signal)).map(normalizarDoc);
+  },
+
+  /**
+   * Descarga un PDF AUTOGENERADO (no "imprimir") de la consulta: el central lo renderiza con QuestPDF a
+   * partir de las columnas y filas que se están mostrando. Devuelve el blob y dispara la descarga.
+   */
+  async descargarPdf(estacion: string, busqueda: string, columnas: string[], filas: string[][]): Promise<void> {
+    const { data } = await api.post(
+      "/consultas/pdf",
+      { estacion, busqueda, columnas, filas },
+      { responseType: "blob" },
+    );
+    const blob = new Blob([data], { type: "application/pdf" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `consulta-${estacion || "estacion"}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
   },
 
   /** Líneas de surtidor (DESP) de una factura, por su número de despacho (NDO_DCTO → NUM_DESP). */
