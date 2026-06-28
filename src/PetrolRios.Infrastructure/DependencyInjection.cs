@@ -76,6 +76,7 @@ public static class DependencyInjection
             sp.GetRequiredService<IOptions<PreciosCombustibleOptions>>(),
             sp.GetRequiredService<ILogger<Services.Precios.CascadaPreciosProvider>>()));
         services.AddScoped<IPreciosCombustibleService, PreciosCombustibleService>();
+        services.AddScoped<Services.Precios.PreciosCombustibleScheduler>(); // job Hangfire del schedule adaptativo
         services.AddSingleton<QrLoginService>(); // estado en memoria del login por QR
         services.AddSingleton<PasswordResetService>(); // tokens de recuperacion en memoria
         services.AddSingleton<AccountUnlockService>(); // tokens de desbloqueo de cuenta en memoria

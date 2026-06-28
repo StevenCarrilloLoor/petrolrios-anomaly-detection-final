@@ -256,6 +256,13 @@ try
         job => job.ExecuteAsync(CancellationToken.None),
         cronExpression);
 
+    // Schedule adaptativo de precios de combustible: "tick" cada hora (al minuto 7). El propio job decide
+    // si toca scrapear (modo normal días 1–10 a las 08:00; modo alerta cada hora el 11–12) y aplica el jitter.
+    RecurringJob.AddOrUpdate<PetrolRios.Infrastructure.Services.Precios.PreciosCombustibleScheduler>(
+        "precios-combustible",
+        job => job.TickAsync(CancellationToken.None),
+        "7 * * * *");
+
     if (sirveFrontend)
     {
         // SPA fallback: cualquier ruta no-API devuelve el index del frontend
