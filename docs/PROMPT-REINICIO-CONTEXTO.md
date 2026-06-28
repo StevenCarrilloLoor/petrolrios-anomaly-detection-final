@@ -113,6 +113,25 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**RONDA G — PRODUCCIÓN / calibración con datos REALES (28-jun-2026). EN CURSO.** Steven conectó la estación
+**REAL SanPio (EST-015)** y re-sincronizó **un mes** (~19.8k transacciones reales). Se recorrió TODO en vivo y se
+documentaron **19 hallazgos** en `HALLAZGOS-PRODUCCION.md` (outputs). Top: (1) `TNI_DCTO`=0 en datos reales (rompe
+$0.00 + scoring plano + reglas con umbral de monto); (2) regla "Despachos rápidos" = 6.080 alertas — patrón real
+(misma placa repetida en minutos, confirmado con datos reales) pero hay que agregar/keyear por placa + ámbito
+Ambos; (3) brechas de extracción (SanPio no envía TURN_DEPO/TURN_TARJ/CRED_CABE; despachador `DD…` sin nombre);
+(4) encoding Ñ ("MUÃ?OZ"). **Detalle importante de infra:** `iniciar-todo` arranca SOLO el agente **EST-001** vía
+`dotnet run` (toma código nuevo); **SanPio (EST-015) es un agente SEPARADO de Steven** (binario propio) → cuando un
+cambio toca el AGENTE, **Steven reinicia/actualiza el agente de SanPio** (avísale). La **API central** sí se
+reconstruye con `iniciar-todo` (los cambios de detectores/DTO quedan vivos al instante).
+- **G1 HECHA (`737043e`, CAMBIOS §101):** **total real cuando `TNI_DCTO`=0** → `FacturaDto.TotalNeto` getter con
+  backing field cae a `TotalSinIva+Iva` (recalcula existentes + nuevos, sin re-extraer; respeta TNI del demo) +
+  `ConsultarDocumentos` con `CASE`. Arregla $0.00, scoring plano y reglas con umbral $. Gate verde **337** (+3
+  `FacturaDtoTests`). Central/detector vivo al reconstruir API; la pantalla de factura/consulta requiere que el
+  agente tome el build (es cambio de agente → reiniciar el de SanPio).
+- **Pendiente G2** (despachos rápidos: placa + agregación + Ambos), **G3** (nombre despachador + encoding Ñ).
+
+---
+
 **NUEVA RONDA ERP/UX-2 (27-jun-2026, pedido de Steven con la entrevista de auditoría + 8 screenshots como base)
 — ✅ A–F COMPLETA (gate verde 334 pruebas + QA en vivo en Chrome con datos REALES del backup en cada etapa).**
 Base: la entrevista (`docs/Juan Valdez - Transcripcion ES.txt`).

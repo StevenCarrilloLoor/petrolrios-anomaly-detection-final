@@ -2982,3 +2982,31 @@ vivo (se reinició **solo** el agente con el SQL corregido, manteniendo UNA inst
 detener-todo→iniciar-todo).
 
 Commit: `c426d58` (código). **→ Con la Etapa F, la ronda ERP/UX-2 (A–F) queda COMPLETA.**
+
+---
+
+## 101. Etapa G1 — Total real cuando `TNI_DCTO` llega en 0 (causa raíz del "$0.00" en datos reales)
+
+**Motivación.** En PRODUCCIÓN con la estación real **SanPio** (EST-015, ~19.8k transacciones reales del mes) se
+detectó que `TNI_DCTO` ("total neto con IVA") de la Contaplus real **llega en 0** (el total real está en
+`TSI_DCTO` + `IVA_DCTO`). Esto rompía 3 cosas a la vez: (1) factura/Consultas/evidencia mostraban **$0.00**;
+(2) el scoring quedaba **plano en la base** (el multiplicador por monto nunca actuaba → todas en 50/Medio);
+(3) las reglas con **umbral en dólares** ("Venta sin placa en monto mayor" > $200, "Venta sin identificación")
+**nunca disparaban** (el monto, 0, jamás superaba el umbral). El cuadre de liquidaciones (Etapa F) ya lo evitaba
+con `TSI+IVA`; el resto del sistema seguía con `TNI_DCTO`.
+
+**Qué se hizo (un fix central):**
+- **`FacturaDto.TotalNeto`** pasó a un getter con backing field: `_totalNeto != 0 ? _totalNeto : TotalSinIva + Iva`.
+  El total real se calcula al **leer** la factura → arregla scoring, umbrales y evidencia, para datos **existentes**
+  (el central recalcula al deserializar el staging, que ya trae `TotalSinIva`/`Iva`) **y nuevos**, **sin re-extraer**.
+  Respeta el `TNI` cuando viene poblado (demo). Inicializadores y tests siguen funcionando.
+- **`FirebirdExtractor.ConsultarDocumentosAsync`** (consulta on-demand, devuelve dict al frontend, no usa
+  `FacturaDto`): el alias `TotalNeto` pasó a `CASE WHEN TNI_DCTO <> 0 THEN TNI_DCTO ELSE TSI_DCTO + IVA_DCTO END`.
+
+**Verificación.** Gate oficial **VERDE** (build Release 0/0, **337 pruebas** [+3 en `FacturaDtoTests`: fallback
+TSI+IVA, respeta TNI, todo-cero], EF OK, eslint + vite OK). El **lado central/detector queda vivo** al reconstruir
+la API (el getter recalcula). La **pantalla de factura/consulta** muestra el total real una vez que el agente de
+cada estación toma el build nuevo (es cambio en el agente; el de SanPio lo reinicia Steven).
+
+Commit: `737043e` (código). Pendiente de la ronda G: **G2** (recalibrar despachos rápidos), **G3** (nombre de
+despachador + encoding Ñ).
