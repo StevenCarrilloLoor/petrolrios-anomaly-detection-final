@@ -128,9 +128,14 @@ comparación sistema‑vs‑API, detector tolerancia cero). Se hace por etapas v
   endpoint enriquecido + tarjeta de dashboard con badges. Migración `PreciosCombustibleSistemaApiLog` + 2 pruebas.
 - **PENDIENTE: E2** cascada de fuentes (arch.gob.ec→camddepe→gasolinaecuador→primicias, ETag/304, backoff/degradación);
   **E3** schedule adaptativo Hangfire (normal días 1–10 + alerta 11–12, jitter, idempotente); **E4** /salud /historial
-  /admin/refresh /admin/precio + alertas escalonadas (N1–N4); **E5** detector tolerancia cero en regulados —
-  **FALTA que Steven confirme el mapeo producto 1/2/3 → Extra/Ecopaís/Diésel** (sin eso no se activa). _Para ver E1
-  en vivo: reconstruir la API (aplica migración + siembra)._
+  /admin/refresh /admin/precio + alertas escalonadas (N1–N4); **E5** detector tolerancia cero en regulados.
+  **MAPEO DE PRODUCTO CONFIRMADO por precio (28-jun, idea de Steven):** se cruzó el precio/galón de cada código
+  contra el salto de banda del 12-jun y los precios oficiales → **producto 1 = Súper** (antes $4,50 / desde $5,69 ≈
+  referencial, **excluido** del detector), **producto 2 = Extra/Ecopaís** (desde $3,312 ≈ oficial **$3,31**, regulada),
+  **producto 3 = Diésel** (desde $3,251 ≈ oficial **$3,25**, regulada). Extra y Ecopaís comparten precio, así que el
+  detector no necesita distinguirlas. **OJO calibración E5:** el POS cobra ~$0,002 por encima del oficial (3.312/3.251)
+  → la "tolerancia cero" necesita epsilon de ±1 centavo (o comparar redondeado a centavos); si no, inunda. _Para ver
+  E1 en vivo: reconstruir la API (aplica migración + siembra)._
 
 ---
 
