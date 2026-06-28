@@ -2884,3 +2884,39 @@ cliente, nombre de despachador, línea de surtido, autorización/guía/observaci
 
 Commit: `6e8da8d` (código). Pendiente de la ronda: **D** (agente reactivo/escalable + tabla X
 auto-estructurada), **E** (rediseño del dashboard), **F** (reporte liquidación→facturas).
+
+---
+
+## 98. Etapa D — Auditoría del agente (reactivo/escalable/dinámico) + consultar CUALQUIER tabla auto-estructurada
+
+**Motivación.** Steven: lo más importante = auditar que todo sea **escalable y reactivo** ("la principal
+debilidad es que el agente puede que no esté tan preparado"); y poder consultar en Consultas una **tabla X**
+medianamente importante que **se auto-estructure** para ver mejor la info (como las tablas que se auto-relacionan).
+
+**Auditoría del agente (resultado).** El agente YA es:
+- **Reactivo:** el `Worker` corre cada **1 s** (configurable en vivo, clamp 1 s–1 h, sin reiniciar); heartbeat
+  siempre (liveness); las **consultas en vivo viajan en el heartbeat** (~1 s); store-and-forward para no perder
+  lotes si el central no responde.
+- **Escalable:** extracción **incremental por marca de agua**; **fuentes configurables** (cualquier tabla,
+  registrada una vez en el central y descargada por todos los agentes); aislamiento por estación; reintentos
+  tolerantes (un error no rompe el ciclo).
+- **Dinámico:** auto-extrae tablas arbitrarias, **auto-relaciona** (`DescubridorRelacionesService`), reporta el
+  **esquema** completo (~6 h u on-demand) y sincroniza el catálogo de empleados.
+- **Único hueco (cerrado en esta etapa):** la consulta on-demand estaba cableada a **DCTO/DESP**.
+
+**Consultar tabla X arbitraria (lo nuevo).**
+- **Agente:** `FirebirdExtractor.ConsultarTablaGenericaAsync` — valida el nombre contra la lista REAL de tablas
+  (`ListarTablasAsync`; **lista blanca anti-inyección**, porque un identificador no se parametriza) y corre
+  `SELECT FIRST n * FROM "tabla"` SOLO LECTURA devolviendo TODAS las columnas. `Worker.EjecutarConsultasAsync`
+  enruta: DESP→despachos, DCTO/vacío→documentos, **cualquier otra tabla→consulta genérica**.
+- **Frontend:** página **"Explorar una tabla"** (`/consultas/tabla`, enlazada desde Consultas) con selector de
+  estación + input de tabla (sugerencias del esquema reportado) + límite, que renderiza las filas con
+  **columnas DINÁMICAS** auto-estructuradas a partir de los datos. `consultas.service.consultarTabla`.
+
+**Verificación.** Gate oficial **verde** (build Release 0/0, **334 tests**, migración OK, eslint + frontend
+build). **QA en vivo:** `VEND` (EST-001) → **6 columnas auto-estructuradas** (`NOM_VEND, COD_VEND, DIA_VEND,
+POR_VEND, COD_ZONA, NUM_EMPL`) + **11 filas**; tabla inexistente (`ZZZ_NO_EXISTE_X`) → rechazada con mensaje
+claro, sin correr SQL (anti-inyección OK).
+
+Commit: `ab17578` (código). Pendiente de la ronda: **E** (rediseño grande del dashboard), **F** (reporte
+liquidación→facturas).
