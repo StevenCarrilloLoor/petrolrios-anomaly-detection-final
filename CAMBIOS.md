@@ -3039,5 +3039,29 @@ placas → acumula por RUC; si reutilizan la misma placa → por placa). Aviso d
 nuevas], migración OK, frontend OK). **Cambio CENTRAL** (no de agente): vivo al reconstruir la API (que aplica la
 migración). Para verlo con datos reales: limpiar alertas + re-sincronizar el mes de SanPio (bat de limpieza en G4).
 
-Commit: `d86643f`. Pendiente de G2: mostrar el conteo acumulado en el frontend (la bandeja ya re-ordena).
-Pendiente de la ronda G: **G3** (nombre despachador + encoding Ñ).
+Commits: `d86643f` (backend + migración + tests), `5dbcdd4` (frontend: badge "×N acumulados" + DTO/tipo).
+**G2 COMPLETA.**
+
+---
+
+## 103. Etapa G3 — Encoding de nombres (charset UTF8) + nota de nombres de despachador
+
+**Motivación.** En producción los nombres con Ñ/tildes de SanPio salían **mojibake** ("MUÑOZ" → "MUÃ?OZ"). El
+análisis de bytes ("Ã" + control = `C3 91` = Ñ en UTF-8) y la verificación contra el Firebird demo (que trae la Ñ
+**eliminada**, distinta a SanPio) confirman que **SanPio guarda los nombres en UTF-8** y el agente los leía con
+`Charset=NONE` (sin decodificar).
+
+**Qué se hizo:** charset Firebird por defecto = **`UTF8`** en el agente (`AgentSettings`, `agent-config.example.json`,
+panel), alineado con que la ruta por defecto ya es ContaGober (bases reales UTF-8). Configurable por estación
+(ISO8859_1/WIN1252 si alguna base fuera Latin-1). **Para SanPio:** poner `FirebirdCharset=UTF8` en el panel del
+agente + reiniciar → los nombres decodifican bien.
+
+**Nombres de despachador `DD…` (PENDIENTE, necesita datos de SanPio).** Salen como código (`DD0000009`) sin nombre
+porque el `LEFT JOIN VEND` no resuelve ese código; el demo usa `VEND` 001–011 (no `DD…`), así que no se diagnostica
+aquí. Diagnóstico: **Explorar tabla → `VEND`** en SanPio para ver si los `DD…` tienen nombre ahí o están en otra
+tabla (p. ej. `EMPL`); con eso se ajusta el join.
+
+**Verificación.** Gate **VERDE** (build Release 0/0, **346 pruebas**, migración OK, frontend OK). Cambio de
+**agente** (charset): para verlo en SanPio, charset UTF8 + reiniciar el agente.
+
+Commit: `e505405`. **→ Ronda G: G1, G2 y G3(encoding) HECHAS.** Pendiente: nombres de despachador (datos SanPio).

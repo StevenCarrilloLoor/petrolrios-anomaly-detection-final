@@ -136,8 +136,15 @@ reconstruye con `iniciar-todo` (los cambios de detectores/DTO quedan vivos al in
   (si hay alerta abierta del caso → acumula/escala). **Ruteo Ambos completado**: `AlertaRepository` y
   `DashboardService` incluyen Ambos; el seed no pisa Ambos en la normalización y fuerza el carril. Gate verde
   **346**. Es CENTRAL (vivo al reconstruir la API, que aplica la migración). Pendiente: mostrar el conteo en el frontend.
-- **Pendiente G3** (nombre despachador `DD…` + encoding Ñ), **G4** (verificación final + docs + **bat para
-  borrar las alertas (PostgreSQL) y re-probar el mes con SanPio** — lo pidió Steven).
+- **G2 frontend HECHO (`5dbcdd4`):** la bandeja muestra "×N acumulados" cuando un caso crece (DTO/tipo + badge).
+- **G3 (encoding) HECHA (`e505405`, CAMBIOS §103):** **charset Firebird por defecto = UTF8** → arregla el mojibake
+  de nombres con Ñ/tildes ("MUÑOZ" → "MUÃ?OZ"; SanPio guarda en UTF-8, el agente leía con NONE). Configurable por
+  estación. **Para SanPio: poner `FirebirdCharset=UTF8` en el panel + reiniciar el agente.** Es cambio de AGENTE.
+- **Bat de limpieza HECHO (`9b4e59b`):** `ejecutables/2-BASE-DE-DATOS-Y-DEMO/limpiar-alertas-y-staging-para-reprobar.bat`
+  pone alertas/staging/ciclos en 0 (sin tocar estaciones/usuarios/reglas) para re-probar el mes de SanPio.
+- **PENDIENTE:** nombres de despachador `DD…` (necesita ver la tabla `VEND` real de SanPio: Explorar tabla → VEND).
+  **Reinicio del agente de SanPio:** aplica G1 (totales reales en factura/consulta) + G3 (charset UTF8 = nombres
+  con Ñ); reiniciar UNA vez (y, para G3, poner el charset en UTF8 en el panel).
 
 ---
 
