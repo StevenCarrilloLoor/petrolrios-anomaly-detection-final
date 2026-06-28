@@ -116,6 +116,9 @@ public sealed class AnomalyDetectionJob
                 .AsNoTracking()
                 .Where(r => r.Activa)
                 .ToListAsync(ct);
+            // Precios oficiales por producto (para el detector de "precio fuera de lista", tolerancia cero
+            // en regulados). Se cargan una vez por ciclo.
+            var preciosOficiales = await CargarPreciosOficialesAsync(ct);
             var totalAlertas = 0;
             var estacionesProcesadas = 0;
 
@@ -201,7 +204,8 @@ public sealed class AnomalyDetectionJob
                     .Where(s => s.EstacionId == estacion.Id && !s.Procesada)
                     .ToListAsync(ct);
                 var contextoA = ConstruirContexto(
-                    estacion, watermark, lote, reglas, reglasPersCadaCiclo, relacionesTabla, alertasPrevias);
+                    estacion, watermark, lote, reglas, reglasPersCadaCiclo, relacionesTabla, alertasPrevias,
+                    preciosOficiales);
                 totalAlertas += await ProcesarContextoAsync(
                     contextoA, estacion, ejecucion, nivelMinCorreo, operativasDeEstacion, ct);
                 foreach (var s in lote) s.Procesada = true;   // el lote queda consumido por el carril incremental
@@ -236,7 +240,8 @@ public sealed class AnomalyDetectionJob
                         persB = [corrida.Custom!];
                     }
                     var contextoB = ConstruirContexto(
-                        estacion, watermark, ventana, reglas, persB, relacionesTabla, alertasPrevias);
+                        estacion, watermark, ventana, reglas, persB, relacionesTabla, alertasPrevias,
+                        preciosOficiales);
                     totalAlertas += await ProcesarContextoAsync(
                         contextoB, estacion, ejecucion, nivelMinCorreo, operativasDeEstacion, ct);
                     // La ventana NO se marca Procesada (es re-lectura por llegada/CreatedAt; el avance de
@@ -311,6 +316,34 @@ public sealed class AnomalyDetectionJob
     }
 
     /// <summary>
+    /// Mapeo código de producto Contaplus → combustible, CONFIRMADO por precio (se cruzó el precio/galón de
+    /// cada código con el salto de banda del 12-jun y los precios oficiales): 1=Súper (libre mercado, la
+    /// ignora el detector), 2=Extra/Ecopaís (regulada), 3=Diésel (regulada). Configurable a futuro por estación.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, TipoCombustible> MapaProductoCombustible =
+        new Dictionary<string, TipoCombustible>
+        {
+            ["1"] = TipoCombustible.Super,
+            ["2"] = TipoCombustible.Extra,
+            ["3"] = TipoCombustible.Diesel
+        };
+
+    /// <summary>Arma los precios oficiales por código de producto desde la tabla de precios + el mapeo.</summary>
+    private async Task<IReadOnlyList<PrecioOficialContexto>> CargarPreciosOficialesAsync(CancellationToken ct)
+    {
+        var porCombustible = await _dbContext.PreciosCombustible
+            .AsNoTracking()
+            .ToDictionaryAsync(p => p.Producto, ct);
+
+        var lista = new List<PrecioOficialContexto>();
+        foreach (var (codigo, combustible) in MapaProductoCombustible)
+            if (porCombustible.TryGetValue(combustible, out var p))
+                lista.Add(new PrecioOficialContexto(
+                    codigo, p.PrecioGalon, combustible.EsRegulado(), p.VigenteDesde, p.VigenteHasta));
+        return lista;
+    }
+
+    /// <summary>
     /// Construye el contexto de detección a partir de un conjunto de registros de staging ya cargados
     /// (no consulta la BD ni marca <c>Procesada</c>: eso lo decide quien llama, según la pasada). Las
     /// reglas y su flag <c>Activa</c> vienen preparados por el gate de programación.
@@ -322,7 +355,8 @@ public sealed class AnomalyDetectionJob
         IReadOnlyList<ReglaDeteccion> reglas,
         IReadOnlyList<ReglaPersonalizada> reglasPersonalizadas,
         IReadOnlyList<RelacionTabla> relaciones,
-        Dictionary<string, int> alertasPrevias)
+        Dictionary<string, int> alertasPrevias,
+        IReadOnlyList<PrecioOficialContexto> preciosOficiales)
     {
         var desde = watermark?.UltimaExtraccion ?? DateTime.UtcNow.AddHours(-1);
 
@@ -378,7 +412,8 @@ public sealed class AnomalyDetectionJob
             Relaciones = relaciones,
             AlertasPreviasPorEmpleado = alertasPrevias,
             HoraApertura = estacion.HoraApertura,
-            HoraCierre = estacion.HoraCierre
+            HoraCierre = estacion.HoraCierre,
+            PreciosOficiales = preciosOficiales
         };
     }
 

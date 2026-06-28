@@ -60,7 +60,26 @@ public sealed class DetectionContext
     // Horario de operación de la estación
     public TimeOnly HoraApertura { get; init; } = new(6, 0);
     public TimeOnly HoraCierre { get; init; } = new(22, 0);
+
+    /// <summary>
+    /// Precios oficiales por código de producto, para que el detector de "precio fuera de lista" compare
+    /// contra el precio regulado real (tolerancia cero) en vez de una heurística. Vacío = el detector cae
+    /// a su heurística (mínimo del día). Lo arma el job desde la tabla de precios + el mapeo de producto.
+    /// </summary>
+    public IReadOnlyList<PrecioOficialContexto> PreciosOficiales { get; init; } = [];
 }
+
+/// <summary>
+/// Precio oficial de un producto vigente en una ventana, para el detector. Para los combustibles regulados
+/// (<see cref="EsRegulado"/> = true: Extra/Ecopaís/Diésel) el precio es único nacional y cobrar distinto es
+/// fuera de lista. La Súper (EsRegulado = false) es libre mercado: el detector la ignora.
+/// </summary>
+public sealed record PrecioOficialContexto(
+    string CodigoProducto,
+    decimal Precio,
+    bool EsRegulado,
+    DateTime VigenteDesde,
+    DateTime? VigenteHasta);
 
 /// <summary>
 /// Resultado de detección antes de persistirse como Alerta.
