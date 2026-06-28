@@ -142,6 +142,11 @@ comparación sistema‑vs‑API, detector tolerancia cero). Se hace por etapas v
   (`OperacionConfig.PreferenciaPreciosCombustible`, en Ajustes → Operación) + **botón "Ejecutar refresco de precios"**.
   El dashboard muestra el precio vigente + ambos (sistema y API) con su fecha para comparar. Día 28 = schedule Inactivo
   (de ahí "API sin dato aún"); usar el botón para forzar el scrape. Gate verde 379.
+- **E7 — feedback de la prueba en vivo (`1f90736`, §110, scraping CONFIRMADO funcionando):** (1) la **Súper siempre usa
+  el precio del SISTEMA** (no la API; `Vigente` la ancla por ser referencial). (2) **Nombre real del combustible** vía
+  fuente única `Domain.Enums.Combustibles` (1=Súper/2=Extra-Ecopaís/3=Diésel) + `lib/combustibles.ts`: la **factura** ya
+  no muestra "—" sino el nombre+tooltip, y la **alerta** dice "(Súper, Extra/Ecopaís)" no "(1,2)". (3) **alerta
+  MultipleCombustible enriquecida** con despachador + n.º de documento. (4) **botón Excel (CSV)** en Consultas. Gate 379.
 
 ---
 

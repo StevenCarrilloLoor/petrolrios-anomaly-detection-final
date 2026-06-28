@@ -3279,3 +3279,32 @@ refresco de precios"** que fuerza la cascada sin esperar al calendario (para pro
 **Inactivo** (solo scrapea días 1–10 y 11–12), por eso se ve "API: sin dato aún"; el botón nuevo es justo para forzarlo.
 
 **Verificación.** Gate `_gate.bat` VERDE (build 0/0, **379 pruebas**, EF sin cambios de modelo, frontend OK). Commit: `4089106`.
+
+---
+
+## 110. Feedback de Steven sobre la prueba en vivo (precios funcionando) — 4 ajustes
+
+Steven probó el sistema en vivo: **el scraping funciona** (dashboard "vía API · gasolinaecuador", $3,31/$3,31/$3,25/$5,65).
+Cuatro detalles a pulir (`1f90736`, gate verde 379):
+
+**110.1 · La Súper siempre usa el precio del SISTEMA.** En el dashboard la Súper salía "vía API" $5,65 (≠ sistema $5,70).
+Como es **libre mercado/referencial**, `PreciosCombustibleService.Vigente` ahora la ancla **siempre al precio del
+sistema**, sin importar la preferencia (el valor de la API se guarda solo para comparar). Respuesta a la pregunta de
+Steven: antes seguía la preferencia; ahora está anclada al sistema.
+
+**110.2 · Nombre real del combustible (no el número), con tooltip.** Nueva fuente única `Domain.Enums.Combustibles`
+(código→combustible: **1=Súper, 2=Extra/Ecopaís, 3=Diésel**; tolera "1" y "01") + espejo en el frontend
+(`lib/combustibles.ts`). **La factura** mostraba el producto como "—" (usaba `NombreProducto`, que viene vacío): ahora
+muestra el **nombre** desde el código + **tooltip** con el código. La descripción de la **alerta** de múltiples
+combustibles ya no dice "(1, 2)" sino "(Súper, Extra/Ecopaís)".
+
+**110.3 · Alerta MultipleCombustible enriquecida.** Antes solo traía placa/fecha/productos (sin documento ni
+despachador, inútil para el auditor). Ahora el metadata incluye **Combustibles** (nombres), **Productos** (códigos,
+referencia/tooltip), **Despachadores** y **Documentos** (n.º de factura) de las facturas involucradas; `EmpleadoCodigo`
+se setea para que el central resuelva el **nombre** del despachador.
+
+**110.4 · Exportar Excel desde Consultas en vivo.** Botón **"Excel"** que descarga los resultados como CSV (con BOM
+UTF-8, para que Excel respete los acentos), junto al **"Imprimir / PDF"** existente.
+
+**Verificación.** Gate VERDE (build 0/0, **379 pruebas**, EF sin cambios de modelo, eslint + `tsc -b && vite build` OK).
+Commit: `1f90736`.
