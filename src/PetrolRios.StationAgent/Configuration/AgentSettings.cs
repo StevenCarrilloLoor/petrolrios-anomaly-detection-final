@@ -26,7 +26,7 @@ public sealed class AgentSettings
     // ─── Base Firebird local (campos estructurados, editables) ───
     public string FirebirdHost { get; set; } = "localhost";
     public int FirebirdPort { get; set; } = 3050;
-    public string FirebirdDatabase { get; set; } = @"C:\CONTAC\CONTAC.FDB";
+    public string FirebirdDatabase { get; set; } = @"C:\Programas\ContaGober1\Datosc\CONTAB.FDB";
     public string FirebirdUser { get; set; } = "SYSDBA";
     public string FirebirdPassword { get; set; } = "masterkey";
     public string FirebirdCharset { get; set; } = "NONE";

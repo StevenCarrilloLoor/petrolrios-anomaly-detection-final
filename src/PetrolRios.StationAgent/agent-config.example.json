@@ -14,7 +14,7 @@
 
   "FirebirdHost": "localhost",
   "FirebirdPort": 3050,
-  "FirebirdDatabase": "C:\\CONTAC\\CONTAC.FDB",
+  "FirebirdDatabase": "C:\\Programas\\ContaGober1\\Datosc\\CONTAB.FDB",
   "FirebirdUser": "SYSDBA",
   "FirebirdPassword": "",
   "FirebirdCharset": "NONE",

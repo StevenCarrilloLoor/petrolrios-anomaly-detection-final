@@ -577,7 +577,7 @@ async function cargarConfig(){
     document.getElementById('f-timeout').value = c.serverTimeoutSegundos || 30;
     document.getElementById('f-fbhost').value = c.firebirdHost || '';
     document.getElementById('f-fbport').value = c.firebirdPort || 3050;
-    document.getElementById('f-fbdatabase').value = c.firebirdDatabase || '';
+    document.getElementById('f-fbdatabase').value = c.firebirdDatabase || 'C:\\Programas\\ContaGober1\\Datosc\\CONTAB.FDB';
     document.getElementById('f-fbuser').value = c.firebirdUser || '';
     document.getElementById('f-fbcharset').value = c.firebirdCharset || 'NONE';
     document.getElementById('f-fbdialect').value = c.firebirdDialect || 3;
