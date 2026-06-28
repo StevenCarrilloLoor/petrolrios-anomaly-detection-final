@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PetrolRios.Application.Interfaces;
 using PetrolRios.Application.RealTime;
 using PetrolRios.Infrastructure.Firebird;
@@ -58,6 +60,17 @@ public static class DependencyInjection
         services.AddScoped<IMonitoreoService, MonitoreoService>();
         services.AddScoped<IEmpleadoDirectorio, EmpleadoDirectorio>();
         services.AddScoped<IEmailNotificacionService, EmailNotificacionService>();
+
+        // Precios oficiales de combustibles regulados de Ecuador (Extra/Ecopaís/Diésel). El servicio sirve
+        // los valores guardados (sembrados); el conector externo (HTTP a una URL configurable, deshabilitado
+        // por defecto) permite "interrogar" una fuente real cuando exista, con respaldo a lo guardado.
+        services.Configure<PreciosCombustibleOptions>(
+            configuration.GetSection(PreciosCombustibleOptions.Section));
+        services.AddSingleton<IProveedorPreciosExterno>(sp => new HttpProveedorPreciosExterno(
+            new System.Net.Http.HttpClient(),
+            sp.GetRequiredService<IOptions<PreciosCombustibleOptions>>(),
+            sp.GetRequiredService<ILogger<HttpProveedorPreciosExterno>>()));
+        services.AddScoped<IPreciosCombustibleService, PreciosCombustibleService>();
         services.AddSingleton<QrLoginService>(); // estado en memoria del login por QR
         services.AddSingleton<PasswordResetService>(); // tokens de recuperacion en memoria
         services.AddSingleton<AccountUnlockService>(); // tokens de desbloqueo de cuenta en memoria

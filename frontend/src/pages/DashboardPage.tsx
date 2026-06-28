@@ -8,6 +8,7 @@ import { useRefrescoMs } from "@/contexts/RefrescoContext";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PreciosCombustibleCard } from "@/components/PreciosCombustibleCard";
 import {
   ResponsiveContainer,
   PieChart,
@@ -452,6 +453,9 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Precios oficiales de combustible de Ecuador (Extra/Ecopaís/Diésel) */}
+      <PreciosCombustibleCard />
 
       {/* Distribución por tipo / nivel (clic en una barra/segmento → bandeja filtrada) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

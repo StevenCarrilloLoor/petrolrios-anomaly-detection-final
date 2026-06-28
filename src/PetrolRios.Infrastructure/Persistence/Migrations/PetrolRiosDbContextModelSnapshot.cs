@@ -584,6 +584,48 @@ namespace PetrolRios.Infrastructure.Persistence.Migrations
                     b.ToTable("logs_auditoria", (string)null);
                 });
 
+            modelBuilder.Entity("PetrolRios.Domain.Entities.PrecioCombustible", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fuente")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("PrecioGalon")
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<int>("Producto")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Subsidio")
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("VigenteDesde")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VigenteHasta")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Producto")
+                        .IsUnique();
+
+                    b.ToTable("precios_combustible", (string)null);
+                });
+
             modelBuilder.Entity("PetrolRios.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<int>("Id")

@@ -35,6 +35,29 @@ public static class SeedData
         await EnsureRolAgenteAsync(context);
         await EnsureAgentUsersStationAssignmentAsync(context);
         await EnsureCuentasAccesoAsync(context, config);
+        await EnsurePreciosCombustibleAsync(context);
+
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Siembra los precios oficiales vigentes de los combustibles regulados de Ecuador (Extra, Ecopaís,
+    /// Diésel) si la tabla está vacía. Valores oficiales del 12-jun-2026 al 11-jul-2026 (EP Petroecuador,
+    /// sistema de bandas). El administrador los actualiza cada mes desde la API/panel; no se pisan los
+    /// existentes (idempotente). La Súper se excluye a propósito: su precio no es regulado.
+    /// </summary>
+    private static async Task EnsurePreciosCombustibleAsync(PetrolRiosDbContext context)
+    {
+        if (await context.PreciosCombustible.AnyAsync()) return;
+
+        const string fuente = "EP Petroecuador — sistema de bandas (vigente jun 2026)";
+        var desde = new DateTime(2026, 6, 12);
+        var hasta = new DateTime(2026, 7, 11);
+
+        await context.PreciosCombustible.AddRangeAsync(
+            PrecioCombustible.Create(TipoCombustible.Extra, 3.31m, 1.021m, desde, hasta, fuente),
+            PrecioCombustible.Create(TipoCombustible.Ecopais, 3.31m, 1.650m, desde, hasta, fuente),
+            PrecioCombustible.Create(TipoCombustible.Diesel, 3.25m, 1.602m, desde, hasta, fuente));
 
         await context.SaveChangesAsync();
     }
