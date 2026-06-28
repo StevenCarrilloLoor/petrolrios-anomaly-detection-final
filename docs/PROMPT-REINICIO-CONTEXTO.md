@@ -113,6 +113,23 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**PRECIOS DE COMBUSTIBLE + FIX AGENTE NUEVO (28-jun-2026, CAMBIOS §106). Gate verde 351.**
+- **§106.2 (`a1b3344`) API de precios de combustible de Ecuador.** Idea de Steven: dar los precios reales de los
+  combustibles regulados (Extra/Ecopaís/Diésel) y mostrarlos en el dashboard; **Súper excluida** (no regulada).
+  Web: EP Petroecuador los fija por **sistema de bandas** (12 de cada mes al 11 del siguiente); vigentes jun-2026:
+  Extra/Ecopaís $3,31, Diésel $3,25. **No hay API pública oficial** → diseño robusto: entidad `PrecioCombustible`
+  + tabla `precios_combustible` sembrada + `PreciosCombustibleService` + `GET/PUT/POST /api/v1/precios-combustible`
+  + conector externo `IProveedorPreciosExterno` (HTTP a URL configurable, OFF por defecto, respaldo a lo guardado)
+  + tarjeta `PreciosCombustibleCard` en el dashboard. Migración `PreciosCombustible` + 4 pruebas. _Para verlo en
+  vivo: reconstruir la API (aplica la migración + siembra los precios)._ El admin actualiza la banda cada mes vía PUT.
+- **§106.1 (`a8e825a`) Fix: agente nuevo arranca con defaults de producción.** Arrancaba con los del DEMO (NONE +
+  ruta vieja) porque sin config `appsettings.json` (config del demo) pisaba los buenos defaults, y demo+publicado
+  corren como Production (no hay env Development que los separe). Solución sin tocar el demo: el publicador deja un
+  `config/agent-config.json` de producción (`agent-config-produccion.json`: ContaGober/3050/**UTF8**, identidad en
+  blanco, Configurado=false) en cada agente; `Cargar` lo lee antes que appsettings. _Para verlo: re-publicar el agente._
+
+---
+
 **RONDA QA — CAZA EXHAUSTIVA DE BUGS sobre el mes real de SanPio (28-jun-2026). 4 clases de bug arregladas; gate verde 346.**
 Steven pidió "control de calidad y caza exhaustiva de bugs PRIMERO, luego nombres de despachador, y luego arreglar
 + rediseñar GRANDE el Monitor de estación". Se hizo un barrido por SQL directo a la BD viva (distribución por

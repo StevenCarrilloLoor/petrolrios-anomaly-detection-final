@@ -3144,3 +3144,40 @@ relanzar el Monitor (proceso aparte, puerto 5190), igual que con el agente.
 
 **Verificación.** Gate `_gate.bat` VERDE (build Release 0/0, **347 pruebas** — +1 `EmpleadoDirectorioTests` —,
 EF sin cambios de modelo, eslint + `tsc -b && vite build` OK; el Monitor compila). Commits: `b1cf5cd`, `3ee7d24`.
+
+---
+
+## 106. Precios de combustible de Ecuador (servicio + API + dashboard) + fix de defaults del agente nuevo
+
+Dos pedidos de Steven.
+
+**106.1 · Fix: el agente recién publicado arrancaba con los defaults del DEMO (`a8e825a`).** Al desplegar un
+agente nuevo, los valores de Firebird salían viejos (Charset=NONE, ruta de Docker) en vez de los de producción
+(UTF8, ContaGober) que se cambiaron en G3. **Causa raíz:** en el primer arranque sin config,
+`AgentConfigStore.Cargar` parte de `appsettings.json` (que es la config del DEMO: `/firebird/data`, puerto 3051,
+`Charset=NONE`) y `AplicarConnectionString` **pisa** los buenos defaults de `AgentSettings.cs`. Como el agente
+corre como **Production** (no hay `launchSettings` ni `appsettings.Development.json`), demo y publicado comparten
+`appsettings`, así que no se pueden divergir por entorno. **Solución sin tocar el demo:** el publicador
+(`publicar-solo-el-agente-multiplataforma.bat`) ahora deja un **`config/agent-config.json` de producción**
+(`agent-config-produccion.json`: identidad en blanco + Firebird ContaGober/3050/**UTF8**, `Configurado=false`)
+en cada uno de los 4 destinos; `Cargar` lee ese archivo ANTES que `appsettings`. Así el agente nuevo ya trae el
+**charset correcto (tildes/Ñ)** y la ruta correcta, y el operador solo completa estación, servidor y credenciales.
+
+**106.2 · Precios oficiales de combustible de Ecuador (`a1b3344`).** Idea de Steven: una API que dé los precios
+reales de los combustibles **regulados/subsidiados** (Extra, Ecopaís, Diésel) y mostrarlos en el dashboard; la
+**Súper se excluye** porque su precio no es regulado y varía por comercializadora. Investigación web: los fija
+**EP Petroecuador por el sistema de bandas** (vigencia del 12 de cada mes al 11 del siguiente; máx +5%/−10%
+mensual); valores vigentes 12-jun a 11-jul 2026 = **Extra/Ecopaís $3,31** (subsidio $1,02 / $1,65), **Diésel
+$3,25** (subsidio $1,60). **No hay API pública oficial de Ecuador** (la de petrointelligence es de México), así
+que el diseño robusto es: entidad `PrecioCombustible` + tabla `precios_combustible` **sembrada** con los valores
+oficiales + `PreciosCombustibleService` que los sirve + **`GET /api/v1/precios-combustible`** (dashboard) +
+**`PUT`** (admin, al cambiar la banda) + **`POST /refrescar`**. Un **conector externo** (`IProveedorPreciosExterno`
+→ HTTP a una URL configurable en `appsettings:PreciosCombustible:FuenteUrl`, **deshabilitado por defecto**) deja
+listo el "interrogar" una fuente real cuando exista, con **respaldo** a lo guardado (nunca rompe por una fuente
+caída). En el dashboard: tarjeta **`PreciosCombustibleCard`** con los 3 precios, subsidio, vigencia y fuente.
+Migración `PreciosCombustible` + **4 pruebas** (orden, upsert, validación, refresco sin fuente).
+
+**Verificación.** Gate `_gate.bat` VERDE (build Release 0/0, **351 pruebas** — +4 `PreciosCombustibleServiceTests`
+—, migración aplicada / EF sin cambios pendientes, eslint + `tsc -b && vite build` OK). Para verlo en vivo:
+reconstruir la API (aplica la migración + siembra los precios) y, para el fix del agente, re-publicar el agente.
+Commits: `a8e825a`, `a1b3344`.
