@@ -1,3 +1,4 @@
+using PetrolRios.Application.DTOs.Firebird;
 using PetrolRios.Application.Interfaces;
 using PetrolRios.Domain.Entities;
 using PetrolRios.Domain.Enums;
@@ -25,8 +26,8 @@ public sealed class MultipleCombustibleRule(RiskScoringEngine scoring) : Detecti
         // por CodigoManguera era incorrecta y la regla no disparaba nunca (ver DetectionRuleBase).
         var despachosPorCliente = IndexarDespachosPorCliente(context.Detalles);
 
-        // (placa, día) → conjunto de productos despachados a esa placa ese día.
-        var productosPorPlacaDia = new Dictionary<(string Placa, DateTime Dia), HashSet<string>>();
+        // (placa, día) → productos (códigos) + las facturas que contribuyeron (para despachador/documentos).
+        var porPlacaDia = new Dictionary<(string Placa, DateTime Dia), (HashSet<string> Productos, List<FacturaDto> Facturas)>();
 
         foreach (var f in context.Facturas)
         {
@@ -38,32 +39,44 @@ public sealed class MultipleCombustibleRule(RiskScoringEngine scoring) : Detecti
             if (despacho is null || string.IsNullOrWhiteSpace(despacho.CodigoProducto)) continue;
 
             var clave = (placa, f.FechaDocumento.Date);
-            if (!productosPorPlacaDia.TryGetValue(clave, out var set))
-                productosPorPlacaDia[clave] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            set.Add(despacho.CodigoProducto.Trim().ToUpperInvariant());
+            if (!porPlacaDia.TryGetValue(clave, out var datos))
+                porPlacaDia[clave] = datos = (new HashSet<string>(StringComparer.OrdinalIgnoreCase), []);
+            datos.Productos.Add(despacho.CodigoProducto.Trim().ToUpperInvariant());
+            datos.Facturas.Add(f);
         }
 
-        foreach (var ((placa, dia), productos) in productosPorPlacaDia)
+        foreach (var ((placa, dia), datos) in porPlacaDia)
         {
-            if (productos.Count < 2) continue;
+            if (datos.Productos.Count < 2) continue;
 
-            var listaProductos = productos.OrderBy(p => p).ToList();
+            var codigos = datos.Productos.OrderBy(p => p).ToList();
+            var nombres = codigos.Select(Combustibles.NombrePorCodigo).ToList();   // nombre real, no el número
+            var despachadores = datos.Facturas
+                .Select(f => f.CodigoVendedor.Trim()).Where(v => v.Length > 0).Distinct().ToList();
+            var documentos = datos.Facturas
+                .Select(f => f.NumeroDocumento.Trim()).Where(n => n.Length > 0).Distinct().ToList();
+
             var (score, nivel) = Scoring.Calculate(riesgoBase: 55);
             anomalies.Add(new DetectedAnomaly
             {
                 TipoDetector = TipoDetector.ComplianceViolation,
                 Ambito = carril,
                 Descripcion = $"Vehículo {placa} con múltiples combustibles " +
-                              $"({string.Join(", ", listaProductos)}) el {dia:yyyy-MM-dd}",
+                              $"({string.Join(", ", nombres)}) el {dia:yyyy-MM-dd}",
                 Score = score,
                 NivelRiesgo = nivel,
                 EstacionId = context.EstacionId,
+                EmpleadoCodigo = despachadores.Count == 1 ? despachadores[0] : null,
                 TransaccionReferencia = $"MULTI-{placa}-{dia:yyyyMMdd}",
                 Metadata = new Dictionary<string, object>
                 {
                     ["Placa"] = placa,
                     ["Fecha"] = dia,
-                    ["Productos"] = listaProductos
+                    ["Combustibles"] = nombres,        // legible para el auditor
+                    ["Productos"] = codigos,           // códigos (referencia / tooltip)
+                    ["Despachadores"] = despachadores,
+                    ["Documentos"] = documentos,
+                    ["CantidadFacturas"] = datos.Facturas.Count
                 }
             });
         }

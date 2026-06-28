@@ -47,6 +47,12 @@ public sealed class PreciosCombustibleService : IPreciosCombustibleService
     public static (decimal Precio, string Origen, DateTime FechaSistema) Vigente(PrecioCombustible f, string? preferencia)
     {
         var fechaSistema = f.UpdatedAt ?? f.CreatedAt;
+
+        // La Súper es libre mercado / referencial: SIEMPRE usa el precio del SISTEMA, sin importar la
+        // preferencia. El valor de la API se guarda solo para comparar, nunca como efectivo.
+        if (!f.Producto.EsRegulado())
+            return (f.PrecioGalon, "Sistema", fechaSistema);
+
         var apiValido = f.PrecioApi is decimal pa && RangoValido(f.Producto, pa);
 
         // Corrección manual del admin vigente (no expirada): es autoritativa, gana sobre la API.

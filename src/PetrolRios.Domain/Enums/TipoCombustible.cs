@@ -27,3 +27,30 @@ public static class TipoCombustibleExtensions
     /// <summary>True si el precio es regulado (uniforme nacional). La Súper es libre mercado → false.</summary>
     public static bool EsRegulado(this TipoCombustible t) => t != TipoCombustible.Super;
 }
+
+/// <summary>
+/// Mapeo entre el CÓDIGO de producto de Contaplus (DESP.COD_PROD / línea de factura) y el combustible.
+/// Confirmado por precio en SanPio (cruzando el salto de banda del 12-jun con los precios oficiales):
+/// 1=Súper, 2=Extra/Ecopaís (mismo código y precio), 3=Diésel. Fuente única de verdad para que tanto los
+/// detectores como la factura muestren el NOMBRE real del combustible (no el número), evitando confusiones.
+/// </summary>
+public static class Combustibles
+{
+    public static TipoCombustible? PorCodigo(string? codigo) =>
+        (codigo ?? string.Empty).Trim().TrimStart('0') switch   // tolera "1" y "01"
+        {
+            "1" => TipoCombustible.Super,
+            "2" => TipoCombustible.Extra,
+            "3" => TipoCombustible.Diesel,
+            _ => null
+        };
+
+    /// <summary>Nombre legible del combustible por su código; si el código es desconocido, lo devuelve tal cual.</summary>
+    public static string NombrePorCodigo(string? codigo) => PorCodigo(codigo) switch
+    {
+        TipoCombustible.Super => "Súper",
+        TipoCombustible.Extra => "Extra/Ecopaís",
+        TipoCombustible.Diesel => "Diésel",
+        _ => (codigo ?? string.Empty).Trim()
+    };
+}

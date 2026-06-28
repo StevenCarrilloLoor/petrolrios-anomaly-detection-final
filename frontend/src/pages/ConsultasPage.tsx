@@ -19,7 +19,31 @@ import {
   X,
   Table2,
   Scale,
+  Download,
 } from "lucide-react";
+
+/** Descarga los documentos consultados como CSV (lo abre Excel). Cliente-side, sin pasar por el servidor. */
+function descargarCsv(docs: DocumentoFirebird[], estacion: string) {
+  const cols = [
+    "N.º documento", "Fecha", "Tipo", "Cliente (código)", "Cliente",
+    "RUC/cédula", "Placa", "Despachador", "Turno", "Total",
+  ];
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const filas = docs.map((d) =>
+    [
+      d.NumeroDocumento, d.Fecha, d.TipoDocumento, d.Cliente, d.ClienteNombre,
+      d.Ruc, d.Placa, d.Vendedor, d.NumeroTurno, d.TotalNeto,
+    ].map(esc).join(","),
+  );
+  // BOM para que Excel respete los acentos.
+  const csv = "﻿" + [cols.map(esc).join(","), ...filas].join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `consultas-${estacion || "estacion"}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const inputClass =
   "rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -214,13 +238,22 @@ export function ConsultasPage() {
           </div>
         </div>
         {docs && docs.length > 0 && (
-          <button
-            onClick={() => window.print()}
-            className="inline-flex shrink-0 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
-            title="Imprimir / guardar como PDF lo que estás viendo con estos filtros"
-          >
-            <Printer size={16} /> Imprimir
-          </button>
+          <div className="flex shrink-0 items-center gap-2 print:hidden">
+            <button
+              onClick={() => descargarCsv(docs, estacion)}
+              className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+              title="Descargar estos resultados como archivo Excel (CSV)"
+            >
+              <Download size={16} /> Excel
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted"
+              title="Imprimir / guardar como PDF lo que estás viendo con estos filtros"
+            >
+              <Printer size={16} /> Imprimir / PDF
+            </button>
+          </div>
         )}
       </div>
 

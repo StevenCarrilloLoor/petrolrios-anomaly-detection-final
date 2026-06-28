@@ -6,6 +6,7 @@ import {
   type DespachoFirebird,
 } from "@/services/consultas.service";
 import { Spinner } from "@/components/ui/Spinner";
+import { nombreCombustible } from "@/lib/combustibles";
 import { FileText, Printer, AlertTriangle, Fuel, X } from "lucide-react";
 
 function money(v: unknown): string {
@@ -267,7 +268,12 @@ export function FacturaPage() {
                   <tbody>
                     {lineas.map((l, i) => (
                       <tr key={`${l.NumeroDespacho}-${i}`} className="border-b border-border/50 last:border-0 print:border-black/10">
-                        <td className="py-1.5 pr-3 text-foreground print:text-black">{texto(l.Producto)}</td>
+                        <td
+                          className="py-1.5 pr-3 text-foreground print:text-black"
+                          title={l.CodigoProducto ? `Código de producto: ${l.CodigoProducto}` : undefined}
+                        >
+                          {nombreCombustible(l.CodigoProducto) || texto(l.Producto)}
+                        </td>
                         <td className="py-1.5 pr-3 font-mono text-xs text-muted-foreground print:text-gray-600">{texto(l.Manguera)}</td>
                         <td className="py-1.5 pr-3 text-right font-mono text-foreground print:text-black">{galones(l.Galones)}</td>
                         <td className="py-1.5 pr-3 text-right font-mono text-foreground print:text-black">{money(l.PrecioUnitario)}</td>
