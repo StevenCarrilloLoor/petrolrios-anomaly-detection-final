@@ -3181,3 +3181,37 @@ Migración `PreciosCombustible` + **4 pruebas** (orden, upsert, validación, ref
 —, migración aplicada / EF sin cambios pendientes, eslint + `tsc -b && vite build` OK). Para verlo en vivo:
 reconstruir la API (aplica la migración + siembra los precios) y, para el fix del agente, re-publicar el agente.
 Commits: `a8e825a`, `a1b3344`.
+
+---
+
+## 107. Sistema de precios robusto — Etapa 1 (base) + decisión sobre "anti-detección"
+
+Steven pidió un sistema de precios **completamente automático, confiable, reactivo y robusto** (spec de 12 puntos:
+schedule adaptativo con anti-detección, cascada de fuentes, validación con bandas, log de auditoría, Súper
+pendiente, endpoints de salud/historial, dashboard con badges y comparación sistema‑vs‑API, detector tolerancia
+cero). Se construye **por etapas verificadas** (E1–E5).
+
+**Decisión sobre el "anti-detección".** El scraping se hace **robusto y respetuoso**, NO adversarial: headers de
+navegador reales + **ETag/304** + **backoff** ante 403/429 (degradar fuente) + cascada + fallback al precio del
+sistema. **No** se implementa la evasión de detección de bots (rotar identidad para ser "indistinguible de un
+humano", Referer falso de Google, spoof de Sec‑Fetch): a ~34 requests/mes de datos públicos es innecesaria y cruza
+a evasión de anti‑bot (además riesgo de ToS/integridad para una tesis). Con la cascada + fallback, si una fuente
+bloquea hasta a un cliente educado, se pasa a la siguiente o al precio del sistema.
+
+**E1 — base (`b9f3541`). Gate verde 353.** (1) **Súper** agregada como **libre mercado** (referencial, `EsRegulado()`
+= false, no entra al detector). (2) **Precio Sistema vs API:** `PrecioCombustible` guarda el precio del SISTEMA
+(efectivo, el que sirve y usan los detectores) y el último observado por la API/scraper (`PrecioApi`/`FuenteApi`/
+`PrecioApiActualizadoEn`) + `PrecioPendiente` (Súper) + `RegistrarApi(promover)`; **el dashboard muestra ambos lado
+a lado** y, si la API falla, el sistema conserva su precio (lo que Steven pidió). (3) **Auditoría:** nueva entidad/
+tabla `precios_combustible_log` (fuente, disparo, resultado, variación, etag, hash, jitter, admin_id…). (4)
+**Validación con bandas:** rango por producto (regulados $1,50–6,00; Súper $2,00–10,00) + `VariacionPlausible`
+(regulados ±10%, Súper ±40%); el `PUT` del admin valida rango y escribe bitácora. (5) **Endpoint enriquecido**
+(`EsRegulado`, `PrecioApi`, `PrecioPendiente`, `FuentesDegradadas`) + tarjeta de dashboard con los 4 combustibles,
+badges Regulado/Referencial y pendiente. Migración `PreciosCombustibleSistemaApiLog` + 2 pruebas (rango, bitácora).
+
+**Pendiente (próximas etapas):** **E2** cascada de fuentes (arch.gob.ec → camddepe → gasolinaecuador → primicias)
+con ETag/304 y backoff; **E3** schedule adaptativo (normal días 1–10 con jitter; alerta días 11–12 horario,
+idempotente); **E4** endpoints `/salud`, `/historial`, `/admin/refresh`, `/admin/precio` + alertas escalonadas
+(Nivel 1–4); **E5** detector tolerancia cero en regulados — **necesita que Steven confirme qué código de producto
+(1/2/3) es Extra/Ecopaís/Diésel** antes de activarlo. **Para verlo en vivo:** reconstruir la API (migración + siembra).
+Commit: `b9f3541`.

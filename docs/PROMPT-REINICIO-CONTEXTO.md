@@ -113,6 +113,27 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**SISTEMA DE PRECIOS ROBUSTO — POR ETAPAS (28-jun-2026, CAMBIOS §107). E1 hecha; gate verde 353.**
+Steven pidió un sistema de precios totalmente automático/reactivo/robusto (spec de 12 puntos: schedule adaptativo,
+cascada de fuentes, validación con bandas, log de auditoría, Súper pendiente, salud/historial, dashboard con
+comparación sistema‑vs‑API, detector tolerancia cero). Se hace por etapas verificadas.
+- **Decisión "anti-detección":** scraping robusto y RESPETUOSO (headers de navegador + ETag/304 + backoff ante
+  403/429 + cascada + fallback al precio del sistema). **NO** se implementa evasión de anti-bot (rotar identidad
+  para ser "indistinguible de un humano", Referer falso de Google, spoof de Sec‑Fetch): innecesaria a ~34 req/mes
+  de datos públicos y cruza a evasión (riesgo ToS/integridad). Con cascada+fallback, si bloquean → siguiente fuente
+  o precio del sistema.
+- **E1 HECHA (`b9f3541`):** Súper referencial (`EsRegulado()` false); precio **Sistema vs API** en `PrecioCombustible`
+  (`PrecioApi`/`FuenteApi`/`PrecioPendiente`/`RegistrarApi(promover)`) → el dashboard muestra ambos y si la API falla
+  el sistema conserva el suyo; tabla `precios_combustible_log`; validación con bandas (`RangoValido`/`VariacionPlausible`);
+  endpoint enriquecido + tarjeta de dashboard con badges. Migración `PreciosCombustibleSistemaApiLog` + 2 pruebas.
+- **PENDIENTE: E2** cascada de fuentes (arch.gob.ec→camddepe→gasolinaecuador→primicias, ETag/304, backoff/degradación);
+  **E3** schedule adaptativo Hangfire (normal días 1–10 + alerta 11–12, jitter, idempotente); **E4** /salud /historial
+  /admin/refresh /admin/precio + alertas escalonadas (N1–N4); **E5** detector tolerancia cero en regulados —
+  **FALTA que Steven confirme el mapeo producto 1/2/3 → Extra/Ecopaís/Diésel** (sin eso no se activa). _Para ver E1
+  en vivo: reconstruir la API (aplica migración + siembra)._
+
+---
+
 **PRECIOS DE COMBUSTIBLE + FIX AGENTE NUEVO (28-jun-2026, CAMBIOS §106). Gate verde 351.**
 - **§106.2 (`a1b3344`) API de precios de combustible de Ecuador.** Idea de Steven: dar los precios reales de los
   combustibles regulados (Extra/Ecopaís/Diésel) y mostrarlos en el dashboard; **Súper excluida** (no regulada).
