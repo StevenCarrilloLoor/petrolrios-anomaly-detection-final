@@ -57,4 +57,27 @@ public sealed class EmpleadoDirectorioTests
 
         dir.Nombre(1, "V001").Should().BeNull();
     }
+
+    [Fact]
+    public async Task CargarAsync_ResuelvePorNucleoNumerico_FormatoDD_ContraCatalogo3Digitos()
+    {
+        // Caso real SanPio: la factura trae el despachador como DCTO.COD_VEND="DD0000010" pero el
+        // catálogo VEND lo guarda como "010" → ambos deben resolver al mismo nombre (núcleo numérico).
+        await using var db = NuevoContexto();
+        db.Empleados.Add(Empleado.Create(15, "010", "CARLA VALAREZO"));
+        db.Empleados.Add(Empleado.Create(15, "009", "NESTOR INTRIAGO"));
+        db.Empleados.Add(Empleado.Create(15, "11", "SAN JACINTO"));
+        await db.SaveChangesAsync();
+
+        var sut = new EmpleadoDirectorio(db);
+        var dir = await sut.CargarAsync(new (int, string?)[]
+        {
+            (15, "DD0000010"), (15, "DD0000009"), (15, "DD0000011"), (15, "DD0000077")
+        });
+
+        dir.Nombre(15, "DD0000010").Should().Be("CARLA VALAREZO");     // DD0000010 → núcleo 10 → catálogo "010"
+        dir.Nombre(15, "DD0000009").Should().Be("NESTOR INTRIAGO");     // DD0000009 → núcleo 9 → catálogo "009"
+        dir.Nombre(15, "DD0000011").Should().Be("SAN JACINTO");         // DD0000011 → núcleo 11 → catálogo "11"
+        dir.Nombre(15, "DD0000077").Should().BeNull("no hay despachador 77 en el catálogo");
+    }
 }
