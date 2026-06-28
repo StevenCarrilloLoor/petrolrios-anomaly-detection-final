@@ -113,6 +113,30 @@ credenciales) o desde "Nuevo Usuario" (código de estación nuevo). El agente co
 
 ## 6. Estado actual del trabajo (ACTUALÍZAME al avanzar)
 
+**RONDA QA — CAZA EXHAUSTIVA DE BUGS sobre el mes real de SanPio (28-jun-2026). 4 clases de bug arregladas; gate verde 346.**
+Steven pidió "control de calidad y caza exhaustiva de bugs PRIMERO, luego nombres de despachador, y luego arreglar
++ rediseñar GRANDE el Monitor de estación". Se hizo un barrido por SQL directo a la BD viva (distribución por
+detector/nivel, firmas de regla, datos basura, acumulación, reglas mudas). Hallazgos y arreglos:
+- **§104.1 (`06b8c89`) Precio fuera de lista por (producto, DÍA)** no por lote → mata **5 904 falsos positivos**
+  (la subida legítima del precio del combustible entre días marcaba toda venta al precio nuevo). Se limpia solo
+  en el próximo re-sync. Es CENTRAL (vivo al reconstruir la API).
+- **§104.2 (`06b8c89`) Monitor incluye Ambos** (`StationMonitor.CentralApiClient` filtraba Operativa estricto →
+  mostraba 0 problemas pese a cientos). Es cambio del MONITOR (reconstruir/relanzar el Monitor).
+- **§104.3 (`4aa24d3`) Reglas programadas (Pasada B) ventanean por LLEGADA `CreatedAt`**, no `FechaOriginal`:
+  los datos cargados en bloque (re-sync de un mes) o tardíos tienen `FechaOriginal` en el pasado y caían fuera de
+  la ventana → PlacaReutilizada no los veía (79 pares placa/día con +5 facturas y solo 1 alerta). Es CENTRAL.
+- **§104.4 (`4aa24d3`) Join factura↔despacho correcto** en MultipleCombustible/PlacaGenerica/AltoVolumenSinPlaca:
+  unían por `CodigoManguera` ("00" de cabecera vs manguera real del detalle → nunca casaban; MultipleCombustible
+  daba 0 pese a **274 casos**). Centralizado en `DetectionRuleBase` por `CodigoCliente` + cercanía temporal. CENTRAL.
+- **No-bugs confirmados:** CashFraud mudo = liquidaciones con `Diferencia=0` (SanPio cuadra caja); placa genérica
+  ZZZ999949 no se usa en SanPio; acumulación/escalado de despachos rápidos impecable (1→38 eventos, Medio→Crítico).
+- **PENDIENTE inmediato (orden de Steven):** (31) **nombres de despachador `DD…`→nombre** — la investigación no
+  halló puente automático en las tablas contables (los `DD…` no mapean a VEND 001–071 ni a EMPL 45–78); necesita
+  dato/decisión de SanPio (ver `VEND`/`EMPL` en vivo o catálogo). (32) **rediseño GRANDE del Monitor de estación**
+  (el filtro Ambos ya está; falta la UI, que va "muy por detrás del sistema central").
+
+---
+
 **RONDA G — PRODUCCIÓN / calibración con datos REALES (28-jun-2026). EN CURSO.** Steven conectó la estación
 **REAL SanPio (EST-015)** y re-sincronizó **un mes** (~19.8k transacciones reales). Se recorrió TODO en vivo y se
 documentaron **19 hallazgos** en `HALLAZGOS-PRODUCCION.md` (outputs). Top: (1) `TNI_DCTO`=0 en datos reales (rompe

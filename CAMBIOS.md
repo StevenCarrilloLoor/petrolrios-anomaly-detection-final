@@ -3065,3 +3065,50 @@ tabla (p. ej. `EMPL`); con eso se ajusta el join.
 **agente** (charset): para verlo en SanPio, charset UTF8 + reiniciar el agente.
 
 Commit: `e505405`. **→ Ronda G: G1, G2 y G3(encoding) HECHAS.** Pendiente: nombres de despachador (datos SanPio).
+
+---
+
+## 104. Caza exhaustiva de bugs sobre el mes real de SanPio (cuatro clases de bug)
+
+**Motivación.** Con SanPio en producción y un mes de datos reales cargado (10 154 facturas, 10 109 detalles,
+106 liquidaciones), Steven pidió **control de calidad y caza exhaustiva de bugs primero**. Un barrido por SQL
+directo a la BD viva (distribución de alertas por detector/nivel, firmas de regla, datos basura, acumulación,
+reglas mudas) destapó cuatro clases de bug. Todas con su gate verde (**build Release 0/0, 346 pruebas** —
+Domain 48 / Detectors 197 / Api 99 / Monitor 2 —, EF sin cambios de modelo, eslint + `tsc -b && vite build` OK).
+
+**104.1 · Precio fuera de lista por (producto, DÍA), no por lote/mes (`06b8c89`).** `PrecioFueraListaRule`
+tomaba como "precio autorizado" el **mínimo del lote** (todo el staging). Con la subida legítima del precio del
+combustible entre días, **toda** venta al precio nuevo quedaba marcada → **5 904 falsos positivos** (el 94 % de
+las alertas). Ahora el precio autorizado es el **mínimo del producto ESE día**, así solo marca sobreprecio
+intra-jornada real. Se limpia solo en el próximo re-sync.
+
+**104.2 · El Monitor de estación incluye el ámbito Ambos (`06b8c89`).** `StationMonitor.CentralApiClient`
+filtraba `Ambito == "Operativa"` estricto y se comía los **Ambos** (los despachos rápidos son Ambos) → el
+Monitor mostraba **0 problemas** aunque el central tuviera cientos. Ahora incluye Operativa + Ambos.
+
+**104.3 · Las reglas programadas (Pasada B) ventanean por LLEGADA, no por fecha de negocio (`4aa24d3`).**
+`AnomalyDetectionJob` filtraba la ventana de la Pasada B por `FechaOriginal` (la fecha de negocio de la
+transacción). Los datos **cargados en bloque** (re-sync de un mes) o que **llegan tarde** por store-and-forward
+tienen `FechaOriginal` en el pasado y caían **fuera** de una ventana anclada al reloj actual → las reglas
+programadas (p. ej. **PlacaReutilizada**) no los veían (había **79 pares placa/día con +5 facturas** y solo
+**1 alerta**). Ahora la ventana usa **`CreatedAt`** ("lo que llegó desde mi última corrida"); la regla sigue
+agrupando por su fecha de negocio internamente, así el "por jornada" se mantiene correcto. La Pasada A (flag
+`Procesada`) nunca sufrió esto; por eso despachos rápidos/precio (cada ciclo) sí cazaron todo.
+
+**104.4 · Vínculo factura↔despacho correcto en las reglas de Compliance (`4aa24d3`).** Tres reglas
+(`MultipleCombustible`, `PlacaGenerica`, `AltoVolumenSinPlaca`) unían factura (DCTO, trae la placa) con
+despacho (DESP, trae producto/galones) por **`CodigoManguera`**. Pero la factura trae la manguera **"00"** de
+cabecera y el detalle la manguera **real** → **nunca casaban**: MultipleCombustible daba 0 pese a **274 casos**
+de 2+ combustibles; PlacaGenerica **sumaba los galones de todo el día del cliente** (sobreconteo en estaciones
+que sí usan la placa genérica); AltoVolumenSinPlaca quedaba muda (galones siempre 0). El vínculo real
+`DESP.NUM_DESP ↔ DCTO.NDO_DCTO` no viaja en los DTO, así que se **centralizó** en `DetectionRuleBase` un
+emparejado por **`CodigoCliente` + cercanía temporal** (el despacho más cercano en el tiempo a la factura del
+mismo cliente; tolerancia 15 min, siempre el más cercano → no cruza visitas distintas). Las tres reglas lo usan.
+
+**No-bugs confirmados (datos, no fallos).** CashFraud mudo = las 106 liquidaciones traen `Diferencia=0` (SanPio
+cuadra caja). PlacaGenerica/VentaSinPlaca mudas en SanPio = **0** facturas con placa genérica y **todas** con
+placa. Acumulación/escalado de despachos rápidos **impecable** (de 1 a 38 eventos, escala Medio→Crítico). Cero
+datos basura (scores 0–100, sin campos vacíos, sin mojibake en las descripciones).
+
+**Verificación.** Gate `_gate.bat` VERDE (build 0/0, **346 pruebas**, EF sin cambios de modelo, frontend OK) +
+QA en vivo por SQL a la BD de producción. Commits: `06b8c89`, `4aa24d3`.
