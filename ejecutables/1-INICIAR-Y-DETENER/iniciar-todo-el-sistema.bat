@@ -72,7 +72,8 @@ if errorlevel 1 (
 
 rem ── [5/7] Frontend ───────────────────────────────────────────
 echo [5/7] Frontend (Vite)...
-start "PetrolRios Frontend" cmd /c "cd /d "%RAIZ%\frontend" && npm run dev && pause"
+REM DESPUÉS:
+start "PetrolRios Frontend" cmd /c "cd /d "%RAIZ%\frontend" && npm run dev -- --host 0.0.0.0 --port 5173 && pause"
 
 rem ── [6/7] Station Agent ──────────────────────────────────────
 echo [6/7] Station Agent EST-001 (con panel local)...
